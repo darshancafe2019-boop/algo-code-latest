@@ -148,18 +148,18 @@ class GlobalDataEngine:
                 """
                 SELECT 
                     COUNT(*) as total_trades,
-                    TOTAL(COALESCE(gross_pnl, net_pnl, 0)) as total_gross,
-                    TOTAL(COALESCE(net_pnl, realized_pnl, result_pnl, 0)) as total_net,
-                    TOTAL(COALESCE(fees, 0)) as total_fees,
-                    TOTAL(COALESCE(funding, 0)) as total_funding,
-                    TOTAL(CASE WHEN COALESCE(exit_timestamp, timestamp) >= ? THEN COALESCE(net_pnl, realized_pnl, result_pnl, 0) ELSE 0 END) as daily_pnl,
-                    TOTAL(CASE WHEN COALESCE(exit_timestamp, timestamp) >= ? THEN COALESCE(net_pnl, realized_pnl, result_pnl, 0) ELSE 0 END) as weekly_pnl,
-                    TOTAL(CASE WHEN COALESCE(exit_timestamp, timestamp) >= ? THEN COALESCE(net_pnl, realized_pnl, result_pnl, 0) ELSE 0 END) as monthly_pnl,
+                    COALESCE(SUM(COALESCE(gross_pnl, net_pnl, 0)), 0.0) as total_gross,
+                    COALESCE(SUM(COALESCE(net_pnl, realized_pnl, result_pnl, 0)), 0.0) as total_net,
+                    COALESCE(SUM(COALESCE(fees, 0)), 0.0) as total_fees,
+                    COALESCE(SUM(COALESCE(funding, 0)), 0.0) as total_funding,
+                    COALESCE(SUM(CASE WHEN COALESCE(exit_timestamp, timestamp) >= ? THEN COALESCE(net_pnl, realized_pnl, result_pnl, 0) ELSE 0 END), 0.0) as daily_pnl,
+                    COALESCE(SUM(CASE WHEN COALESCE(exit_timestamp, timestamp) >= ? THEN COALESCE(net_pnl, realized_pnl, result_pnl, 0) ELSE 0 END), 0.0) as weekly_pnl,
+                    COALESCE(SUM(CASE WHEN COALESCE(exit_timestamp, timestamp) >= ? THEN COALESCE(net_pnl, realized_pnl, result_pnl, 0) ELSE 0 END), 0.0) as monthly_pnl,
                     COUNT(CASE WHEN COALESCE(net_pnl, realized_pnl, result_pnl, 0) > 0 THEN 1 END) as win_count,
                     COUNT(CASE WHEN COALESCE(net_pnl, realized_pnl, result_pnl, 0) < 0 THEN 1 END) as loss_count,
                     COUNT(CASE WHEN COALESCE(net_pnl, realized_pnl, result_pnl, 0) = 0 THEN 1 END) as breakeven_count,
-                    TOTAL(CASE WHEN COALESCE(net_pnl, realized_pnl, result_pnl, 0) > 0 THEN COALESCE(net_pnl, realized_pnl, result_pnl, 0) ELSE 0 END) as win_sum,
-                    TOTAL(CASE WHEN COALESCE(net_pnl, realized_pnl, result_pnl, 0) < 0 THEN ABS(COALESCE(net_pnl, realized_pnl, result_pnl, 0)) ELSE 0 END) as loss_sum
+                    COALESCE(SUM(CASE WHEN COALESCE(net_pnl, realized_pnl, result_pnl, 0) > 0 THEN COALESCE(net_pnl, realized_pnl, result_pnl, 0) ELSE 0 END), 0.0) as win_sum,
+                    COALESCE(SUM(CASE WHEN COALESCE(net_pnl, realized_pnl, result_pnl, 0) < 0 THEN ABS(COALESCE(net_pnl, realized_pnl, result_pnl, 0)) ELSE 0 END), 0.0) as loss_sum
                 FROM trades_log 
                 WHERE execution_mode = ? AND status IN ('CLOSED', 'FILLED')
                 """,

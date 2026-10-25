@@ -383,11 +383,9 @@ class SessionManager:
         token_hash = hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
         session_id = f"sess-{uuid.uuid4().hex[:12]}"
         now_utc = datetime.now(timezone.utc)
-        now_local = datetime.now()
-        today_date = now_local.strftime("%Y-%m-%d")
-        # Daily Trading Session: expires at 23:59:59 local time tonight (or max 24 hours)
-        midnight_tonight = datetime.combine(now_local.date() + timedelta(days=1), datetime.min.time())
-        expires_at = midnight_tonight.astimezone(timezone.utc).isoformat()
+        today_date = now_utc.strftime("%Y-%m-%d")
+        # Daily Trading Session: 24-hour lifetime from creation
+        expires_at = (now_utc + timedelta(hours=24)).isoformat()
         now_iso = now_utc.isoformat()
 
         session_dict = {
@@ -424,17 +422,30 @@ class SessionManager:
         now_ts = time.time()
         now = datetime.now(timezone.utc)
         today_local = datetime.now().strftime("%Y-%m-%d")
+        today_utc = now.strftime("%Y-%m-%d")
 
         # 1. Fast in-memory hit
         cached_entry = _SESSION_CACHE.get(token_hash)
         if cached_entry:
             cached_at, cached_session = cached_entry
             if now_ts - cached_at < _SESSION_CACHE_TTL_SEC:
-                # Daily Login Rule: verify session belongs to current calendar day
+                # Daily Login Rule: verify session belongs to current calendar day or was created within 24h
                 cached_login_date = cached_session.get("login_date")
                 if not cached_login_date and cached_session.get("created_at"):
                     cached_login_date = cached_session.get("created_at", "")[:10]
-                if cached_login_date and cached_login_date != today_local:
+                is_same_day = (cached_login_date in (today_local, today_utc))
+                is_recent = False
+                try:
+                    c_str = cached_session.get("created_at")
+                    if c_str:
+                        c_dt = datetime.fromisoformat(c_str)
+                        if c_dt.tzinfo is None:
+                            c_dt = c_dt.replace(tzinfo=timezone.utc)
+                        is_recent = (now - c_dt).total_seconds() < 86400
+                except Exception:
+                    pass
+
+                if cached_login_date and not is_same_day and not is_recent:
                     db.revoke_session(cached_session["session_id"])
                     _SESSION_CACHE.pop(token_hash, None)
                     return None
@@ -466,11 +477,23 @@ class SessionManager:
             _SESSION_CACHE.pop(token_hash, None)
             return None
 
-        # 3. Daily Login Rule: verify session belongs to current calendar day
+        # 3. Daily Login Rule: verify session belongs to current calendar day or was created within 24h
         session_login_date = session.get("login_date")
         if not session_login_date and session.get("created_at"):
             session_login_date = session.get("created_at", "")[:10]
-        if session_login_date and session_login_date != today_local:
+        is_same_day = (session_login_date in (today_local, today_utc))
+        is_recent = False
+        try:
+            c_str = session.get("created_at")
+            if c_str:
+                c_dt = datetime.fromisoformat(c_str)
+                if c_dt.tzinfo is None:
+                    c_dt = c_dt.replace(tzinfo=timezone.utc)
+                is_recent = (now - c_dt).total_seconds() < 86400
+        except Exception:
+            pass
+
+        if session_login_date and not is_same_day and not is_recent:
             db.revoke_session(session["session_id"])
             _SESSION_CACHE.pop(token_hash, None)
             return None

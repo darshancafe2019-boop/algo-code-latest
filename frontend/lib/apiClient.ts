@@ -374,8 +374,10 @@ class ResilientApiClient {
           }
         }
 
-        // Genuine unauthenticated state
-        window.dispatchEvent(new CustomEvent("quantos:auth_required"));
+        // Genuine unauthenticated state (do not logout on transient server lag/500/504/timeouts)
+        if (res.status === 401 || res.status === 403) {
+          window.dispatchEvent(new CustomEvent("quantos:auth_required"));
+        }
         return false;
       } catch {
         return false;

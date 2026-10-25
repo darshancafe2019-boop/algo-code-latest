@@ -165,10 +165,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
-      clearSessionState();
+      // Only wipe session if the server explicitly tells us the token is invalid/unauthorized (401/403).
+      // Transient 500/502/503/504 or network blips must NOT dump the operator back to the login screen.
+      if (res.status === 401 || res.status === 403) {
+        clearSessionState();
+      }
       return false;
     } catch {
-      clearSessionState();
+      // Do not clear session on network failures or abort errors
       return false;
     } finally {
       setIsLoading(false);

@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import logging
 import threading
+import time
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
@@ -37,6 +38,7 @@ class AccountManager:
     def __init__(self):
         self._lock = threading.RLock()
         self._accounts: Dict[str, BrokerAccount] = {}
+        self._last_sync_times: Dict[str, float] = {}
         self._bootstrap_accounts()
 
     def _get_key(self, provider: str, account_id: str, environment: Any) -> str:
@@ -215,174 +217,168 @@ class AccountManager:
 
             return None
 
-    def _sync_with_trades_and_positions(self, environment: Environment) -> None:
+    def _sync_with_trades_and_positions(self, environment: Environment, force: bool = False) -> None:
         """
         Synchronizes account balances, margin used, realized PnL, and unrealized PnL
         directly from the authoritative bot runtime & trade database.
         Ensures PnL on portfolio matches bot fleet PnL everywhere.
         """
         try:
+            now_ts = time.time()
+            env_key = str(environment.value if hasattr(environment, "value") else environment).upper()
+            if not force and (now_ts - self._last_sync_times.get(env_key, 0.0)) < 1.0:
+                return
+            self._last_sync_times[env_key] = now_ts
+
             from src import db
-            conn = db.get_connection()
+            env_str = environment.value.upper()
+            
+            # 1. Closed trades PnL by broker / account
+            closed_rows = db.safe_query("""
+                SELECT 
+                    COALESCE(broker_provider, COALESCE(provider, '')) as broker,
+                    COALESCE(broker_account_id, COALESCE(account_id, '')) as acc_id,
+                    COALESCE(execution_mode, 'PAPER') as mode,
+                    SUM(COALESCE(net_pnl, COALESCE(realized_pnl, COALESCE(result_pnl, 0.0)))) as realized_pnl,
+                    SUM(COALESCE(fees, COALESCE(brokerage_fee, 0.0))) as fees
+                FROM trades_log 
+                WHERE status IN ('CLOSED', 'FILLED', 'TRADED')
+                  AND UPPER(COALESCE(execution_mode, 'PAPER')) = ?
+                GROUP BY broker, acc_id
+            """, (env_str,))
+
+            # Overall fallback realized PnL for mode
+            overall_row = db.safe_query_one("""
+                SELECT 
+                    SUM(COALESCE(net_pnl, COALESCE(realized_pnl, COALESCE(result_pnl, 0.0)))) as total_realized,
+                    SUM(COALESCE(fees, COALESCE(brokerage_fee, 0.0))) as total_fees
+                FROM trades_log 
+                WHERE status IN ('CLOSED', 'FILLED', 'TRADED')
+                  AND UPPER(COALESCE(execution_mode, 'PAPER')) = ?
+            """, (env_str,)) or {}
+            total_env_realized = float(overall_row.get("total_realized") or 0.0) if isinstance(overall_row, dict) else (float(overall_row[0] or 0.0) if len(overall_row) > 0 else 0.0)
+            total_env_fees = float(overall_row.get("total_fees") or 0.0) if isinstance(overall_row, dict) else (float(overall_row[1] or 0.0) if len(overall_row) > 1 else 0.0)
+
+            # 2. Open positions unrealized PnL & margin by broker / account
+            open_pos_rows = []
+            overall_pos = None
             try:
-                c = conn.cursor()
-                env_str = environment.value.upper()
-                
-                # 1. Closed trades PnL by broker / account
-                c.execute("""
+                open_pos_rows = db.safe_query("""
                     SELECT 
-                        COALESCE(broker_provider, COALESCE(provider, '')) as broker,
-                        COALESCE(broker_account_id, COALESCE(account_id, '')) as acc_id,
+                        COALESCE(bot_id, '') as bot_id,
                         COALESCE(execution_mode, 'PAPER') as mode,
-                        SUM(COALESCE(net_pnl, COALESCE(realized_pnl, COALESCE(result_pnl, 0.0)))) as realized_pnl,
-                        SUM(COALESCE(fees, COALESCE(brokerage_fee, 0.0))) as fees
-                    FROM trades_log 
-                    WHERE status IN ('CLOSED', 'FILLED', 'TRADED')
+                        SUM(COALESCE(unrealized_pnl, 0.0)) as unrealized_pnl,
+                        SUM(COALESCE(quantity * entry_price, 0.0)) as margin_used,
+                        COUNT(*) as pos_count
+                    FROM positions 
+                    WHERE status = 'OPEN'
                       AND UPPER(COALESCE(execution_mode, 'PAPER')) = ?
-                    GROUP BY broker, acc_id
+                    GROUP BY bot_id
                 """, (env_str,))
-                closed_rows = c.fetchall()
 
-                # Overall fallback realized PnL for mode
-                c.execute("""
+                overall_pos = db.safe_query_one("""
                     SELECT 
-                        SUM(COALESCE(net_pnl, COALESCE(realized_pnl, COALESCE(result_pnl, 0.0)))) as total_realized,
-                        SUM(COALESCE(fees, COALESCE(brokerage_fee, 0.0))) as total_fees
-                    FROM trades_log 
-                    WHERE status IN ('CLOSED', 'FILLED', 'TRADED')
+                        SUM(COALESCE(unrealized_pnl, 0.0)) as total_unrealized,
+                        SUM(COALESCE(quantity * entry_price, 0.0)) as total_margin,
+                        COUNT(*) as total_pos_count
+                    FROM positions 
+                    WHERE status = 'OPEN'
                       AND UPPER(COALESCE(execution_mode, 'PAPER')) = ?
-                """, (env_str,))
-                overall_row = c.fetchone()
-                total_env_realized = float(overall_row[0] or 0.0) if (overall_row and len(overall_row) > 0 and overall_row[0] is not None) else 0.0
-                total_env_fees = float(overall_row[1] or 0.0) if (overall_row and len(overall_row) > 1 and overall_row[1] is not None) else 0.0
+                """, (env_str,)) or {}
+            except Exception:
+                pass
 
-                # 2. Open positions unrealized PnL & margin by broker / account
-                open_pos_rows = []
-                overall_pos = None
-                try:
-                    c.execute("""
-                        SELECT 
-                            COALESCE(bot_id, '') as bot_id,
-                            COALESCE(execution_mode, 'PAPER') as mode,
-                            SUM(COALESCE(unrealized_pnl, 0.0)) as unrealized_pnl,
-                            SUM(COALESCE(quantity * entry_price, 0.0)) as margin_used,
-                            COUNT(*) as pos_count
-                        FROM positions 
-                        WHERE status = 'OPEN'
-                          AND UPPER(COALESCE(execution_mode, 'PAPER')) = ?
-                        GROUP BY bot_id
-                    """, (env_str,))
-                    open_pos_rows = c.fetchall()
+            total_env_unrealized = float(overall_pos.get("total_unrealized") or 0.0) if isinstance(overall_pos, dict) else (float(overall_pos[0] or 0.0) if (overall_pos and len(overall_pos) > 0) else 0.0)
+            total_env_margin = float(overall_pos.get("total_margin") or 0.0) if isinstance(overall_pos, dict) else (float(overall_pos[1] or 0.0) if (overall_pos and len(overall_pos) > 1) else 0.0)
+            total_env_pos_count = int(overall_pos.get("total_pos_count") or 0) if isinstance(overall_pos, dict) else (int(overall_pos[2] or 0) if (overall_pos and len(overall_pos) > 2) else 0)
 
-                    c.execute("""
-                        SELECT 
-                            SUM(COALESCE(unrealized_pnl, 0.0)) as total_unrealized,
-                            SUM(COALESCE(quantity * entry_price, 0.0)) as total_margin,
-                            COUNT(*) as total_pos_count
-                        FROM positions 
-                        WHERE status = 'OPEN'
-                          AND UPPER(COALESCE(execution_mode, 'PAPER')) = ?
-                    """, (env_str,))
-                    overall_pos = c.fetchone()
-                except Exception:
-                    pass
+            # Map closed trade stats
+            broker_pnl_map: Dict[str, Dict[str, float]] = {}
+            for r in closed_rows:
+                if not r:
+                    continue
+                brk = str(r.get("broker") if isinstance(r, dict) else r[0] if len(r) > 0 else "").upper()
+                acc_id = str(r.get("acc_id") if isinstance(r, dict) else r[1] if len(r) > 1 else "")
+                realized = float(r.get("realized_pnl") if isinstance(r, dict) else r[3] if len(r) > 3 else 0.0)
+                fees = float(r.get("fees") if isinstance(r, dict) else r[4] if len(r) > 4 else 0.0)
+                
+                key = f"{brk}:{acc_id}"
+                broker_pnl_map[key] = {"realized": realized, "fees": fees}
+                if brk:
+                    if brk not in broker_pnl_map:
+                        broker_pnl_map[brk] = {"realized": 0.0, "fees": 0.0}
+                    broker_pnl_map[brk]["realized"] += realized
+                    broker_pnl_map[brk]["fees"] += fees
 
-                total_env_unrealized = float(overall_pos[0] or 0.0) if (overall_pos and len(overall_pos) > 0 and overall_pos[0] is not None) else 0.0
-                total_env_margin = float(overall_pos[1] or 0.0) if (overall_pos and len(overall_pos) > 1 and overall_pos[1] is not None) else 0.0
-                total_env_pos_count = int(overall_pos[2] or 0) if (overall_pos and len(overall_pos) > 2 and overall_pos[2] is not None) else 0
+            # Map open position stats
+            broker_pos_map: Dict[str, Dict[str, float]] = {}
+            for r in open_pos_rows:
+                if not r:
+                    continue
+                brk = str(r.get("bot_id") if isinstance(r, dict) else r[0] if len(r) > 0 else "").upper()
+                acc_id = str(r.get("acc_id") if isinstance(r, dict) else r[1] if len(r) > 1 else "")
+                unrealized = float(r.get("unrealized_pnl") if isinstance(r, dict) else r[2] if len(r) > 2 else 0.0)
+                margin = float(r.get("margin_used") if isinstance(r, dict) else r[3] if len(r) > 3 else 0.0)
+                cnt = int(r.get("pos_count") if isinstance(r, dict) else r[4] if len(r) > 4 else 0)
 
-                # Map closed trade stats
-                broker_pnl_map: Dict[str, Dict[str, float]] = {}
-                for r in closed_rows:
-                    if not r or len(r) < 5:
-                        continue
-                    brk = str(r[0] or "").upper()
-                    acc_id = str(r[1] or "")
-                    realized = float(r[3] or 0.0)
-                    fees = float(r[4] or 0.0)
-                    
-                    key = f"{brk}:{acc_id}"
-                    broker_pnl_map[key] = {"realized": realized, "fees": fees}
-                    if brk:
-                        if brk not in broker_pnl_map:
-                            broker_pnl_map[brk] = {"realized": 0.0, "fees": 0.0}
-                        broker_pnl_map[brk]["realized"] += realized
-                        broker_pnl_map[brk]["fees"] += fees
+                key = f"{brk}:{acc_id}"
+                broker_pos_map[key] = {"unrealized": unrealized, "margin": margin, "count": cnt}
+                if brk:
+                    if brk not in broker_pos_map:
+                        broker_pos_map[brk] = {"unrealized": 0.0, "margin": 0.0, "count": 0}
+                    broker_pos_map[brk]["unrealized"] += unrealized
+                    broker_pos_map[brk]["margin"] += margin
+                    broker_pos_map[brk]["count"] += cnt
 
-                # Map open position stats
-                broker_pos_map: Dict[str, Dict[str, float]] = {}
-                for r in open_pos_rows:
-                    if not r or len(r) < 5:
-                        continue
-                    brk = str(r[0] or "").upper()
-                    acc_id = str(r[1] or "")
-                    unrealized = float(r[2] or 0.0)
-                    margin = float(r[3] or 0.0)
-                    cnt = int(r[4] or 0)
+            # Update accounts in memory
+            with self._lock:
+                env_accounts = [acc for acc in self._accounts.values() if acc.environment == environment]
+                if not env_accounts:
+                    return
 
-                    key = f"{brk}:{acc_id}"
-                    broker_pos_map[key] = {"unrealized": unrealized, "margin": margin, "count": cnt}
-                    if brk:
-                        if brk not in broker_pos_map:
-                            broker_pos_map[brk] = {"unrealized": 0.0, "margin": 0.0, "count": 0}
-                        broker_pos_map[brk]["unrealized"] += unrealized
-                        broker_pos_map[brk]["margin"] += margin
-                        broker_pos_map[brk]["count"] += cnt
+                attributed_realized = 0.0
+                attributed_unrealized = 0.0
+                attributed_margin = 0.0
 
-                # Update accounts in memory
-                with self._lock:
-                    env_accounts = [acc for acc in self._accounts.values() if acc.environment == environment]
-                    if not env_accounts:
-                        return
+                for acc in env_accounts:
+                    norm_prov = normalize_provider_id(acc.provider)
+                    exact_key = f"{norm_prov}:{acc.account_id}"
+                    prov_key = norm_prov
 
-                    attributed_realized = 0.0
-                    attributed_unrealized = 0.0
-                    attributed_margin = 0.0
+                    stats = broker_pnl_map.get(exact_key) or broker_pnl_map.get(prov_key) or {"realized": 0.0, "fees": 0.0}
+                    pos_stats = broker_pos_map.get(exact_key) or broker_pos_map.get(prov_key) or {"unrealized": 0.0, "margin": 0.0, "count": 0}
 
-                    for acc in env_accounts:
-                        norm_prov = normalize_provider_id(acc.provider)
-                        exact_key = f"{norm_prov}:{acc.account_id}"
-                        prov_key = norm_prov
+                    acc.realized_pnl = round(stats["realized"], 2)
+                    acc.fees = round(stats["fees"], 2)
+                    acc.unrealized_pnl = round(pos_stats["unrealized"], 2)
+                    acc.margin_used = round(pos_stats["margin"], 2)
+                    acc.positions_count = int(pos_stats.get("count", 0))
 
-                        stats = broker_pnl_map.get(exact_key) or broker_pnl_map.get(prov_key) or {"realized": 0.0, "fees": 0.0}
-                        pos_stats = broker_pos_map.get(exact_key) or broker_pos_map.get(prov_key) or {"unrealized": 0.0, "margin": 0.0, "count": 0}
+                    acc.available_margin = max(0.0, round(acc.cash_balance - acc.margin_used, 2))
+                    acc.available_cash = max(0.0, round(acc.cash_balance - acc.margin_used, 2))
+                    acc.equity = round(acc.cash_balance + acc.collateral + acc.realized_pnl + acc.unrealized_pnl - acc.fees, 2)
+                    acc.last_updated = datetime.now(timezone.utc).isoformat()
 
-                        acc.realized_pnl = round(stats["realized"], 2)
-                        acc.fees = round(stats["fees"], 2)
-                        acc.unrealized_pnl = round(pos_stats["unrealized"], 2)
-                        acc.margin_used = round(pos_stats["margin"], 2)
-                        acc.positions_count = int(pos_stats.get("count", 0))
+                    attributed_realized += acc.realized_pnl
+                    attributed_unrealized += acc.unrealized_pnl
+                    attributed_margin += acc.margin_used
 
-                        acc.available_margin = max(0.0, round(acc.cash_balance - acc.margin_used, 2))
-                        acc.available_cash = max(0.0, round(acc.cash_balance - acc.margin_used, 2))
-                        acc.equity = round(acc.cash_balance + acc.collateral + acc.realized_pnl + acc.unrealized_pnl - acc.fees, 2)
-                        acc.last_updated = datetime.now(timezone.utc).isoformat()
+                # If there is remaining unmapped PnL, allocate to primary paper account
+                if environment == Environment.PAPER:
+                    rem_realized = round(total_env_realized - attributed_realized, 2)
+                    rem_unrealized = round(total_env_unrealized - attributed_unrealized, 2)
+                    rem_margin = round(total_env_margin - attributed_margin, 2)
 
-                        attributed_realized += acc.realized_pnl
-                        attributed_unrealized += acc.unrealized_pnl
-                        attributed_margin += acc.margin_used
-
-                    # If there is remaining unmapped PnL, allocate to primary paper account
-                    if environment == Environment.PAPER:
-                        rem_realized = round(total_env_realized - attributed_realized, 2)
-                        rem_unrealized = round(total_env_unrealized - attributed_unrealized, 2)
-                        rem_margin = round(total_env_margin - attributed_margin, 2)
-
-                        primary_key = self._get_key("PAPER", "paper_primary", Environment.PAPER)
-                        primary_acc = self._accounts.get(primary_key)
-                        if primary_acc and (abs(rem_realized) > 0.01 or abs(rem_unrealized) > 0.01 or abs(rem_margin) > 0.01):
-                            primary_acc.realized_pnl = round(primary_acc.realized_pnl + rem_realized, 2)
-                            primary_acc.unrealized_pnl = round(primary_acc.unrealized_pnl + rem_unrealized, 2)
-                            primary_acc.margin_used = round(primary_acc.margin_used + max(0.0, rem_margin), 2)
-                            primary_acc.available_margin = max(0.0, round(primary_acc.cash_balance - primary_acc.margin_used, 2))
-                            primary_acc.available_cash = max(0.0, round(primary_acc.cash_balance - primary_acc.margin_used, 2))
-                            primary_acc.equity = round(primary_acc.cash_balance + primary_acc.collateral + primary_acc.realized_pnl + primary_acc.unrealized_pnl - primary_acc.fees, 2)
-                            primary_acc.last_updated = datetime.now(timezone.utc).isoformat()
-            finally:
-                try:
-                    conn.close()
-                except Exception:
-                    pass
+                    primary_key = self._get_key("PAPER", "paper_primary", Environment.PAPER)
+                    primary_acc = self._accounts.get(primary_key)
+                    if primary_acc and (abs(rem_realized) > 0.01 or abs(rem_unrealized) > 0.01 or abs(rem_margin) > 0.01):
+                        primary_acc.realized_pnl = round(primary_acc.realized_pnl + rem_realized, 2)
+                        primary_acc.unrealized_pnl = round(primary_acc.unrealized_pnl + rem_unrealized, 2)
+                        primary_acc.margin_used = round(primary_acc.margin_used + max(0.0, rem_margin), 2)
+                        primary_acc.available_margin = max(0.0, round(primary_acc.cash_balance - primary_acc.margin_used, 2))
+                        primary_acc.available_cash = max(0.0, round(primary_acc.cash_balance - primary_acc.margin_used, 2))
+                        primary_acc.equity = round(primary_acc.cash_balance + primary_acc.collateral + primary_acc.realized_pnl + primary_acc.unrealized_pnl - primary_acc.fees, 2)
+                        primary_acc.last_updated = datetime.now(timezone.utc).isoformat()
 
         except Exception as exc:
             logger.warning("Error in _sync_with_trades_and_positions: %s", exc)

@@ -64,6 +64,29 @@ def translate_sqlite_sql_to_postgres(sql: str) -> str:
     pg_sql = re.sub(r'\bAUTOINCREMENT\b', '', pg_sql, flags=re.IGNORECASE)
     pg_sql = re.sub(r'\bdatetime\s*\(\s*[\'"]now[\'"]\s*\)', 'CURRENT_TIMESTAMP', pg_sql, flags=re.IGNORECASE)
     
+    # 2c. SQLite TOTAL(...) aggregate translation -> PostgreSQL COALESCE(SUM(...), 0.0)
+    total_pattern = re.compile(r'\bTOTAL\s*\(', re.IGNORECASE)
+    while True:
+        match = total_pattern.search(pg_sql)
+        if not match:
+            break
+        start_idx = match.start()
+        open_paren_idx = match.end() - 1
+        depth = 1
+        idx = open_paren_idx + 1
+        while idx < len(pg_sql) and depth > 0:
+            if pg_sql[idx] == '(':
+                depth += 1
+            elif pg_sql[idx] == ')':
+                depth -= 1
+            idx += 1
+        if depth == 0:
+            inner_expr = pg_sql[open_paren_idx + 1:idx - 1]
+            replacement = f'COALESCE(SUM({inner_expr}), 0.0)'
+            pg_sql = pg_sql[:start_idx] + replacement + pg_sql[idx:]
+        else:
+            break
+    
     # 3. Handle legacy SQLite rowid
     pg_sql = re.sub(r'\bORDER\s+BY\s+rowid\b', 'ORDER BY 1', pg_sql, flags=re.IGNORECASE)
     pg_sql = re.sub(r'\browid\b', 'id', pg_sql, flags=re.IGNORECASE)

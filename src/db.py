@@ -212,8 +212,12 @@ _pg_consecutive_failures = 0
 def _trip_pg_circuit_breaker(duration_sec: float = 60.0, reason: str = ""):
     """Trips the PostgreSQL circuit breaker so fallback to SQLite is instant without pool timeouts.
     Circuit breaker only trips on genuine connection drops/outages, never on schema/table or permission errors.
+    In production mode, PostgreSQL is the authoritative system of record; never disable PostgreSQL access.
     """
     global _pg_circuit_broken_until, _pg_consecutive_failures
+    if getattr(config, "IS_PRODUCTION", False):
+        return
+
     reason_str = str(reason)
     non_trip_patterns = (
         "UndefinedTable",
@@ -245,16 +249,19 @@ def _record_pg_success():
 def get_db_pool():
     """Returns the single central PostgreSQL ConnectionPool or None if disabled/circuit-broken."""
     global _pg_pool, _pg_circuit_broken_until
-    if os.getenv("FORCE_SQLITE", "false").lower() == "true" or not getattr(config, "IS_POSTGRES", False) or time.time() < _pg_circuit_broken_until:
+    if os.getenv("FORCE_SQLITE", "false").lower() == "true" or not getattr(config, "IS_POSTGRES", False):
+        return None
+    if not getattr(config, "IS_PRODUCTION", False) and time.time() < _pg_circuit_broken_until:
         return None
 
     if _pg_pool is None and getattr(config, "IS_POSTGRES", False) and getattr(config, "DATABASE_URL", None):
         with _pg_pool_lock:
-            if _pg_pool is None and time.time() >= _pg_circuit_broken_until:
+            if _pg_pool is None and (getattr(config, "IS_PRODUCTION", False) or time.time() >= _pg_circuit_broken_until):
                 try:
                     from psycopg_pool import ConnectionPool
+                    clean_conninfo = str(config.DATABASE_URL).strip().strip("'\"")
                     _pg_pool = ConnectionPool(
-                        conninfo=config.DATABASE_URL,
+                        conninfo=clean_conninfo,
                         min_size=1,
                         max_size=10,
                         timeout=5.0,
@@ -302,7 +309,8 @@ def get_pg_connection():
         return pool.getconn(timeout=5.0)
     if getattr(config, "IS_POSTGRES", False) and getattr(config, "DATABASE_URL", None):
         import psycopg
-        return psycopg.connect(config.DATABASE_URL, connect_timeout=5)
+        clean_url = str(config.DATABASE_URL).strip().strip("'\"")
+        return psycopg.connect(clean_url, connect_timeout=5)
     raise RuntimeError("PostgreSQL disabled/unavailable")
 
 
@@ -573,9 +581,10 @@ def get_authoritative_connection():
                 yield adapter
                 conn.commit()
                 return
-        elif getattr(config, "DATABASE_URL", None) and time.time() >= _pg_circuit_broken_until:
+        elif getattr(config, "DATABASE_URL", None) and (getattr(config, "IS_PRODUCTION", False) or time.time() >= _pg_circuit_broken_until):
             import psycopg
-            conn = psycopg.connect(config.DATABASE_URL, connect_timeout=5)
+            clean_url = str(config.DATABASE_URL).strip().strip("'\"")
+            conn = psycopg.connect(clean_url, connect_timeout=5)
             try:
                 adapter = PostgresConnectionAdapter(conn)
                 yield adapter
@@ -631,11 +640,12 @@ def safe_execute(sql: str, params: tuple = ()) -> bool:
                     type(e).__name__, pg_code, duration_ms, req_id, sql[:120].strip(), e
                 )
                 raise RuntimeError(f"Database execute failed on authoritative PostgreSQL engine: {e}")
-        elif getattr(config, "DATABASE_URL", None) and time.time() >= _pg_circuit_broken_until:
+        elif getattr(config, "DATABASE_URL", None) and (getattr(config, "IS_PRODUCTION", False) or time.time() >= _pg_circuit_broken_until):
             try:
                 import psycopg
                 pg_sql = translate_sqlite_sql_to_postgres(sql)
-                conn = psycopg.connect(config.DATABASE_URL, connect_timeout=5)
+                clean_url = str(config.DATABASE_URL).strip().strip("'\"")
+                conn = psycopg.connect(clean_url, connect_timeout=5)
                 try:
                     with conn.transaction():
                         with conn.cursor() as cur:
@@ -702,12 +712,13 @@ def safe_query(sql: str, params: tuple = ()) -> list:
                     type(e).__name__, pg_code, duration_ms, req_id, sql[:120].strip(), e
                 )
                 raise RuntimeError(f"Database query failed on authoritative PostgreSQL engine: {e}")
-        elif getattr(config, "DATABASE_URL", None) and time.time() >= _pg_circuit_broken_until:
+        elif getattr(config, "DATABASE_URL", None) and (getattr(config, "IS_PRODUCTION", False) or time.time() >= _pg_circuit_broken_until):
             try:
                 import psycopg
                 from psycopg.rows import dict_row
                 pg_sql = translate_sqlite_sql_to_postgres(sql)
-                conn = psycopg.connect(config.DATABASE_URL, connect_timeout=5)
+                clean_url = str(config.DATABASE_URL).strip().strip("'\"")
+                conn = psycopg.connect(clean_url, connect_timeout=5)
                 try:
                     with conn.cursor(row_factory=dict_row) as cur:
                         getattr(cur, "execute")(pg_sql, params)

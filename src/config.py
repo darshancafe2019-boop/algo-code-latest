@@ -42,6 +42,18 @@ for _env_file in [
         else:
             _load_env_fallback(_env_file)
 
+def _clean_env_val(val):
+    if not isinstance(val, str):
+        return val
+    cleaned = val.strip()
+    if (cleaned.startswith('"') and cleaned.endswith('"')) or (cleaned.startswith("'") and cleaned.endswith("'")):
+        cleaned = cleaned[1:-1].strip()
+    return cleaned
+
+for _k, _v in list(os.environ.items()):
+    if isinstance(_v, str):
+        os.environ[_k] = _clean_env_val(_v)
+
 BINANCE_TESTNET_API_KEY = os.getenv("BINANCE_TESTNET_API_KEY", "")
 BINANCE_TESTNET_SECRET_KEY = os.getenv("BINANCE_TESTNET_SECRET_KEY", "")
 BINANCE_LIVE_API_KEY = os.getenv("BINANCE_LIVE_API_KEY", "")
@@ -111,7 +123,8 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 # Database Configuration (PostgreSQL / SQLite)
-_raw_db_url = os.getenv("DATABASE_URL", "").strip()
+_raw_db_url = _clean_env_val(os.getenv("DATABASE_URL", ""))
+DATABASE_MIGRATION_URL = _clean_env_val(os.getenv("DATABASE_MIGRATION_URL", ""))
 try:
     _parsed_db_url = urlsplit(_raw_db_url)
     _has_pg_url = (
@@ -180,20 +193,20 @@ else:
 
 
 # Institutional Authentication, 2FA & Password Reset
-AUTH_TOTP_ENCRYPTION_KEY = os.getenv("AUTH_TOTP_ENCRYPTION_KEY", "algo-crypto-secret-key-32bytes!!")
+AUTH_TOTP_ENCRYPTION_KEY = _clean_env_val(os.getenv("AUTH_TOTP_ENCRYPTION_KEY", "algo-crypto-secret-key-32bytes!!"))
 if _is_production and (not AUTH_TOTP_ENCRYPTION_KEY or AUTH_TOTP_ENCRYPTION_KEY == "algo-crypto-secret-key-32bytes!!"):
     raise RuntimeError(
         "FATAL SECURITY CONFIGURATION: AUTH_TOTP_ENCRYPTION_KEY must be set to a secure, unique 32+ character key in production."
     )
 
-AUTH_SESSION_SECRET = os.getenv("AUTH_SESSION_SECRET", "")
+AUTH_SESSION_SECRET = _clean_env_val(os.getenv("AUTH_SESSION_SECRET", ""))
 if _is_production and not AUTH_SESSION_SECRET:
     raise RuntimeError(
         "FATAL SECURITY CONFIGURATION: AUTH_SESSION_SECRET must be configured in production."
     )
 
-EMAIL_PROVIDER = os.getenv("EMAIL_PROVIDER", "resend").lower()
-RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
+EMAIL_PROVIDER = _clean_env_val(os.getenv("EMAIL_PROVIDER", "resend")).lower()
+RESEND_API_KEY = _clean_env_val(os.getenv("RESEND_API_KEY", ""))
 OTP_FROM_EMAIL = os.getenv("OTP_FROM_EMAIL", os.getenv("AUTH_EMAIL_FROM", os.getenv("RESEND_FROM_EMAIL", "Quant.OS Security <onboarding@resend.dev>")))
 RESEND_FROM_EMAIL = os.getenv("RESEND_FROM_EMAIL", OTP_FROM_EMAIL)
 AUTH_EMAIL_FROM = os.getenv("AUTH_EMAIL_FROM", OTP_FROM_EMAIL)

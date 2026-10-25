@@ -73,7 +73,11 @@ class BinanceMarketDataService:
         """Performs robust HTTP GET with rate limiting and circuit breaker protections."""
         now = time.time()
         if now < self._circuit_open_until:
-            logger.warning(f"Binance circuit breaker active. Skipping {endpoint}")
+            if now - getattr(self, "_last_cb_log", 0) > 60:
+                self._last_cb_log = now
+                logger.warning(f"Binance circuit breaker active (cooling down for {int(self._circuit_open_until - now)}s). Skipping {endpoint}")
+            else:
+                logger.debug(f"Binance circuit breaker active. Skipping {endpoint}")
             self._status = "DISCONNECTED"
             return None
 
@@ -94,7 +98,11 @@ class BinanceMarketDataService:
                 return resp.json()
             elif resp.status_code in [429, 418]:
                 # Rate limited
-                retry_after = int(resp.headers.get("Retry-After", 10))
+                try:
+                    retry_after = int(resp.headers.get("Retry-After", 60))
+                except (ValueError, TypeError):
+                    retry_after = 60
+                retry_after = min(max(retry_after, 10), 300)
                 self._circuit_open_until = time.time() + retry_after
                 self._status = "RATE_LIMITED"
                 logger.error(f"Binance Rate Limited (HTTP {resp.status_code}) on {endpoint}. Backing off {retry_after}s.")

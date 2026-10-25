@@ -321,7 +321,7 @@ class BotDeploymentEngine:
         try:
             db.safe_execute(sql)
         except Exception as exc:
-            logger.exception("Failed to initialize data_core_persisted_bots table: %s", exc)
+            logger.warning("Could not initialize data_core_persisted_bots table (likely managed schema or lack DDL privilege): %s", exc)
 
     def _load_persisted_fleet(self) -> None:
         """Loads all persisted bots and specs from the database into memory on startup."""

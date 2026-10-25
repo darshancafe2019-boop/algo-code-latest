@@ -387,6 +387,25 @@ def test_send_otp_storage_failure_returns_safe_request_id(client, monkeypatch):
     assert "private storage detail" not in response.get_data(as_text=True)
 
 
+def test_send_otp_recipient_lookup_failure_returns_safe_request_id(client, monkeypatch):
+    monkeypatch.setattr(
+        "dashboard.db.get_user_by_username",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("private storage detail")),
+    )
+
+    response = client.post(
+        "/api/auth/send-otp",
+        json={"email": TARGET_ADMIN_EMAIL},
+        headers={"X-Unauthenticated": "true"},
+    )
+
+    assert response.status_code == 503
+    payload = response.get_json()
+    assert payload["error_code"] == "AUTH_STORAGE_UNAVAILABLE"
+    assert payload["request_id"].startswith("req_")
+    assert "private storage detail" not in response.get_data(as_text=True)
+
+
 def test_otp_challenge_creation_rolls_back_both_tables():
     challenge_id = f"test_atomic_{uuid.uuid4().hex}"
     trigger_name = f"test_fail_legacy_{uuid.uuid4().hex}"

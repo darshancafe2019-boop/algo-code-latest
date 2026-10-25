@@ -214,6 +214,10 @@ _pg_circuit_broken_until = 0.0
 _pg_consecutive_failures = 0
 
 
+def _is_pg_pool_timeout(exc: Exception) -> bool:
+    return type(exc).__name__ == "PoolTimeout"
+
+
 def _trip_pg_circuit_breaker(duration_sec: float = 60.0, reason: str = ""):
     """Trips the PostgreSQL circuit breaker so fallback to SQLite is instant without pool timeouts.
     Circuit breaker only trips on genuine connection drops/outages, never on schema/table or permission errors.
@@ -255,12 +259,18 @@ def _robust_check_connection(conn) -> None:
     """Probes a connection's health before handing it out from the pool.
     If the socket was severed or corrupted by Neon SSL drops, it explicitly closes
     the broken connection so psycopg_pool discards it and spawns a fresh replacement.
+    Ensures connection remains in clean IDLE transaction state.
     """
     try:
         if getattr(conn, "closed", False):
             raise RuntimeError("Connection is closed")
         with conn.cursor() as cur:
             cur.execute("SELECT 1;")
+        if not getattr(conn, "autocommit", False):
+            try:
+                conn.rollback()
+            except Exception:
+                pass
     except Exception as check_err:
         try:
             conn.close()
@@ -334,7 +344,7 @@ def get_db_pool_stats() -> Dict[str, Any]:
             "usage_ms": stats.get("usage_ms", 0),
         }
     except Exception as e:
-        return {"configured": True, "error": str(e)}
+        return {"configured": True, "error": type(e).__name__}
 
 
 def get_pg_connection():
@@ -606,37 +616,58 @@ def get_authoritative_connection():
     """
     Context manager returning an active connection to the authoritative database:
     - In PostgreSQL mode (production): yields a PostgresConnectionAdapter wrapping a pool connection with RowAdapter.
+      If the connection pool times out (3.5s) or encounters an error, automatically falls back to a direct PostgreSQL connection.
     - In SQLite mode (local dev/test): yields an optimized sqlite3.Connection with sqlite3.Row factory.
     """
     if getattr(config, "IS_POSTGRES", False):
         pool = get_db_pool()
+        pool_failed = False
+        last_pool_exc = None
         if pool is not None:
-            with pool.connection() as conn:
-                adapter = PostgresConnectionAdapter(conn)
-                try:
-                    yield adapter
-                    if not getattr(conn, "autocommit", False):
-                        conn.commit()
-                except Exception:
+            try:
+                with pool.connection(timeout=3.5) as conn:
+                    adapter = PostgresConnectionAdapter(conn)
                     try:
+                        yield adapter
                         if not getattr(conn, "autocommit", False):
-                            conn.rollback()
+                            conn.commit()
+                        return
                     except Exception:
-                        pass
-                    raise
-                return
-        elif getattr(config, "DATABASE_URL", None) and (getattr(config, "IS_PRODUCTION", False) or time.time() >= _pg_circuit_broken_until):
+                        try:
+                            if not getattr(conn, "autocommit", False):
+                                conn.rollback()
+                        except Exception:
+                            pass
+                        raise
+            except Exception as pool_err:
+                pool_failed = True
+                last_pool_exc = pool_err
+                logger.warning("Pool checkout failed in get_authoritative_connection (%s). Falling back to direct connection...", pool_err)
+
+        if getattr(config, "DATABASE_URL", None) and (pool is None or pool_failed or getattr(config, "IS_PRODUCTION", False) or time.time() >= _pg_circuit_broken_until):
             import psycopg
             clean_url = str(config.DATABASE_URL).strip().strip("'\"")
-            conn = psycopg.connect(clean_url, connect_timeout=5)
+            conn = psycopg.connect(clean_url, connect_timeout=10, keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=3)
             try:
                 adapter = PostgresConnectionAdapter(conn)
                 yield adapter
-                conn.commit()
+                if not getattr(conn, "autocommit", False):
+                    conn.commit()
                 return
+            except Exception:
+                try:
+                    if not getattr(conn, "autocommit", False):
+                        conn.rollback()
+                except Exception:
+                    pass
+                raise
             finally:
-                conn.close()
-        raise RuntimeError("Authoritative PostgreSQL connection pool unavailable in production mode.")
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+
+        raise RuntimeError(f"Authoritative PostgreSQL connection unavailable in production mode: {last_pool_exc}")
 
     conn = get_connection()
     try:
@@ -680,6 +711,12 @@ def safe_execute(sql: str, params: tuple = ()) -> bool:
                     return True
                 except Exception as exc:
                     last_exc = exc
+                    if _is_pg_pool_timeout(exc):
+                        logger.warning(
+                            "PostgreSQL connection pool is saturated during execute [req_id=%s]; breaking to direct connection fallback.",
+                            req_id,
+                        )
+                        break
                     err_str = str(exc).lower()
                     pg_code = getattr(exc, "pgcode", getattr(getattr(exc, "diag", None), "sqlstate", "UNKNOWN"))
 
@@ -792,6 +829,12 @@ def safe_query(sql: str, params: tuple = ()) -> list:
                         return res
                 except Exception as exc:
                     last_exc = exc
+                    if _is_pg_pool_timeout(exc):
+                        logger.warning(
+                            "PostgreSQL connection pool is saturated during query [req_id=%s]; breaking to direct connection fallback.",
+                            req_id,
+                        )
+                        break
                     err_str = str(exc).lower()
                     is_transient_net = any(k in err_str for k in [
                         "ssl error", "decryption failed", "bad record mac",
@@ -903,7 +946,7 @@ def init_db(force: bool = False) -> None:
             try:
                 pool = get_db_pool()
                 if pool is not None:
-                    with pool.connection() as conn:
+                    with pool.connection(timeout=5.0) as conn:
                         with conn.cursor() as cur:
                             cur.execute("SELECT 1;")
                             critical_tables = [
@@ -13015,7 +13058,6 @@ def purge_all_expired_records(current_time_iso: Optional[str] = None) -> Dict[st
         cursor.execute("DELETE FROM pending_signal_approvals WHERE expires_at < ?", (current_time_iso,))
         results["pending_signal_approvals"] = cursor.rowcount
     return results
-
 
 
 

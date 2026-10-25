@@ -100,7 +100,7 @@ def get_readiness():
             db_status = "ERROR"
             db_pool_info["probe_error"] = f"Unexpected alive row: {row}"
     except Exception as exc:
-        db_pool_info["probe_error"] = f"{type(exc).__name__}: {exc}"
+        db_pool_info["probe_error"] = type(exc).__name__
         logger.error(
             "Readiness probe database error; request_id=%s exception_type=%s: %s",
             getattr(request, "request_id", ""),

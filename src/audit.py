@@ -63,12 +63,18 @@ def _audit_writer_worker():
                     from src.db import get_db_pool, translate_sqlite_sql_to_postgres
                     pg_sql = translate_sqlite_sql_to_postgres(insert_sql)
                     pool = get_db_pool()
+                    pool_written = False
                     if pool is not None:
-                        with pool.connection() as conn:
-                            with conn.transaction():
-                                with conn.cursor() as cur:
-                                    cur.executemany(pg_sql, clean_items)
-                    elif getattr(config, "IS_POSTGRES", False) and getattr(config, "DATABASE_URL", None):
+                        try:
+                            with pool.connection(timeout=3.0) as conn:
+                                with conn.transaction():
+                                    with conn.cursor() as cur:
+                                        cur.executemany(pg_sql, clean_items)
+                            pool_written = True
+                        except Exception as pool_write_err:
+                            logger.warning("Audit pool write failed (%s), falling back to direct connection", pool_write_err)
+
+                    if not pool_written and getattr(config, "DATABASE_URL", None):
                         import psycopg
                         conn = psycopg.connect(config.DATABASE_URL, connect_timeout=5)
                         try:

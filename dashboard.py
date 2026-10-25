@@ -14430,32 +14430,38 @@ def api_auth_email_otp_resend():
     user_email = ""
 
     if challenge_id:
-        challenge = db.get_auth_otp_challenge(challenge_id)
-        if not challenge:
-            return jsonify({
-                "status": "error",
-                "success": False,
-                "message": "Challenge not found.",
-                "request_id": request_id
-            }), 404
-        user = db.get_user_by_id(challenge["user_id"])
-        purpose = challenge.get("purpose", "LOGIN")
-        user_email = challenge.get("recipient_email", "")
+        try:
+            challenge = db.get_auth_otp_challenge(challenge_id)
+            if not challenge:
+                return jsonify({
+                    "status": "error",
+                    "success": False,
+                    "message": "Challenge not found.",
+                    "request_id": request_id
+                }), 404
+            user = db.get_user_by_id(challenge["user_id"])
+            purpose = challenge.get("purpose", "LOGIN")
+            user_email = challenge.get("recipient_email", "")
+        except Exception:
+            return _auth_storage_unavailable(request_id, "lookup_otp_challenge")
     elif email_input:
-        # Resolve user by email or username
-        auth_admin_email = (os.getenv("AUTH_ADMIN_EMAIL") or os.getenv("AUTH_BOOTSTRAP_EMAIL") or getattr(config, "AUTH_ADMIN_EMAIL", "") or "admin@quantos.internal").strip().lower()
-        if email_input == "admin" or email_input.lower() == auth_admin_email or email_input.lower() == "ashishparadkar1999@gmail.com":
-            user = db.get_user_by_username("admin")
-            user_email = auth_admin_email
-        else:
-            user = db.get_user_by_username(email_input)
-            if not user:
-                # Lookup by email
-                users = db.safe_query("SELECT * FROM users WHERE LOWER(TRIM(email)) = ? AND is_active = 1", (email_input,))
-                if users:
-                    user = users[0]
-            if user:
-                user_email = (user.get("email") or "").strip().lower()
+        try:
+            # Resolve user by email or username
+            auth_admin_email = (os.getenv("AUTH_ADMIN_EMAIL") or os.getenv("AUTH_BOOTSTRAP_EMAIL") or getattr(config, "AUTH_ADMIN_EMAIL", "") or "ashishparadkar1999@gmail.com").strip().lower()
+            if email_input == "admin" or email_input.lower() == auth_admin_email or email_input.lower() == "ashishparadkar1999@gmail.com":
+                user = db.get_user_by_username("admin")
+                user_email = email_input if "@" in email_input else auth_admin_email
+            else:
+                user = db.get_user_by_username(email_input)
+                if not user:
+                    # Lookup by email
+                    users = db.safe_query("SELECT * FROM users WHERE LOWER(TRIM(email)) = ? AND is_active = 1", (email_input,))
+                    if users:
+                        user = users[0]
+                if user:
+                    user_email = (user.get("email") or "").strip().lower()
+        except Exception:
+            return _auth_storage_unavailable(request_id, "lookup_otp_recipient")
 
     # Rate limiting: 60s cooldown per recipient email / IP
     rate_identifier = user_email or email_input or challenge_id
@@ -14490,7 +14496,10 @@ def api_auth_email_otp_resend():
         }), 404
 
     if user.get("username") == "admin":
-        user_email = (os.getenv("AUTH_ADMIN_EMAIL") or os.getenv("AUTH_BOOTSTRAP_EMAIL") or getattr(config, "AUTH_ADMIN_EMAIL", "") or (user.get("email") or "") or "admin@quantos.internal").strip().lower()
+        if email_input and "@" in email_input:
+            user_email = email_input
+        else:
+            user_email = (os.getenv("AUTH_ADMIN_EMAIL") or os.getenv("AUTH_BOOTSTRAP_EMAIL") or getattr(config, "AUTH_ADMIN_EMAIL", "") or (user.get("email") or "") or "ashishparadkar1999@gmail.com").strip().lower()
     elif not user_email:
         user_email = (user.get("email") or "").strip().lower()
 

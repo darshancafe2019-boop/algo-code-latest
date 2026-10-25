@@ -666,6 +666,7 @@ def safe_execute(sql: str, params: tuple = ()) -> bool:
         if pool is not None:
             pg_sql = translate_sqlite_sql_to_postgres(sql)
             is_ddl = sql.strip().upper().startswith(("CREATE ", "ALTER ", "DROP ", "VACUUM"))
+            last_exc = None
             for attempt in range(2):
                 try:
                     with pool.connection(timeout=3.5) as conn:
@@ -677,9 +678,10 @@ def safe_execute(sql: str, params: tuple = ()) -> bool:
                     if duration_ms > 250.0:
                         logger.warning("SLOW QUERY DETECTED [duration=%0.2fms, req_id=%s] sql=%s", duration_ms, req_id, sql[:120].strip())
                     return True
-                except Exception as e:
-                    err_str = str(e).lower()
-                    pg_code = getattr(e, "pgcode", getattr(getattr(e, "diag", None), "sqlstate", "UNKNOWN"))
+                except Exception as exc:
+                    last_exc = exc
+                    err_str = str(exc).lower()
+                    pg_code = getattr(exc, "pgcode", getattr(getattr(exc, "diag", None), "sqlstate", "UNKNOWN"))
 
                     # If DDL is denied due to schema permissions (42501), log gracefully and do NOT trip circuit breaker
                     if is_ddl and (pg_code == "42501" or "permission denied" in err_str):
@@ -693,15 +695,15 @@ def safe_execute(sql: str, params: tuple = ()) -> bool:
                         "could not receive data from server"
                     ])
                     if attempt == 0 and is_transient_net:
-                        logger.warning("Transient PG connection/SSL drop in safe_execute (%s). Retrying with fresh connection...", e)
+                        logger.warning("Transient PG connection/SSL drop in safe_execute (%s). Retrying with fresh connection...", exc)
                         time.sleep(0.05)
                         continue
 
-                    _trip_pg_circuit_breaker(60.0, str(e))
+                    _trip_pg_circuit_breaker(60.0, str(exc))
                     duration_ms = round((time.perf_counter() - t0) * 1000, 2)
                     logger.exception(
                         "Database execute failed on pool [class=%s, code=%s, duration=%0.2fms, req_id=%s] sql=%s: %s",
-                        type(e).__name__, pg_code, duration_ms, req_id, sql[:120].strip(), e
+                        type(exc).__name__, pg_code, duration_ms, req_id, sql[:120].strip(), exc
                     )
 
             # Direct connection fallback if pool failed
@@ -709,7 +711,7 @@ def safe_execute(sql: str, params: tuple = ()) -> bool:
                 try:
                     import psycopg
                     clean_url = str(config.DATABASE_URL).strip().strip("'\"")
-                    logger.warning("Falling back to direct psycopg.connect for execute after pool error: %s", e)
+                    logger.warning("Falling back to direct psycopg.connect for execute after pool error: %s", last_exc)
                     with psycopg.connect(clean_url, connect_timeout=10, keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=3) as direct_conn:
                         with direct_conn.transaction():
                             with direct_conn.cursor() as cur:
@@ -720,7 +722,7 @@ def safe_execute(sql: str, params: tuple = ()) -> bool:
                     logger.error("Direct connection fallback for execute failed: %s", direct_err)
 
             if getattr(config, "IS_PRODUCTION", False):
-                raise RuntimeError(f"Database execute failed on authoritative PostgreSQL engine: {e}")
+                raise RuntimeError(f"Database execute failed on authoritative PostgreSQL engine: {last_exc}")
             return False
         elif getattr(config, "DATABASE_URL", None) and (getattr(config, "IS_PRODUCTION", False) or time.time() >= _pg_circuit_broken_until):
             try:
@@ -773,6 +775,7 @@ def safe_query(sql: str, params: tuple = ()) -> list:
         pool = get_db_pool()
         if pool is not None:
             pg_sql = translate_sqlite_sql_to_postgres(sql)
+            last_exc = None
             for attempt in range(2):
                 try:
                     from psycopg.rows import dict_row
@@ -787,8 +790,9 @@ def safe_query(sql: str, params: tuple = ()) -> list:
                             logger.warning("SLOW QUERY DETECTED [duration=%0.2fms, req_id=%s] sql=%s", duration_ms, req_id, sql[:120].strip())
                         _record_pg_success()
                         return res
-                except Exception as e:
-                    err_str = str(e).lower()
+                except Exception as exc:
+                    last_exc = exc
+                    err_str = str(exc).lower()
                     is_transient_net = any(k in err_str for k in [
                         "ssl error", "decryption failed", "bad record mac",
                         "consuming input failed", "connection closed", "connection reset",
@@ -796,16 +800,16 @@ def safe_query(sql: str, params: tuple = ()) -> list:
                         "could not receive data from server"
                     ])
                     if attempt == 0 and is_transient_net:
-                        logger.warning("Transient PG connection/SSL drop in safe_query (%s). Retrying with fresh connection...", e)
+                        logger.warning("Transient PG connection/SSL drop in safe_query (%s). Retrying with fresh connection...", exc)
                         time.sleep(0.05)
                         continue
 
-                    _trip_pg_circuit_breaker(60.0, str(e))
+                    _trip_pg_circuit_breaker(60.0, str(exc))
                     duration_ms = round((time.perf_counter() - t0) * 1000, 2)
-                    pg_code = getattr(e, "pgcode", getattr(getattr(e, "diag", None), "sqlstate", "UNKNOWN"))
+                    pg_code = getattr(exc, "pgcode", getattr(getattr(exc, "diag", None), "sqlstate", "UNKNOWN"))
                     logger.exception(
                         "Database query failed on pool [class=%s, code=%s, duration=%0.2fms, req_id=%s] sql=%s: %s",
-                        type(e).__name__, pg_code, duration_ms, req_id, sql[:120].strip(), e
+                        type(exc).__name__, pg_code, duration_ms, req_id, sql[:120].strip(), exc
                     )
 
             # Direct connection fallback if pool checkout/query failed
@@ -814,7 +818,7 @@ def safe_query(sql: str, params: tuple = ()) -> list:
                     import psycopg
                     from psycopg.rows import dict_row
                     clean_url = str(config.DATABASE_URL).strip().strip("'\"")
-                    logger.warning("Falling back to direct psycopg.connect for query after pool error: %s", e)
+                    logger.warning("Falling back to direct psycopg.connect for query after pool error: %s", last_exc)
                     with psycopg.connect(clean_url, connect_timeout=10, keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=3) as direct_conn:
                         with direct_conn.cursor(row_factory=dict_row) as cur:
                             getattr(cur, "execute")(pg_sql, params)
@@ -824,7 +828,7 @@ def safe_query(sql: str, params: tuple = ()) -> list:
                 except Exception as direct_err:
                     logger.error("Direct connection fallback for query failed: %s", direct_err)
 
-            raise RuntimeError(f"Database query failed on authoritative PostgreSQL engine: {e}")
+            raise RuntimeError(f"Database query failed on authoritative PostgreSQL engine: {last_exc}")
         elif getattr(config, "DATABASE_URL", None) and (getattr(config, "IS_PRODUCTION", False) or time.time() >= _pg_circuit_broken_until):
             try:
                 import psycopg

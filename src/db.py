@@ -668,7 +668,7 @@ def safe_execute(sql: str, params: tuple = ()) -> bool:
             is_ddl = sql.strip().upper().startswith(("CREATE ", "ALTER ", "DROP ", "VACUUM"))
             for attempt in range(2):
                 try:
-                    with pool.connection() as conn:
+                    with pool.connection(timeout=3.5) as conn:
                         with conn.transaction():
                             with conn.cursor() as cur:
                                 getattr(cur, "execute")(pg_sql, params)
@@ -700,18 +700,34 @@ def safe_execute(sql: str, params: tuple = ()) -> bool:
                     _trip_pg_circuit_breaker(60.0, str(e))
                     duration_ms = round((time.perf_counter() - t0) * 1000, 2)
                     logger.exception(
-                        "Database execute failed [class=%s, code=%s, duration=%0.2fms, req_id=%s] sql=%s: %s",
+                        "Database execute failed on pool [class=%s, code=%s, duration=%0.2fms, req_id=%s] sql=%s: %s",
                         type(e).__name__, pg_code, duration_ms, req_id, sql[:120].strip(), e
                     )
-                    if getattr(config, "IS_PRODUCTION", False):
-                        raise RuntimeError(f"Database execute failed on authoritative PostgreSQL engine: {e}")
-                    return False
+
+            # Direct connection fallback if pool failed
+            if getattr(config, "DATABASE_URL", None):
+                try:
+                    import psycopg
+                    clean_url = str(config.DATABASE_URL).strip().strip("'\"")
+                    logger.warning("Falling back to direct psycopg.connect for execute after pool error: %s", e)
+                    with psycopg.connect(clean_url, connect_timeout=10, keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=3) as direct_conn:
+                        with direct_conn.transaction():
+                            with direct_conn.cursor() as cur:
+                                getattr(cur, "execute")(pg_sql, params)
+                    _record_pg_success()
+                    return True
+                except Exception as direct_err:
+                    logger.error("Direct connection fallback for execute failed: %s", direct_err)
+
+            if getattr(config, "IS_PRODUCTION", False):
+                raise RuntimeError(f"Database execute failed on authoritative PostgreSQL engine: {e}")
+            return False
         elif getattr(config, "DATABASE_URL", None) and (getattr(config, "IS_PRODUCTION", False) or time.time() >= _pg_circuit_broken_until):
             try:
                 import psycopg
                 pg_sql = translate_sqlite_sql_to_postgres(sql)
                 clean_url = str(config.DATABASE_URL).strip().strip("'\"")
-                conn = psycopg.connect(clean_url, connect_timeout=5, keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=3)
+                conn = psycopg.connect(clean_url, connect_timeout=10, keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=3)
                 try:
                     with conn.transaction():
                         with conn.cursor() as cur:
@@ -760,7 +776,7 @@ def safe_query(sql: str, params: tuple = ()) -> list:
             for attempt in range(2):
                 try:
                     from psycopg.rows import dict_row
-                    with pool.connection() as conn:
+                    with pool.connection(timeout=3.5) as conn:
                         with conn.cursor(row_factory=dict_row) as cur:
                             getattr(cur, "execute")(pg_sql, params)
                             res = [sanitize_for_json(dict(r)) for r in cur.fetchall()]
@@ -788,17 +804,34 @@ def safe_query(sql: str, params: tuple = ()) -> list:
                     duration_ms = round((time.perf_counter() - t0) * 1000, 2)
                     pg_code = getattr(e, "pgcode", getattr(getattr(e, "diag", None), "sqlstate", "UNKNOWN"))
                     logger.exception(
-                        "Database query failed [class=%s, code=%s, duration=%0.2fms, req_id=%s] sql=%s: %s",
+                        "Database query failed on pool [class=%s, code=%s, duration=%0.2fms, req_id=%s] sql=%s: %s",
                         type(e).__name__, pg_code, duration_ms, req_id, sql[:120].strip(), e
                     )
-                    raise RuntimeError(f"Database query failed on authoritative PostgreSQL engine: {e}")
+
+            # Direct connection fallback if pool checkout/query failed
+            if getattr(config, "DATABASE_URL", None):
+                try:
+                    import psycopg
+                    from psycopg.rows import dict_row
+                    clean_url = str(config.DATABASE_URL).strip().strip("'\"")
+                    logger.warning("Falling back to direct psycopg.connect for query after pool error: %s", e)
+                    with psycopg.connect(clean_url, connect_timeout=10, keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=3) as direct_conn:
+                        with direct_conn.cursor(row_factory=dict_row) as cur:
+                            getattr(cur, "execute")(pg_sql, params)
+                            res = [sanitize_for_json(dict(r)) for r in cur.fetchall()]
+                    _record_pg_success()
+                    return res
+                except Exception as direct_err:
+                    logger.error("Direct connection fallback for query failed: %s", direct_err)
+
+            raise RuntimeError(f"Database query failed on authoritative PostgreSQL engine: {e}")
         elif getattr(config, "DATABASE_URL", None) and (getattr(config, "IS_PRODUCTION", False) or time.time() >= _pg_circuit_broken_until):
             try:
                 import psycopg
                 from psycopg.rows import dict_row
                 pg_sql = translate_sqlite_sql_to_postgres(sql)
                 clean_url = str(config.DATABASE_URL).strip().strip("'\"")
-                conn = psycopg.connect(clean_url, connect_timeout=5, keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=3)
+                conn = psycopg.connect(clean_url, connect_timeout=10, keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=3)
                 try:
                     with conn.cursor(row_factory=dict_row) as cur:
                         getattr(cur, "execute")(pg_sql, params)

@@ -326,7 +326,11 @@ class BotDeploymentEngine:
     def _load_persisted_fleet(self) -> None:
         """Loads all persisted bots and specs from the database into memory on startup."""
         try:
-            rows = db.safe_query("SELECT bot_id, spec_json, bot_json, state FROM data_core_persisted_bots")
+            try:
+                rows = db.safe_query("SELECT bot_id, spec_json, bot_json, state FROM data_core_persisted_bots")
+            except Exception as q_exc:
+                logger.debug("data_core_persisted_bots table not ready yet, fleet starts empty: %s", q_exc)
+                rows = []
             loaded_count = 0
             for row in rows:
                 bot_id = row.get("bot_id")

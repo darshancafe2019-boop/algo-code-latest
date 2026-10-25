@@ -49,48 +49,54 @@ class ProviderService:
     def _init_db_defaults(self) -> None:
         """Initializes provider configs and role selections in database if not present."""
         with self._lock:
-            # Seed default roles
-            for role_k, default_p in self.DEFAULT_ROLES.items():
-                row = db.safe_query("SELECT provider_id FROM provider_role_selections WHERE role_key = ?", (role_k,))
-                if not row:
-                    now_iso = datetime.now(timezone.utc).isoformat()
-                    db.safe_execute(
-                        "INSERT INTO provider_role_selections (role_key, provider_id, updated_at) VALUES (?, ?, ?)",
-                        (role_k, default_p, now_iso),
-                    )
+            try:
+                # Seed default roles
+                for role_k, default_p in self.DEFAULT_ROLES.items():
+                    row = db.safe_query("SELECT provider_id FROM provider_role_selections WHERE role_key = ?", (role_k,))
+                    if not row:
+                        now_iso = datetime.now(timezone.utc).isoformat()
+                        db.safe_execute(
+                            "INSERT INTO provider_role_selections (role_key, provider_id, updated_at) VALUES (?, ?, ?)",
+                            (role_k, default_p, now_iso),
+                        )
+            except Exception as e:
+                logger.debug("Provider default roles DB notice: %s", e)
 
-            # Seed provider control configs
-            for p in self.registry.get_all():
-                row = db.safe_query("SELECT * FROM provider_control_configs WHERE provider_id = ?", (p.id,))
-                if not row:
-                    now_iso = datetime.now(timezone.utc).isoformat()
-                    db.safe_execute(
-                        """
-                        INSERT INTO provider_control_configs (
-                            provider_id, provider_name, category, enabled, configured,
-                            market_data_enabled, execution_enabled, is_primary, is_secondary,
-                            credentials_masked_json, custom_settings_json, last_health_check,
-                            last_tick, connection_state, updated_at
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                        """,
-                        (
-                            p.id,
-                            p.name,
-                            p.category.value,
-                            1,
-                            1 if self._check_is_configured(p.id) else 0,
-                            1 if p.capabilities.marketData else 0,
-                            1 if p.capabilities.orderExecution else 0,
-                            1 if p.id == "dhan" else 0,
-                            1 if p.id == "fyers" else 0,
-                            json.dumps(self._get_masked_credentials(p.id)),
-                            json.dumps({}),
-                            now_iso,
-                            "",
-                            ConnectionState.NOT_CONFIGURED.value,
-                            now_iso,
-                        ),
-                    )
+            try:
+                # Seed provider control configs
+                for p in self.registry.get_all():
+                    row = db.safe_query("SELECT * FROM provider_control_configs WHERE provider_id = ?", (p.id,))
+                    if not row:
+                        now_iso = datetime.now(timezone.utc).isoformat()
+                        db.safe_execute(
+                            """
+                            INSERT INTO provider_control_configs (
+                                provider_id, provider_name, category, enabled, configured,
+                                market_data_enabled, execution_enabled, is_primary, is_secondary,
+                                credentials_masked_json, custom_settings_json, last_health_check,
+                                last_tick, connection_state, updated_at
+                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            """,
+                            (
+                                p.id,
+                                p.name,
+                                p.category.value,
+                                1,
+                                1 if self._check_is_configured(p.id) else 0,
+                                1 if p.capabilities.marketData else 0,
+                                1 if p.capabilities.orderExecution else 0,
+                                1 if p.id == "dhan" else 0,
+                                1 if p.id == "fyers" else 0,
+                                json.dumps(self._get_masked_credentials(p.id)),
+                                json.dumps({}),
+                                now_iso,
+                                "",
+                                ConnectionState.NOT_CONFIGURED.value,
+                                now_iso,
+                            ),
+                        )
+            except Exception as e:
+                logger.debug("Provider control configs DB notice: %s", e)
 
     def _check_is_configured(self, provider_id: str) -> bool:
         """Checks if provider has required credentials in env or storage."""
@@ -291,7 +297,11 @@ class ProviderService:
     def get_active_roles(self) -> Dict[str, str]:
         """Retrieves currently selected provider IDs for each platform role."""
         roles = dict(self.DEFAULT_ROLES)
-        rows = db.safe_query("SELECT role_key, provider_id FROM provider_role_selections") or []
+        rows = []
+        try:
+            rows = db.safe_query("SELECT role_key, provider_id FROM provider_role_selections") or []
+        except Exception:
+            rows = []
         for r in rows:
             roles[r["role_key"]] = r["provider_id"]
 

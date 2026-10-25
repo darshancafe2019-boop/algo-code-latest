@@ -5,7 +5,39 @@ export function isSameOriginBrowserRequest(req: NextRequest): boolean {
   if (!origin) return false;
 
   try {
-    return new URL(origin).origin === req.nextUrl.origin;
+    const originUrl = new URL(origin);
+    const targetOrigin = req.nextUrl.origin;
+    if (originUrl.origin === targetOrigin) {
+      return true;
+    }
+
+    // Support host/port equivalence when accessing via 127.0.0.1 vs localhost
+    const originHost = originUrl.hostname.toLowerCase();
+    const targetHost = req.nextUrl.hostname.toLowerCase();
+    const originPort = originUrl.port || (originUrl.protocol === "https:" ? "443" : "80");
+    const targetPort = req.nextUrl.port || (req.nextUrl.protocol === "https:" ? "443" : "80");
+
+    const isOriginLoopback = originHost === "localhost" || originHost === "127.0.0.1";
+    const isTargetLoopback = targetHost === "localhost" || targetHost === "127.0.0.1";
+
+    if (isOriginLoopback && isTargetLoopback && originPort === targetPort) {
+      return true;
+    }
+
+    // Check against Host / X-Forwarded-Host header
+    const hostHeader = req.headers.get("x-forwarded-host") || req.headers.get("host");
+    if (hostHeader) {
+      const [hostName, hostPort = originUrl.protocol === "https:" ? "443" : "80"] = hostHeader.split(":");
+      const isHeaderLoopback = hostName.toLowerCase() === "localhost" || hostName.toLowerCase() === "127.0.0.1";
+      if (
+        (originHost === hostName.toLowerCase() || (isOriginLoopback && isHeaderLoopback)) &&
+        originPort === hostPort
+      ) {
+        return true;
+      }
+    }
+
+    return false;
   } catch {
     return false;
   }

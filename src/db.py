@@ -210,8 +210,26 @@ _pg_consecutive_failures = 0
 
 
 def _trip_pg_circuit_breaker(duration_sec: float = 60.0, reason: str = ""):
-    """Trips the PostgreSQL circuit breaker so fallback to SQLite is instant without pool timeouts."""
+    """Trips the PostgreSQL circuit breaker so fallback to SQLite is instant without pool timeouts.
+    Circuit breaker only trips on genuine connection drops/outages, never on schema/table or permission errors.
+    """
     global _pg_circuit_broken_until, _pg_consecutive_failures
+    reason_str = str(reason)
+    non_trip_patterns = (
+        "UndefinedTable",
+        "does not exist",
+        "InsufficientPrivilege",
+        "permission denied",
+        "SyntaxError",
+        "UniqueViolation",
+        "NotNullViolation",
+        "ForeignKeyViolation",
+        "CheckViolation",
+        "InvalidTextRepresentation",
+    )
+    if any(p.lower() in reason_str.lower() for p in non_trip_patterns):
+        return
+
     _pg_consecutive_failures += 1
     if _pg_consecutive_failures >= 2:
         _pg_circuit_broken_until = time.time() + duration_sec

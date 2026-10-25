@@ -304,8 +304,8 @@ async function handleProxy(req: NextRequest, ctx: { params?: { path: string[] } 
   }
 
   const isStream = subPath.startsWith("stream") || subPath.includes("/stream") || subPath.includes("market-data/stream") || req.headers.get("accept")?.includes("text/event-stream");
-  const isHeavy = subPath.includes("backtest") || subPath.includes("simulate") || subPath.includes("portfolio") || subPath.includes("risk") || subPath.includes("journal") || subPath.includes("positions") || subPath.includes("options") || subPath.includes("dashboard") || subPath.includes("snapshot") || subPath.includes("instruments") || subPath.includes("universe") || subPath.includes("orders");
-  const timeoutMs = isHeavy ? 45000 : 25000;
+  const isHeavy = subPath.includes("backtest") || subPath.includes("simulate") || subPath.includes("portfolio") || subPath.includes("risk") || subPath.includes("journal") || subPath.includes("positions") || subPath.includes("options") || subPath.includes("dashboard") || subPath.includes("snapshot") || subPath.includes("instruments") || subPath.includes("universe") || subPath.includes("orders") || subPath.includes("status");
+  const timeoutMs = isHeavy ? 60000 : 35000;
 
   let bodyData: BodyInit | null = null;
   if (["POST", "PUT", "PATCH", "DELETE"].includes(req.method)) {
@@ -416,12 +416,14 @@ async function handleProxy(req: NextRequest, ctx: { params?: { path: string[] } 
 
     const responseString = JSON.stringify(jsonBody ?? {});
     if (finalResponse.ok && req.method === "GET" && (subPath.includes("instruments") || subPath.includes("universe") || subPath.includes("providers") || subPath.includes("expiries") || subPath.includes("status"))) {
-      PROXY_MEMORY_CACHE.set(targetUrl, {
+      const entry: CacheEntry = {
         body: responseString,
         contentType: "application/json",
         status: finalResponse.status,
         timestamp: Date.now(),
-      });
+      };
+      PROXY_MEMORY_CACHE.set(targetUrl, entry);
+      PROXY_MEMORY_CACHE.set(subPath, entry);
     }
 
     return new NextResponse(responseString, {
@@ -432,7 +434,7 @@ async function handleProxy(req: NextRequest, ctx: { params?: { path: string[] } 
 
   // Resilient Cache Fallback: If backend is cold starting, redeploying, or timed out, serve cached response if available
   if (req.method === "GET") {
-    const cached = PROXY_MEMORY_CACHE.get(targetUrl);
+    const cached = PROXY_MEMORY_CACHE.get(targetUrl) || PROXY_MEMORY_CACHE.get(subPath);
     if (cached && (Date.now() - cached.timestamp < 15 * 60 * 1000)) {
       return new NextResponse(cached.body, {
         status: cached.status,

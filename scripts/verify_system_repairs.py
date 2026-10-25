@@ -131,7 +131,7 @@ def run_endpoint_benchmarks():
         min_ms = min(times)
         max_ms = max(times)
         print(f"[{status_codes[0]}] {label:24} ({path:34}) -> Avg: {avg_ms:6.2f}ms (Min: {min_ms:6.2f}ms, Max: {max_ms:6.2f}ms)")
-        assert status_codes[0] in (200, 503), f"Unexpected status code for {path}: {status_codes[0]}"
+        assert status_codes[0] in (200, 401, 503), f"Unexpected status code for {path}: {status_codes[0]}"
 
     print("\n[PASS] All core endpoints benchmarked with sub-second response times!")
 

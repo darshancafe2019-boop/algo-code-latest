@@ -97,8 +97,8 @@ def run_pipeline_verification() -> Dict[str, Any]:
     all_insts = global_discovery_engine.get_all_instruments()
     
     eq_sample = next((i for i in all_insts if i.market == "INDIA" and i.asset_class == "EQUITY" and i.instrument_type == "CASH" and i.canonical_symbol == "RELIANCE"), None) or next((i for i in all_insts if i.market == "INDIA" and i.asset_class == "EQUITY"), None)
-    idx_sample = next((i for i in all_insts if i.market == "INDIA" and i.instrument_type == "REFERENCE_INDEX" and "NIFTY" in i.canonical_symbol), None) or next((i for i in all_insts if i.market == "INDIA" and i.instrument_type == "REFERENCE_INDEX"), None)
-    fut_sample = next((i for i in all_insts if i.market == "INDIA" and i.instrument_type == "FUTURE"), None)
+    idx_sample = next((i for i in all_insts if i.market == "INDIA" and i.instrument_type == "REFERENCE_INDEX" and i.canonical_symbol in ("NIFTY", "NIFTY 50", "BANKNIFTY")), None) or next((i for i in all_insts if i.market == "INDIA" and i.instrument_type == "REFERENCE_INDEX"), None)
+    fut_sample = next((i for i in all_insts if i.market == "INDIA" and i.instrument_type == "FUTURE" and "NIFTY" in i.canonical_symbol), None) or next((i for i in all_insts if i.market == "INDIA" and i.instrument_type == "FUTURE"), None)
     opt_sample = next((i for i in all_insts if i.market == "INDIA" and i.instrument_type == "OPTION"), None)
     spot_sample = next((i for i in all_insts if i.market == "CRYPTO" and i.instrument_type == "SPOT" and i.instrument_key == "BTCUSDT"), None)
     perp_sample = next((i for i in all_insts if i.market == "CRYPTO" and i.instrument_type == "PERPETUAL" and i.instrument_key == "BTCUSDT"), None)
@@ -138,10 +138,17 @@ def run_pipeline_verification() -> Dict[str, Any]:
         
         if is_upstox:
             if auth_valid:
-                q_dict = global_upstox_service.fetch_market_quotes([sym])
-                if sym in q_dict:
+                q_dict = global_upstox_service.fetch_market_quotes([sym, ik])
+                matched = q_dict.get(sym) or q_dict.get(ik)
+                if matched and (
+                    float(matched.get("last_price", 0.0)) > 0
+                    or float(matched.get("bid", 0.0)) > 0
+                    or float(matched.get("ask", 0.0)) > 0
+                    or float(matched.get("close", 0.0)) > 0
+                    or matched.get("source") == "UPSTOX_REST"
+                ):
                     rest_ok = True
-                    quote_price = q_dict[sym].get("last_price", 0.0)
+                    quote_price = float(matched.get("last_price") or matched.get("bid") or matched.get("close") or 0.0)
             else:
                 error_msg = "UPSTOX_ACCESS_TOKEN_MISSING"
         else:

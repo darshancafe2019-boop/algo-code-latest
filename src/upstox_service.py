@@ -686,6 +686,10 @@ class UpstoxService:
         clean_upper = sym_str.upper()
         clean_compact = clean_upper.replace(" ", "").replace("_", "")
 
+        # 0. If already in valid formatted syntax like NSE_EQ|... or NSE_INDEX|... or NSE_FO|... or with colon
+        if ("|" in sym_str or ":" in sym_str) and (sym_str.startswith("NSE_") or sym_str.startswith("BSE_")):
+            return sym_str.replace(":", "|")
+
         # 1. Check official curated registry
         if clean_upper in OFFICIAL_UPSTOX_KEYS:
             return OFFICIAL_UPSTOX_KEYS[clean_upper]["instrument_key"]
@@ -721,10 +725,10 @@ class UpstoxService:
             if base_sym in _UPSTOX_EQUITY_BY_SYMBOL:
                 return _UPSTOX_EQUITY_BY_SYMBOL[base_sym]["instrument_key"]
 
-        if clean_upper.endswith("-FUT") or clean_upper.endswith(" FUT") or clean_upper.endswith("FUT"):
+        if clean_upper.endswith("-FUT") or clean_upper.endswith(" FUT") or clean_upper.endswith("FUT") or " FUT " in clean_upper:
             if clean_upper in _UPSTOX_FUTURES_BY_SYMBOL:
                 return _UPSTOX_FUTURES_BY_SYMBOL[clean_upper]["instrument_key"]
-            base_und = clean_upper.replace("-FUT", "").replace(" FUT", "").replace("FUT", "").strip()
+            base_und = clean_upper.split()[0].replace("-FUT", "").replace("FUT", "").strip()
             if base_und in _UPSTOX_FUTURES_BY_UNDERLYING and _UPSTOX_FUTURES_BY_UNDERLYING[base_und]:
                 return _UPSTOX_FUTURES_BY_UNDERLYING[base_und][0]["instrument_key"]
 
@@ -738,11 +742,7 @@ class UpstoxService:
             if base_sym in _UPSTOX_FUTURES_BY_SYMBOL:
                 return _UPSTOX_FUTURES_BY_SYMBOL[base_sym]["instrument_key"]
 
-        # 5. If already in valid formatted syntax like NSE_EQ|... or NSE_INDEX|... or NSE_FO|...
-        if "|" in sym_str and (sym_str.startswith("NSE_") or sym_str.startswith("BSE_")):
-            return sym_str
-
-        # 6. Check if symbol is an Option contract description (e.g. NIFTY 23400 CE, NIFTY 2026-09-22 23400 CE, UPSTOX_NSE_NIFTY_23400_CE, etc.)
+        # 5. Check if symbol is an Option contract description (e.g. NIFTY 23400 CE, NIFTY 2026-09-22 23400 CE, UPSTOX_NSE_NIFTY_23400_CE, etc.)
         import re
         exp_match = re.search(r"(\d{4}-\d{2}-\d{2})", sym_str)
         exp_val = exp_match.group(1) if exp_match else None
@@ -761,6 +761,12 @@ class UpstoxService:
             resolved_key = self.resolve_option_instrument_key(und, expiry=exp_val, strike=strike_val, option_type=opt_type)
             if resolved_key:
                 return resolved_key
+
+        # 6. Fallback index pattern check
+        if clean_upper.startswith("NIFTY") or clean_upper.startswith("BANKNIFTY") or clean_upper.startswith("FINNIFTY") or clean_upper.startswith("INDIA VIX"):
+            return f"NSE_INDEX|{sym_str}"
+        elif clean_upper.startswith("SENSEX") or clean_upper.startswith("BSE"):
+            return f"BSE_INDEX|{sym_str}"
 
         return None
 
@@ -1259,11 +1265,41 @@ class UpstoxService:
                 normalized_map: Dict[str, Any] = {}
                 first_entry = None
 
+                # Build exhaustive lookup index across raw keys, instrument tokens, and symbols
+                lookup_map: Dict[str, Any] = {}
+                for rk, rv in raw_data.items():
+                    if isinstance(rv, dict):
+                        lookup_map[rk] = rv
+                        lookup_map[rk.upper()] = rv
+                        lookup_map[rk.replace(":", "|")] = rv
+                        lookup_map[rk.replace("|", ":")] = rv
+                        tok = rv.get("instrument_token")
+                        if tok:
+                            lookup_map[tok] = rv
+                            lookup_map[tok.upper()] = rv
+                            lookup_map[tok.replace("|", ":")] = rv
+                            lookup_map[tok.replace(":", "|")] = rv
+                        s = rv.get("symbol") or rv.get("trading_symbol")
+                        if s:
+                            s_clean = str(s).strip()
+                            lookup_map[s_clean] = rv
+                            lookup_map[s_clean.upper()] = rv
+
                 for ik, orig_sym in key_to_orig.items():
                     formatted_key = ik.replace("|", ":")
-                    q_data = raw_data.get(formatted_key) or raw_data.get(ik) or {}
-                    last_price = float(q_data.get("last_price") or 0.0)
                     can_sym = self.resolve_canonical_symbol(ik)
+                    q_data = (
+                        lookup_map.get(ik)
+                        or lookup_map.get(formatted_key)
+                        or lookup_map.get(orig_sym)
+                        or lookup_map.get(orig_sym.upper())
+                        or lookup_map.get(can_sym)
+                        or lookup_map.get(can_sym.upper())
+                        or raw_data.get(formatted_key)
+                        or raw_data.get(ik)
+                        or {}
+                    )
+                    last_price = float(q_data.get("last_price") or 0.0)
 
                     item = {
                         "symbol": can_sym,
@@ -1322,22 +1358,60 @@ class UpstoxService:
             )
             if data.get("status") == "success" and "data" in data:
                 raw_data = data["data"]
+                lookup_map: Dict[str, Any] = {}
+                for rk, rv in raw_data.items():
+                    if isinstance(rv, dict):
+                        lookup_map[rk] = rv
+                        lookup_map[rk.upper()] = rv
+                        lookup_map[rk.replace(":", "|")] = rv
+                        lookup_map[rk.replace("|", ":")] = rv
+                        tok = rv.get("instrument_token")
+                        if tok:
+                            lookup_map[tok] = rv
+                            lookup_map[tok.upper()] = rv
+                            lookup_map[tok.replace("|", ":")] = rv
+                            lookup_map[tok.replace(":", "|")] = rv
+                        s = rv.get("symbol") or rv.get("trading_symbol")
+                        if s:
+                            s_clean = str(s).strip()
+                            lookup_map[s_clean] = rv
+                            lookup_map[s_clean.upper()] = rv
+
                 for sym, ik in sym_to_key.items():
                     formatted_key = ik.replace("|", ":")
-                    q_data = raw_data.get(formatted_key) or raw_data.get(ik)
+                    can_sym = self.resolve_canonical_symbol(ik)
+                    q_data = (
+                        lookup_map.get(ik)
+                        or lookup_map.get(formatted_key)
+                        or lookup_map.get(sym)
+                        or lookup_map.get(sym.upper())
+                        or lookup_map.get(can_sym)
+                        or lookup_map.get(can_sym.upper())
+                        or raw_data.get(formatted_key)
+                        or raw_data.get(ik)
+                    )
                     if q_data:
-                        ohlc = q_data.get("ohlc", {})
-                        last_price = float(q_data.get("last_price") or ohlc.get("close", 0.0))
-                        close_prev = float(ohlc.get("close") or last_price)
-                        change_pct = float(q_data.get("net_change", 0.0))
-                        if close_prev > 0 and change_pct == 0.0:
+                        ohlc = q_data.get("ohlc") or {}
+
+                        def _to_f(v, d=0.0):
+                            if v is None:
+                                return d
+                            try:
+                                return float(v)
+                            except (ValueError, TypeError):
+                                return d
+
+                        last_price = _to_f(q_data.get("last_price"), _to_f(ohlc.get("close"), 0.0))
+                        close_prev = _to_f(ohlc.get("close"), last_price)
+                        change_pct = _to_f(q_data.get("net_change"), 0.0)
+                        if close_prev > 0 and change_pct == 0.0 and last_price > 0:
                             change_pct = ((last_price - close_prev) / close_prev) * 100.0
 
-                        depth = q_data.get("depth", {})
-                        buy_depth = depth.get("buy", [{}])
-                        sell_depth = depth.get("sell", [{}])
-                        bid = float(buy_depth[0].get("price", 0.0) if buy_depth else 0.0)
-                        ask = float(sell_depth[0].get("price", 0.0) if sell_depth else 0.0)
+                        depth = q_data.get("depth") or {}
+                        buy_depth = depth.get("buy") or []
+                        sell_depth = depth.get("sell") or []
+                        bid = _to_f(buy_depth[0].get("price")) if buy_depth and isinstance(buy_depth[0], dict) else 0.0
+                        ask = _to_f(sell_depth[0].get("price")) if sell_depth and isinstance(sell_depth[0], dict) else 0.0
 
                         quote = {
                             "symbol": sym,
@@ -1346,13 +1420,13 @@ class UpstoxService:
                             "price": last_price,
                             "bid": bid,
                             "ask": ask,
-                            "volume": float(q_data.get("volume", 0.0)),
-                            "open": float(ohlc.get("open", 0.0)),
-                            "high": float(ohlc.get("high", 0.0)),
-                            "low": float(ohlc.get("low", 0.0)),
+                            "volume": _to_f(q_data.get("volume"), 0.0),
+                            "open": _to_f(ohlc.get("open"), 0.0),
+                            "high": _to_f(ohlc.get("high"), 0.0),
+                            "low": _to_f(ohlc.get("low"), 0.0),
                             "close": close_prev,
                             "change_pct": round(change_pct, 2),
-                            "oi": float(q_data.get("oi", 0.0)),
+                            "oi": _to_f(q_data.get("oi"), 0.0),
                             "timestamp": now_iso,
                             "source": "UPSTOX_REST",
                             "is_live": True,

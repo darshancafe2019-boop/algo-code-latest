@@ -609,7 +609,9 @@ def resolve_canonical_quote(
         from src.bot_wizard_service import get_live_quote
         wiz_q = get_live_quote(clean_symbol)
         w_price = float(wiz_q.get("last") or wiz_q.get("price") or wiz_q.get("ltp") or 0.0)
-        if w_price > 0:
+        w_source = str(wiz_q.get("source") or "").upper()
+        w_prov = str(wiz_q.get("provider") or "").upper()
+        if w_price > 0 and w_source not in ("SIMULATED", "PAPER", "SYNTHETIC") and w_prov not in ("PAPER", "SIMULATED", "SYNTHETIC"):
             now_ts_iso = datetime.now(timezone.utc).isoformat()
             return 200, {
                 "ok": True,

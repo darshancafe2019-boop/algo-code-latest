@@ -251,6 +251,24 @@ def _record_pg_success():
     _pg_consecutive_failures = 0
 
 
+def _robust_check_connection(conn) -> None:
+    """Probes a connection's health before handing it out from the pool.
+    If the socket was severed or corrupted by Neon SSL drops, it explicitly closes
+    the broken connection so psycopg_pool discards it and spawns a fresh replacement.
+    """
+    try:
+        if getattr(conn, "closed", False):
+            raise RuntimeError("Connection is closed")
+        with conn.cursor() as cur:
+            cur.execute("SELECT 1;")
+    except Exception as check_err:
+        try:
+            conn.close()
+        except Exception:
+            pass
+        raise check_err
+
+
 def get_db_pool():
     """Returns the single central PostgreSQL ConnectionPool or None if disabled/circuit-broken."""
     global _pg_pool, _pg_circuit_broken_until
@@ -268,23 +286,23 @@ def get_db_pool():
                     _pg_pool = ConnectionPool(
                         conninfo=clean_conninfo,
                         min_size=1,
-                        max_size=10,
-                        timeout=10.0,
-                        max_idle=45.0,
-                        max_lifetime=300.0,
-                        reconnect_timeout=15.0,
-                        check=ConnectionPool.check_connection,
+                        max_size=20,
+                        timeout=30.0,
+                        max_idle=30.0,
+                        max_lifetime=180.0,
+                        reconnect_timeout=3.0,
+                        check=_robust_check_connection,
                         open=True,
                         kwargs={
-                            "autocommit": False,
-                            "connect_timeout": 5,
+                            "autocommit": True,
+                            "connect_timeout": 15,
                             "keepalives": 1,
-                            "keepalives_idle": 30,
-                            "keepalives_interval": 10,
+                            "keepalives_idle": 10,
+                            "keepalives_interval": 5,
                             "keepalives_count": 3,
                         }
                     )
-                    logger.info("Initialized cloud-hardened PostgreSQL ConnectionPool (min=1, max=10, check=active)")
+                    logger.info("Initialized cloud-hardened PostgreSQL ConnectionPool (min=1, max=20, check=robust)")
                 except Exception as e:
                     logger.exception("Failed to initialize PostgreSQL ConnectionPool: %s", e)
                     _trip_pg_circuit_breaker(60.0, str(e))
@@ -595,8 +613,17 @@ def get_authoritative_connection():
         if pool is not None:
             with pool.connection() as conn:
                 adapter = PostgresConnectionAdapter(conn)
-                yield adapter
-                conn.commit()
+                try:
+                    yield adapter
+                    if not getattr(conn, "autocommit", False):
+                        conn.commit()
+                except Exception:
+                    try:
+                        if not getattr(conn, "autocommit", False):
+                            conn.rollback()
+                    except Exception:
+                        pass
+                    raise
                 return
         elif getattr(config, "DATABASE_URL", None) and (getattr(config, "IS_PRODUCTION", False) or time.time() >= _pg_circuit_broken_until):
             import psycopg
@@ -737,7 +764,8 @@ def safe_query(sql: str, params: tuple = ()) -> list:
                         with conn.cursor(row_factory=dict_row) as cur:
                             getattr(cur, "execute")(pg_sql, params)
                             res = [sanitize_for_json(dict(r)) for r in cur.fetchall()]
-                        conn.commit()
+                        if not getattr(conn, "autocommit", False):
+                            conn.commit()
                         duration_ms = round((time.perf_counter() - t0) * 1000, 2)
                         if duration_ms > 250.0:
                             logger.warning("SLOW QUERY DETECTED [duration=%0.2fms, req_id=%s] sql=%s", duration_ms, req_id, sql[:120].strip())

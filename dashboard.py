@@ -570,10 +570,10 @@ def handle_uncaught_exception(e):
         "status": "error",
         "error": {
             "code": "INTERNAL_SERVER_ERROR",
-            "message": "An internal server error occurred",
+            "message": f"An internal server error occurred: {e}",
             "requestId": req_id,
             "timestamp": datetime.now(timezone.utc).isoformat(),
-            "details": {}
+            "details": {"error": str(e), "type": type(e).__name__}
         },
         "meta": {
             "timestamp": datetime.now(timezone.utc).isoformat(),

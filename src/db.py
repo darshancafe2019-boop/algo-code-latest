@@ -59,6 +59,11 @@ def translate_sqlite_sql_to_postgres(sql: str) -> str:
     # 2. Parameter placeholder translation (? -> %s)
     pg_sql = pg_sql.replace("?", "%s")
     
+    # 2b. Auto-increment & date translation for SQLite DDL compatibility
+    pg_sql = re.sub(r'\bINTEGER\s+PRIMARY\s+KEY\s+AUTOINCREMENT\b', 'SERIAL PRIMARY KEY', pg_sql, flags=re.IGNORECASE)
+    pg_sql = re.sub(r'\bAUTOINCREMENT\b', '', pg_sql, flags=re.IGNORECASE)
+    pg_sql = re.sub(r'\bdatetime\s*\(\s*[\'"]now[\'"]\s*\)', 'CURRENT_TIMESTAMP', pg_sql, flags=re.IGNORECASE)
+    
     # 3. Handle legacy SQLite rowid
     pg_sql = re.sub(r'\bORDER\s+BY\s+rowid\b', 'ORDER BY 1', pg_sql, flags=re.IGNORECASE)
     pg_sql = re.sub(r'\browid\b', 'id', pg_sql, flags=re.IGNORECASE)
@@ -696,7 +701,7 @@ def safe_query(sql: str, params: tuple = ()) -> list:
                 with pool.connection() as conn:
                     with conn.cursor(row_factory=dict_row) as cur:
                         getattr(cur, "execute")(pg_sql, params)
-                        res = list(cur.fetchall())
+                        res = [sanitize_for_json(dict(r)) for r in cur.fetchall()]
                     conn.commit()
                     duration_ms = round((time.perf_counter() - t0) * 1000, 2)
                     if duration_ms > 250.0:
@@ -722,7 +727,7 @@ def safe_query(sql: str, params: tuple = ()) -> list:
                 try:
                     with conn.cursor(row_factory=dict_row) as cur:
                         getattr(cur, "execute")(pg_sql, params)
-                        res = list(cur.fetchall())
+                        res = [sanitize_for_json(dict(r)) for r in cur.fetchall()]
                     conn.commit()
                     return res
                 finally:

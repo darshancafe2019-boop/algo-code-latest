@@ -96,11 +96,16 @@ def get_readiness():
         row = safe_query_one("SELECT 1 AS alive")
         if row and (row.get("alive") == 1 or list(row.values())[0] == 1):
             db_status = "HEALTHY"
+        else:
+            db_status = "ERROR"
+            db_pool_info["probe_error"] = f"Unexpected alive row: {row}"
     except Exception as exc:
+        db_pool_info["probe_error"] = f"{type(exc).__name__}: {exc}"
         logger.error(
-            "Readiness probe database error; request_id=%s exception_type=%s",
+            "Readiness probe database error; request_id=%s exception_type=%s: %s",
             getattr(request, "request_id", ""),
             type(exc).__name__,
+            exc,
         )
         db_status = "ERROR"
 

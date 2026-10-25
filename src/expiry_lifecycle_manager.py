@@ -189,6 +189,8 @@ class DerivativeExpiryManager:
         self._stop_event = threading.Event()
         self._interval_seconds = 8.0
         self._retry_backoffs = [2.0, 5.0, 10.0]
+        self._in_memory_event_keys: set = set()
+        self._has_db_table: Optional[bool] = None
         self._init_db_schema()
 
     @classmethod
@@ -201,7 +203,7 @@ class DerivativeExpiryManager:
     def _init_db_schema(self) -> None:
         """Initializes persistent tables for expiry lifecycle events and idempotency."""
         try:
-            db.safe_execute(
+            success = db.safe_execute(
                 """
                 CREATE TABLE IF NOT EXISTS expiry_lifecycle_events (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -216,20 +218,25 @@ class DerivativeExpiryManager:
                 )
                 """
             )
-            db.safe_execute(
-                """
-                CREATE INDEX IF NOT EXISTS idx_expiry_events_pos_id 
-                ON expiry_lifecycle_events(position_id, event_type)
-                """
-            )
-            db.safe_execute(
-                """
-                CREATE INDEX IF NOT EXISTS idx_expiry_events_idem 
-                ON expiry_lifecycle_events(idempotency_key)
-                """
-            )
+            if success:
+                self._has_db_table = True
+                db.safe_execute(
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_expiry_events_pos_id 
+                    ON expiry_lifecycle_events(position_id, event_type)
+                    """
+                )
+                db.safe_execute(
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_expiry_events_idem 
+                    ON expiry_lifecycle_events(idempotency_key)
+                    """
+                )
+            else:
+                self._has_db_table = False
         except Exception as e:
-            logger.error("Failed to initialize expiry lifecycle db schema: %s", e)
+            logger.warning("Optional expiry lifecycle db schema setup skipped or failed: %s", e)
+            self._has_db_table = False
 
     # ─────────────────────────────────────────────────────────────────────────
     # 1. DERIVATIVE DETECTION & EXCHANGE TIMEZONE CALCULATION
@@ -425,27 +432,39 @@ class DerivativeExpiryManager:
         details_json = json.dumps(details or {})
         now_iso = datetime.now(timezone.utc).isoformat()
 
+        # Fast in-memory idempotency check
+        if idempotency_key and idempotency_key in self._in_memory_event_keys:
+            logger.debug("Idempotent expiry event '%s' already recorded (in-memory).", idempotency_key)
+            return False
+
         try:
-            if idempotency_key:
+            if idempotency_key and self._has_db_table is not False:
                 existing = db.safe_query(
                     "SELECT id FROM expiry_lifecycle_events WHERE idempotency_key = ?",
                     (idempotency_key,)
                 )
                 if existing:
-                    logger.debug("Idempotent expiry event '%s' already recorded.", idempotency_key)
+                    self._in_memory_event_keys.add(idempotency_key)
+                    logger.debug("Idempotent expiry event '%s' already recorded in DB.", idempotency_key)
                     return False
 
-            db.safe_execute(
-                """
-                INSERT INTO expiry_lifecycle_events (position_id, bot_id, symbol, event_type, state, idempotency_key, details, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (position_id, bot_id, symbol, event_type, state, idempotency_key, details_json, now_iso)
-            )
+            if self._has_db_table is not False:
+                db.safe_execute(
+                    """
+                    INSERT INTO expiry_lifecycle_events (position_id, bot_id, symbol, event_type, state, idempotency_key, details, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (position_id, bot_id, symbol, event_type, state, idempotency_key, details_json, now_iso)
+                )
+
+            if idempotency_key:
+                self._in_memory_event_keys.add(idempotency_key)
             return True
         except Exception as e:
-            logger.error("Failed to record expiry event (%s): %s", event_type, e)
-            return False
+            if idempotency_key:
+                self._in_memory_event_keys.add(idempotency_key)
+            logger.warning("Notice recording expiry event (%s): %s", event_type, e)
+            return True
 
     # ─────────────────────────────────────────────────────────────────────────
     # 3. POSITION INSPECTION & ORDER CANCELLATION

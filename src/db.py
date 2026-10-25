@@ -269,10 +269,22 @@ def get_db_pool():
                         conninfo=clean_conninfo,
                         min_size=1,
                         max_size=10,
-                        timeout=5.0,
+                        timeout=10.0,
+                        max_idle=45.0,
+                        max_lifetime=300.0,
+                        reconnect_timeout=15.0,
+                        check=ConnectionPool.check_connection,
                         open=True,
+                        kwargs={
+                            "autocommit": False,
+                            "connect_timeout": 5,
+                            "keepalives": 1,
+                            "keepalives_idle": 30,
+                            "keepalives_interval": 10,
+                            "keepalives_count": 3,
+                        }
                     )
-                    logger.info("Initialized central PostgreSQL ConnectionPool (min=1, max=10)")
+                    logger.info("Initialized cloud-hardened PostgreSQL ConnectionPool (min=1, max=10, check=active)")
                 except Exception as e:
                     logger.exception("Failed to initialize PostgreSQL ConnectionPool: %s", e)
                     _trip_pg_circuit_breaker(60.0, str(e))
@@ -626,31 +638,53 @@ def safe_execute(sql: str, params: tuple = ()) -> bool:
         pool = get_db_pool()
         if pool is not None:
             pg_sql = translate_sqlite_sql_to_postgres(sql)
-            try:
-                with pool.connection() as conn:
-                    with conn.transaction():
-                        with conn.cursor() as cur:
-                            getattr(cur, "execute")(pg_sql, params)
-                _record_pg_success()
-                duration_ms = round((time.perf_counter() - t0) * 1000, 2)
-                if duration_ms > 250.0:
-                    logger.warning("SLOW QUERY DETECTED [duration=%0.2fms, req_id=%s] sql=%s", duration_ms, req_id, sql[:120].strip())
-                return True
-            except Exception as e:
-                _trip_pg_circuit_breaker(60.0, str(e))
-                duration_ms = round((time.perf_counter() - t0) * 1000, 2)
-                pg_code = getattr(e, "pgcode", getattr(getattr(e, "diag", None), "sqlstate", "UNKNOWN"))
-                logger.exception(
-                    "Database execute failed [class=%s, code=%s, duration=%0.2fms, req_id=%s] sql=%s: %s",
-                    type(e).__name__, pg_code, duration_ms, req_id, sql[:120].strip(), e
-                )
-                raise RuntimeError(f"Database execute failed on authoritative PostgreSQL engine: {e}")
+            is_ddl = sql.strip().upper().startswith(("CREATE ", "ALTER ", "DROP ", "VACUUM"))
+            for attempt in range(2):
+                try:
+                    with pool.connection() as conn:
+                        with conn.transaction():
+                            with conn.cursor() as cur:
+                                getattr(cur, "execute")(pg_sql, params)
+                    _record_pg_success()
+                    duration_ms = round((time.perf_counter() - t0) * 1000, 2)
+                    if duration_ms > 250.0:
+                        logger.warning("SLOW QUERY DETECTED [duration=%0.2fms, req_id=%s] sql=%s", duration_ms, req_id, sql[:120].strip())
+                    return True
+                except Exception as e:
+                    err_str = str(e).lower()
+                    pg_code = getattr(e, "pgcode", getattr(getattr(e, "diag", None), "sqlstate", "UNKNOWN"))
+
+                    # If DDL is denied due to schema permissions (42501), log gracefully and do NOT trip circuit breaker
+                    if is_ddl and (pg_code == "42501" or "permission denied" in err_str):
+                        logger.warning("PostgreSQL DDL skipped due to restricted permissions [code=%s]: %s", pg_code, sql[:120].strip())
+                        return False
+
+                    is_transient_net = any(k in err_str for k in [
+                        "ssl error", "decryption failed", "bad record mac",
+                        "consuming input failed", "connection closed", "connection reset",
+                        "broken pipe", "server closed the connection unexpectedly",
+                        "could not receive data from server"
+                    ])
+                    if attempt == 0 and is_transient_net:
+                        logger.warning("Transient PG connection/SSL drop in safe_execute (%s). Retrying with fresh connection...", e)
+                        time.sleep(0.05)
+                        continue
+
+                    _trip_pg_circuit_breaker(60.0, str(e))
+                    duration_ms = round((time.perf_counter() - t0) * 1000, 2)
+                    logger.exception(
+                        "Database execute failed [class=%s, code=%s, duration=%0.2fms, req_id=%s] sql=%s: %s",
+                        type(e).__name__, pg_code, duration_ms, req_id, sql[:120].strip(), e
+                    )
+                    if getattr(config, "IS_PRODUCTION", False):
+                        raise RuntimeError(f"Database execute failed on authoritative PostgreSQL engine: {e}")
+                    return False
         elif getattr(config, "DATABASE_URL", None) and (getattr(config, "IS_PRODUCTION", False) or time.time() >= _pg_circuit_broken_until):
             try:
                 import psycopg
                 pg_sql = translate_sqlite_sql_to_postgres(sql)
                 clean_url = str(config.DATABASE_URL).strip().strip("'\"")
-                conn = psycopg.connect(clean_url, connect_timeout=5)
+                conn = psycopg.connect(clean_url, connect_timeout=5, keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=3)
                 try:
                     with conn.transaction():
                         with conn.cursor() as cur:
@@ -696,34 +730,47 @@ def safe_query(sql: str, params: tuple = ()) -> list:
         pool = get_db_pool()
         if pool is not None:
             pg_sql = translate_sqlite_sql_to_postgres(sql)
-            try:
-                from psycopg.rows import dict_row
-                with pool.connection() as conn:
-                    with conn.cursor(row_factory=dict_row) as cur:
-                        getattr(cur, "execute")(pg_sql, params)
-                        res = [sanitize_for_json(dict(r)) for r in cur.fetchall()]
-                    conn.commit()
+            for attempt in range(2):
+                try:
+                    from psycopg.rows import dict_row
+                    with pool.connection() as conn:
+                        with conn.cursor(row_factory=dict_row) as cur:
+                            getattr(cur, "execute")(pg_sql, params)
+                            res = [sanitize_for_json(dict(r)) for r in cur.fetchall()]
+                        conn.commit()
+                        duration_ms = round((time.perf_counter() - t0) * 1000, 2)
+                        if duration_ms > 250.0:
+                            logger.warning("SLOW QUERY DETECTED [duration=%0.2fms, req_id=%s] sql=%s", duration_ms, req_id, sql[:120].strip())
+                        _record_pg_success()
+                        return res
+                except Exception as e:
+                    err_str = str(e).lower()
+                    is_transient_net = any(k in err_str for k in [
+                        "ssl error", "decryption failed", "bad record mac",
+                        "consuming input failed", "connection closed", "connection reset",
+                        "broken pipe", "server closed the connection unexpectedly",
+                        "could not receive data from server"
+                    ])
+                    if attempt == 0 and is_transient_net:
+                        logger.warning("Transient PG connection/SSL drop in safe_query (%s). Retrying with fresh connection...", e)
+                        time.sleep(0.05)
+                        continue
+
+                    _trip_pg_circuit_breaker(60.0, str(e))
                     duration_ms = round((time.perf_counter() - t0) * 1000, 2)
-                    if duration_ms > 250.0:
-                        logger.warning("SLOW QUERY DETECTED [duration=%0.2fms, req_id=%s] sql=%s", duration_ms, req_id, sql[:120].strip())
-                    _record_pg_success()
-                    return res
-            except Exception as e:
-                _trip_pg_circuit_breaker(60.0, str(e))
-                duration_ms = round((time.perf_counter() - t0) * 1000, 2)
-                pg_code = getattr(e, "pgcode", getattr(getattr(e, "diag", None), "sqlstate", "UNKNOWN"))
-                logger.exception(
-                    "Database query failed [class=%s, code=%s, duration=%0.2fms, req_id=%s] sql=%s: %s",
-                    type(e).__name__, pg_code, duration_ms, req_id, sql[:120].strip(), e
-                )
-                raise RuntimeError(f"Database query failed on authoritative PostgreSQL engine: {e}")
+                    pg_code = getattr(e, "pgcode", getattr(getattr(e, "diag", None), "sqlstate", "UNKNOWN"))
+                    logger.exception(
+                        "Database query failed [class=%s, code=%s, duration=%0.2fms, req_id=%s] sql=%s: %s",
+                        type(e).__name__, pg_code, duration_ms, req_id, sql[:120].strip(), e
+                    )
+                    raise RuntimeError(f"Database query failed on authoritative PostgreSQL engine: {e}")
         elif getattr(config, "DATABASE_URL", None) and (getattr(config, "IS_PRODUCTION", False) or time.time() >= _pg_circuit_broken_until):
             try:
                 import psycopg
                 from psycopg.rows import dict_row
                 pg_sql = translate_sqlite_sql_to_postgres(sql)
                 clean_url = str(config.DATABASE_URL).strip().strip("'\"")
-                conn = psycopg.connect(clean_url, connect_timeout=5)
+                conn = psycopg.connect(clean_url, connect_timeout=5, keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=3)
                 try:
                     with conn.cursor(row_factory=dict_row) as cur:
                         getattr(cur, "execute")(pg_sql, params)

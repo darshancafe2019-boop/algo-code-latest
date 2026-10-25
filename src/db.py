@@ -279,6 +279,17 @@ def _robust_check_connection(conn) -> None:
         raise check_err
 
 
+def _get_pg_clean_url() -> Optional[str]:
+    """Returns the sanitized PostgreSQL database URL or None if not configured/SQLite."""
+    raw = getattr(config, "DATABASE_URL", None) or os.getenv("DATABASE_URL")
+    if not raw:
+        return None
+    url = str(raw).strip().strip("'\"")
+    if url.startswith(("postgres://", "postgresql://")):
+        return url
+    return None
+
+
 def get_db_pool():
     """Returns the single central PostgreSQL ConnectionPool or None if disabled/circuit-broken."""
     global _pg_pool, _pg_circuit_broken_until
@@ -287,12 +298,12 @@ def get_db_pool():
     if not getattr(config, "IS_PRODUCTION", False) and time.time() < _pg_circuit_broken_until:
         return None
 
-    if _pg_pool is None and getattr(config, "IS_POSTGRES", False) and getattr(config, "DATABASE_URL", None):
+    clean_conninfo = _get_pg_clean_url()
+    if _pg_pool is None and getattr(config, "IS_POSTGRES", False) and clean_conninfo:
         with _pg_pool_lock:
             if _pg_pool is None and (getattr(config, "IS_PRODUCTION", False) or time.time() >= _pg_circuit_broken_until):
                 try:
                     from psycopg_pool import ConnectionPool
-                    clean_conninfo = str(config.DATABASE_URL).strip().strip("'\"")
                     _pg_pool = ConnectionPool(
                         conninfo=clean_conninfo,
                         min_size=1,
@@ -644,9 +655,9 @@ def get_authoritative_connection():
                 last_pool_exc = pool_err
                 logger.warning("Pool checkout failed in get_authoritative_connection (%s). Falling back to direct connection...", pool_err)
 
-        if getattr(config, "DATABASE_URL", None) and (pool is None or pool_failed or getattr(config, "IS_PRODUCTION", False) or time.time() >= _pg_circuit_broken_until):
+        clean_url = _get_pg_clean_url()
+        if clean_url and (pool is None or pool_failed or getattr(config, "IS_PRODUCTION", False) or time.time() >= _pg_circuit_broken_until):
             import psycopg
-            clean_url = str(config.DATABASE_URL).strip().strip("'\"")
             conn = psycopg.connect(clean_url, connect_timeout=10, keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=3)
             try:
                 adapter = PostgresConnectionAdapter(conn)
@@ -667,7 +678,8 @@ def get_authoritative_connection():
                 except Exception:
                     pass
 
-        raise RuntimeError(f"Authoritative PostgreSQL connection unavailable in production mode: {last_pool_exc}")
+        if getattr(config, "IS_POSTGRES", False) and getattr(config, "IS_PRODUCTION", False):
+            raise RuntimeError(f"Authoritative PostgreSQL connection unavailable in production mode: {last_pool_exc}")
 
     conn = get_connection()
     try:
@@ -744,10 +756,10 @@ def safe_execute(sql: str, params: tuple = ()) -> bool:
                     )
 
             # Direct connection fallback if pool failed
-            if getattr(config, "DATABASE_URL", None):
+            clean_url = _get_pg_clean_url()
+            if clean_url:
                 try:
                     import psycopg
-                    clean_url = str(config.DATABASE_URL).strip().strip("'\"")
                     logger.warning("Falling back to direct psycopg.connect for execute after pool error: %s", last_exc)
                     with psycopg.connect(clean_url, connect_timeout=10, keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=3) as direct_conn:
                         with direct_conn.transaction():
@@ -856,11 +868,11 @@ def safe_query(sql: str, params: tuple = ()) -> list:
                     )
 
             # Direct connection fallback if pool checkout/query failed
-            if getattr(config, "DATABASE_URL", None):
+            clean_url = _get_pg_clean_url()
+            if clean_url:
                 try:
                     import psycopg
                     from psycopg.rows import dict_row
-                    clean_url = str(config.DATABASE_URL).strip().strip("'\"")
                     logger.warning("Falling back to direct psycopg.connect for query after pool error: %s", last_exc)
                     with psycopg.connect(clean_url, connect_timeout=10, keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=3) as direct_conn:
                         with direct_conn.cursor(row_factory=dict_row) as cur:
@@ -872,12 +884,12 @@ def safe_query(sql: str, params: tuple = ()) -> list:
                     logger.error("Direct connection fallback for query failed: %s", direct_err)
 
             raise RuntimeError(f"Database query failed on authoritative PostgreSQL engine: {last_exc}")
-        elif getattr(config, "DATABASE_URL", None) and (getattr(config, "IS_PRODUCTION", False) or time.time() >= _pg_circuit_broken_until):
+        elif _get_pg_clean_url() and (getattr(config, "IS_PRODUCTION", False) or time.time() >= _pg_circuit_broken_until):
             try:
                 import psycopg
                 from psycopg.rows import dict_row
                 pg_sql = translate_sqlite_sql_to_postgres(sql)
-                clean_url = str(config.DATABASE_URL).strip().strip("'\"")
+                clean_url = _get_pg_clean_url()
                 conn = psycopg.connect(clean_url, connect_timeout=10, keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=3)
                 try:
                     with conn.cursor(row_factory=dict_row) as cur:

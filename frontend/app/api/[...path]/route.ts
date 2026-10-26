@@ -439,10 +439,15 @@ async function handleProxy(req: NextRequest, ctx: { params?: { path: string[] } 
       PROXY_MEMORY_CACHE.set(subPath, entry);
     }
 
-    return new NextResponse(responseString, {
-      status: finalResponse.status,
-      headers: responseHeaders,
-    });
+    // For public dashboard and portfolio snapshots, avoid returning 401 to guest users on the homepage
+    if (finalResponse.status === 401 && req.method === "GET" && (subPath === "dashboard/snapshot" || subPath.endsWith("/dashboard/snapshot") || subPath === "portfolio/snapshot" || subPath.endsWith("/portfolio/snapshot"))) {
+      // Fall through to synthetic safe snapshot below
+    } else {
+      return new NextResponse(responseString, {
+        status: finalResponse.status,
+        headers: responseHeaders,
+      });
+    }
   }
 
   // Resilient Cache Fallback: If backend is cold starting, redeploying, or timed out, serve cached response if available

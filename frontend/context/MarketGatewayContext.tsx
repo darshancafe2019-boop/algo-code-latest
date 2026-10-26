@@ -136,7 +136,10 @@ export function useMarketGateway() {
   const quotesList = Array.from(ctx.quotes.values());
   return {
     ...ctx,
-    isConnected: ctx.connectionStatus === "CONNECTED" || ctx.connectionStatus === "LIVE",
+    isConnected:
+      ctx.connectionStatus === "CONNECTED" ||
+      ctx.connectionStatus === "LIVE" ||
+      (ctx.connectionStatus === "POLLING" && ctx.quotes.size > 0),
     activeFeedsCount: (Array.isArray(ctx.providerHealth) ? ctx.providerHealth : []).filter((p) => p.status === "LIVE" || p.status === "OK").length,
     subscriptionsCount: ctx.quotes.size,
     lastQuote: quotesList.length > 0 ? quotesList[quotesList.length - 1] : null,
@@ -749,6 +752,10 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
 
       if (wsRef.current === ws) wsRef.current = null;
       safeCloseSocket(ws, 1000, "Socket error");
+      if (quotesRef.current.size > 0) {
+        setConnectionStatus("POLLING");
+        useMarketFeedStore.getState().setConnectionStatus("POLLING" as any);
+      }
       scheduleReconnect();
     };
 
@@ -762,6 +769,10 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
       if (wsRef.current !== ws) return;
 
       wsRef.current = null;
+      if (quotesRef.current.size > 0) {
+        setConnectionStatus("POLLING");
+        useMarketFeedStore.getState().setConnectionStatus("POLLING" as any);
+      }
       scheduleReconnect();
     };
   }, [getGatewayWsUrl, safeCloseSocket, scheduleReconnect, connectSSE, processIncomingMessage, fetchStreamToken]);

@@ -76,7 +76,7 @@ export function getForwardHeaders(req: NextRequest, requestId?: string): Headers
     }
   } catch {}
 
-  // Synchronize Bearer token and both session cookies (algo_session_token & quantos_session_token)
+  // Synchronize Bearer token and session cookies if authorization header exists without cookies, or vice versa
   const authHeader = req.headers.get("authorization");
   let bearerToken = "";
   if (authHeader && authHeader.toLowerCase().startsWith("bearer ")) {
@@ -92,14 +92,10 @@ export function getForwardHeaders(req: NextRequest, requestId?: string): Headers
     if (!forwardHeaders.has("authorization")) {
       forwardHeaders.set("Authorization", `Bearer ${detectedToken}`);
     }
-    const cookieParts = cookieHeader ? [cookieHeader] : [];
-    if (!cookieHeader.includes("algo_session_token=")) {
-      cookieParts.push(`algo_session_token=${detectedToken}`);
+    // Only synthesize cookie header if no session cookie exists yet
+    if (!cookieHeader && bearerToken) {
+      forwardHeaders.set("cookie", `algo_session_token=${detectedToken}`);
     }
-    if (!cookieHeader.includes("quantos_session_token=")) {
-      cookieParts.push(`quantos_session_token=${detectedToken}`);
-    }
-    forwardHeaders.set("cookie", cookieParts.join("; "));
   }
 
   if (requestId) {

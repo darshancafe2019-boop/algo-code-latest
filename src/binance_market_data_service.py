@@ -63,7 +63,8 @@ class BinanceMarketDataService:
         self._options_cache: Dict[str, Tuple[float, Dict[str, Any]]] = {}
         self._orderbook_cache: Dict[str, Tuple[float, Dict[str, Any]]] = {}
         self._candles_cache: Dict[str, Tuple[float, List[Dict[str, Any]]]] = {}
-        self._cache_ttl_seconds = 1.5  # 1.5s TTL for sub-second page synchronization
+        # 15.0s TTL to prevent Binance IP rate-limiting (HTTP 418/429) on shared cloud hosts
+        self._cache_ttl_seconds = 15.0
 
     # =========================================================================
     # CORE REST TRANSPORT & RATE LIMITING
@@ -139,7 +140,8 @@ class BinanceMarketDataService:
         now = time.time()
         if cache_key in self._ticker_cache:
             ts, data = self._ticker_cache[cache_key]
-            if now - ts < self._cache_ttl_seconds:
+            # Return cached data if within TTL or if circuit breaker is currently active (prevent None returns)
+            if (now - ts < self._cache_ttl_seconds) or (now < self._circuit_open_until):
                 return data
 
         # Query Binance USDT-M Futures 24hr ticker + Premium Index for Mark/Index/Funding
@@ -197,8 +199,10 @@ class BinanceMarketDataService:
             quote_volume_24h = float(spot_ticker.get("quoteVolume") or 0.0)
             change_pct_24h = float(spot_ticker.get("priceChangePercent") or 0.0)
 
-        # Zero mock / fake price policy: if live ticker not received, do not invent prices
+        # Zero mock / fake price policy: if live ticker not received, check if we have a cached quote before returning None
         if last_price == 0.0:
+            if cache_key in self._ticker_cache:
+                return self._ticker_cache[cache_key][1]
             return None
 
         mid_price = round((bid_price + ask_price) / 2.0, 2)

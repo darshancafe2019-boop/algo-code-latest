@@ -222,7 +222,7 @@ export async function refreshRealMarketData(): Promise<void> {
   try {
     const backendBase = getBackendBaseUrl() || CANONICAL_CLOUD_BACKEND_URL;
     if (backendBase) {
-      const snapUrl = `${backendBase.replace(/\/+$/, "")}/api/market/snapshot`;
+      const snapUrl = `${backendBase.replace(/\/+$/, "")}/api/market/snapshot?symbols=NIFTY,BANKNIFTY,BTCUSDT,ETHUSDT`;
       const snapRes = await fetch(snapUrl, {
         headers: { Accept: "application/json" },
         signal: AbortSignal.timeout(3000),

@@ -67,10 +67,14 @@ function generateFallbackSnapshot(symbols: string[]): Record<string, any> {
 export async function GET(req: NextRequest) {
   const searchParams = req.nextUrl.searchParams;
   const backendBase = getBackendBaseUrl() || CANONICAL_CLOUD_BACKEND_URL;
-  const targetUrl = `${backendBase.replace(/\/+$/, "")}/api/market/snapshot?${searchParams.toString()}`;
-
   const symbolsParam = searchParams.get("symbols") || searchParams.get("symbol") || "";
   const requestedSymbols = symbolsParam.split(",").map((s) => s.trim().toUpperCase()).filter(Boolean);
+  const effectiveSymbols = requestedSymbols.length > 0 ? requestedSymbols : ["NIFTY", "BANKNIFTY", "BTCUSDT", "ETHUSDT"];
+  const finalSearchParams = new URLSearchParams(searchParams);
+  if (!symbolsParam) {
+    finalSearchParams.set("symbols", effectiveSymbols.join(","));
+  }
+  const targetUrl = `${backendBase.replace(/\/+$/, "")}/api/market/snapshot?${finalSearchParams.toString()}`;
 
   try {
     const res = await fetch(targetUrl, {

@@ -87,6 +87,7 @@ class AuthenticatedPytestClient(FlaskClient):
             or "test_email_otp_and_auth_flow" in getattr(frame, "filename", "")
             or "test_unauthenticated_api_rejection" in getattr(frame, "filename", "")
             or "test_audit_repair_verification" in getattr(frame, "filename", "")
+            or "test_production_session_timeout_resilience" in getattr(frame, "filename", "")
             for frame in stack
         )
 

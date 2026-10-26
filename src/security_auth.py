@@ -20,6 +20,7 @@ import base64
 import secrets
 import hashlib
 import logging
+import threading
 from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, Optional, List, Tuple
 
@@ -354,8 +355,8 @@ TOTPManager.hash_recovery_code = RecoveryCodesManager.hash_recovery_code
 # In-memory fast validation cache: token_hash -> (cached_at_timestamp, session_dict)
 _SESSION_CACHE: Dict[str, Tuple[float, Dict[str, Any]]] = {}
 _LAST_ACTIVITY_UPDATE: Dict[str, float] = {}
-_SESSION_CACHE_TTL_SEC = 20.0
-_ACTIVITY_UPDATE_INTERVAL_SEC = 60.0
+_SESSION_CACHE_TTL_SEC = 60.0
+_ACTIVITY_UPDATE_INTERVAL_SEC = 300.0
 
 
 class SessionManager:
@@ -402,7 +403,9 @@ class SessionManager:
         }
 
         db.create_user_session(session_dict)
-        _SESSION_CACHE[token_hash] = (time.time(), dict(session_dict))
+        now_ts = time.time()
+        _LAST_ACTIVITY_UPDATE[session_id] = now_ts
+        _SESSION_CACHE[token_hash] = (now_ts, dict(session_dict))
         return raw_token, session_dict
 
     @staticmethod
@@ -464,11 +467,14 @@ class SessionManager:
                     except Exception:
                         pass
 
-                # Throttle database activity update to at most once per 60s
+                # Throttle database activity update to at most once per 300s, dispatching asynchronously
                 last_act = _LAST_ACTIVITY_UPDATE.get(cached_session["session_id"], 0.0)
                 if now_ts - last_act > _ACTIVITY_UPDATE_INTERVAL_SEC:
                     _LAST_ACTIVITY_UPDATE[cached_session["session_id"]] = now_ts
-                    db.update_session_activity(cached_session["session_id"])
+                    try:
+                        threading.Thread(target=db.update_session_activity, args=(cached_session["session_id"],), daemon=True).start()
+                    except Exception:
+                        pass
                 return cached_session
 
         # 2. Database fetch
@@ -526,11 +532,14 @@ class SessionManager:
         except Exception:
             pass
 
-        # Update activity in DB if due
+        # Update activity in DB if due (non-blocking daemon thread)
         last_act = _LAST_ACTIVITY_UPDATE.get(session["session_id"], 0.0)
         if now_ts - last_act > _ACTIVITY_UPDATE_INTERVAL_SEC:
             _LAST_ACTIVITY_UPDATE[session["session_id"]] = now_ts
-            db.update_session_activity(session["session_id"])
+            try:
+                threading.Thread(target=db.update_session_activity, args=(session["session_id"],), daemon=True).start()
+            except Exception:
+                pass
 
         _SESSION_CACHE[token_hash] = (now_ts, session)
         return session

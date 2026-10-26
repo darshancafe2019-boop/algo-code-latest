@@ -62,7 +62,7 @@ ROLE_PERMISSIONS: Dict[str, Set[str]] = {
 
 
 _USER_CACHE: Dict[str, Tuple[float, Dict[str, Any]]] = {}
-_USER_CACHE_TTL_SEC = 20.0
+_USER_CACHE_TTL_SEC = 60.0
 
 
 def invalidate_user_cache(user_id: Optional[str] = None):
@@ -84,9 +84,9 @@ def get_current_user_and_session(allow_dev_fallback: bool = False) -> Tuple[Opti
     if auth_hdr.startswith("Bearer "):
         token = auth_hdr.split(" ")[1].strip()
 
-    # 2. Check Cookie fallback
+    # 2. Check Cookie fallback (supports both production and legacy cookie names)
     if not token:
-        token = request.cookies.get("algo_session_token", "")
+        token = request.cookies.get("algo_session_token", "") or request.cookies.get("quantos_session_token", "")
 
     session = SessionManager.validate_session(token) if token else None
     if not session:
@@ -110,6 +110,22 @@ def get_current_user_and_session(allow_dev_fallback: bool = False) -> Tuple[Opti
     cached_user = _USER_CACHE.get(user_id)
     if cached_user and (now_ts - cached_user[0] < _USER_CACHE_TTL_SEC):
         return cached_user[1], session
+
+    # Single-query optimization: if the session lookup already joined the users table, construct user dict directly
+    if session.get("username"):
+        user = {
+            "id": user_id,
+            "username": session.get("username"),
+            "email": session.get("email"),
+            "role": session.get("role", "ADMIN"),
+            "is_2fa_enabled": bool(session.get("is_2fa_enabled", 0)),
+            "must_change_password": bool(session.get("must_change_password", 0)),
+            "passkeys_json": session.get("passkeys_json", "[]"),
+            "recovery_codes_json": session.get("recovery_codes_json", "[]"),
+            "is_active": 1,
+        }
+        _USER_CACHE[user_id] = (now_ts, user)
+        return user, session
 
     user = db.get_user_by_id(user_id)
     if user:
@@ -237,15 +253,16 @@ def require_csrf(fn):
     @wraps(fn)
     def wrapper(*args, **kwargs):
         if request.method in ["POST", "PUT", "PATCH", "DELETE"]:
-            token_cookie = request.cookies.get("algo_session_token")
+            token_cookie = request.cookies.get("algo_session_token") or request.cookies.get("quantos_session_token")
             if token_cookie:
                 origin = request.headers.get("Origin") or ""
                 host = request.headers.get("Host") or ""
                 if origin:
                     clean_origin = origin.replace("http://", "").replace("https://", "").split("/")[0]
                     clean_host = host.split("/")[0]
-                    # Allow local development ports (3100, 5050)
-                    if not (clean_origin.startswith("127.0.0.1") or clean_origin.startswith("localhost") or clean_origin == clean_host):
+                    is_local = clean_origin.startswith("127.0.0.1") or clean_origin.startswith("localhost")
+                    is_trusted = clean_origin.endswith(".vercel.app") or clean_origin.endswith(".onrender.com")
+                    if not (is_local or clean_origin == clean_host or is_trusted):
                         return jsonify({
                             "status": "error",
                             "error_code": "CSRF_REJECTED",

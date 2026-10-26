@@ -76,32 +76,35 @@ export function getForwardHeaders(req: NextRequest, requestId?: string): Headers
     }
   } catch {}
 
-  // Ensure Cookie contains algo_session_token if Bearer token is present in Authorization
+  // Synchronize Bearer token and both session cookies (algo_session_token & quantos_session_token)
   const authHeader = req.headers.get("authorization");
+  let bearerToken = "";
   if (authHeader && authHeader.toLowerCase().startsWith("bearer ")) {
-    const bearerToken = authHeader.substring(7).trim();
-    if (bearerToken) {
-      const existingCookie = forwardHeaders.get("cookie") || "";
-      if (!existingCookie.includes("algo_session_token=")) {
-        const cookieVal = existingCookie
-          ? `${existingCookie}; algo_session_token=${bearerToken}`
-          : `algo_session_token=${bearerToken}`;
-        forwardHeaders.set("cookie", cookieVal);
-      }
-    }
+    bearerToken = authHeader.substring(7).trim();
   }
 
-  // Vice versa: if algo_session_token is in cookie but no Authorization header, set Authorization header
-  const cookieHeader = forwardHeaders.get("cookie");
-  if (cookieHeader && !forwardHeaders.has("authorization")) {
-    const match = cookieHeader.match(/algo_session_token=([^;]+)/);
-    if (match && match[1]) {
-      forwardHeaders.set("Authorization", `Bearer ${match[1].trim()}`);
+  let cookieHeader = forwardHeaders.get("cookie") || "";
+  const algoMatch = cookieHeader.match(/algo_session_token=([^;]+)/);
+  const quantosMatch = cookieHeader.match(/quantos_session_token=([^;]+)/);
+  const detectedToken = bearerToken || (algoMatch ? algoMatch[1].trim() : "") || (quantosMatch ? quantosMatch[1].trim() : "");
+
+  if (detectedToken) {
+    if (!forwardHeaders.has("authorization")) {
+      forwardHeaders.set("Authorization", `Bearer ${detectedToken}`);
     }
+    const cookieParts = cookieHeader ? [cookieHeader] : [];
+    if (!cookieHeader.includes("algo_session_token=")) {
+      cookieParts.push(`algo_session_token=${detectedToken}`);
+    }
+    if (!cookieHeader.includes("quantos_session_token=")) {
+      cookieParts.push(`quantos_session_token=${detectedToken}`);
+    }
+    forwardHeaders.set("cookie", cookieParts.join("; "));
   }
 
   if (requestId) {
     forwardHeaders.set("X-Request-Id", requestId);
+    forwardHeaders.set("X-Correlation-Id", requestId);
   }
   const clientIp =
     req.headers.get("x-forwarded-for") ||

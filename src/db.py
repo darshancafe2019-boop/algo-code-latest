@@ -159,6 +159,21 @@ class CursorAdapter:
     def rowcount(self):
         return getattr(self._cur, "rowcount", -1)
 
+    def close(self):
+        try:
+            self._cur.close()
+        except Exception:
+            pass
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+
+    def __getattr__(self, name):
+        return getattr(self._cur, name)
+
 
 class PostgresConnectionAdapter:
     """Wraps a psycopg Connection to translate SQLite SQL dialects and return CursorAdapters."""
@@ -187,6 +202,12 @@ class PostgresConnectionAdapter:
 
     def rollback(self):
         self._pg_conn.rollback()
+
+    def close(self):
+        try:
+            self._pg_conn.close()
+        except Exception:
+            pass
 
     def __enter__(self):
         return self
@@ -336,26 +357,28 @@ def get_db_pool():
             if _pg_pool is None and (getattr(config, "IS_PRODUCTION", False) or time.time() >= _pg_circuit_broken_until):
                 try:
                     from psycopg_pool import ConnectionPool
+                    min_conns = int(os.getenv("PG_POOL_MIN", "4"))
+                    max_conns = int(os.getenv("PG_POOL_MAX", "20"))
                     _pg_pool = ConnectionPool(
                         conninfo=clean_conninfo,
-                        min_size=1,
-                        max_size=20,
-                        timeout=30.0,
-                        max_idle=30.0,
-                        max_lifetime=180.0,
-                        reconnect_timeout=3.0,
+                        min_size=min_conns,
+                        max_size=max_conns,
+                        timeout=15.0,
+                        max_idle=300.0,
+                        max_lifetime=600.0,
+                        reconnect_timeout=15.0,
                         check=_robust_check_connection,
                         open=True,
                         kwargs={
                             "autocommit": True,
                             "connect_timeout": 15,
                             "keepalives": 1,
-                            "keepalives_idle": 10,
-                            "keepalives_interval": 5,
+                            "keepalives_idle": 30,
+                            "keepalives_interval": 10,
                             "keepalives_count": 3,
                         }
                     )
-                    logger.info("Initialized cloud-hardened PostgreSQL ConnectionPool (min=1, max=20, check=robust)")
+                    logger.info("Initialized cloud-hardened PostgreSQL ConnectionPool (min=%d, max=%d, check=robust)", min_conns, max_conns)
                 except Exception as e:
                     logger.exception("Failed to initialize PostgreSQL ConnectionPool: %s", e)
                     _trip_pg_circuit_breaker(60.0, str(e))
@@ -677,8 +700,9 @@ def get_authoritative_connection():
         pool_failed = False
         last_pool_exc = None
         if pool is not None:
+            checkout_timeout = float(os.getenv("PG_POOL_CHECKOUT_TIMEOUT", "8.0"))
             try:
-                with pool.connection(timeout=3.5) as conn:
+                with pool.connection(timeout=checkout_timeout) as conn:
                     adapter = PostgresConnectionAdapter(conn)
                     try:
                         yield adapter
@@ -751,10 +775,10 @@ def safe_execute(sql: str, params: tuple = ()) -> bool:
         if pool is not None:
             pg_sql = translate_sqlite_sql_to_postgres(sql)
             is_ddl = sql.strip().upper().startswith(("CREATE ", "ALTER ", "DROP ", "VACUUM"))
-            last_exc = None
+            checkout_timeout = float(os.getenv("PG_POOL_CHECKOUT_TIMEOUT", "8.0"))
             for attempt in range(2):
                 try:
-                    with pool.connection(timeout=3.5) as conn:
+                    with pool.connection(timeout=checkout_timeout) as conn:
                         with conn.transaction():
                             with conn.cursor() as cur:
                                 getattr(cur, "execute")(pg_sql, params)
@@ -866,11 +890,11 @@ def safe_query(sql: str, params: tuple = ()) -> list:
         pool = get_db_pool()
         if pool is not None:
             pg_sql = translate_sqlite_sql_to_postgres(sql)
-            last_exc = None
+            checkout_timeout = float(os.getenv("PG_POOL_CHECKOUT_TIMEOUT", "8.0"))
             for attempt in range(2):
                 try:
                     from psycopg.rows import dict_row
-                    with pool.connection(timeout=3.5) as conn:
+                    with pool.connection(timeout=checkout_timeout) as conn:
                         with conn.cursor(row_factory=dict_row) as cur:
                             getattr(cur, "execute")(pg_sql, params)
                             res = [sanitize_for_json(dict(r)) for r in cur.fetchall()]
@@ -12472,16 +12496,28 @@ def create_user_session(session_dict: Dict[str, Any]) -> bool:
 
 def get_user_session_by_token_hash(token_hash: str) -> Optional[Dict[str, Any]]:
     """Fetches active user session by token hash."""
+    t0 = time.perf_counter()
     now_iso = datetime.now(timezone.utc).isoformat()
     rows = safe_query(
         """
-        SELECT s.*, u.username, u.email, u.role, u.is_2fa_enabled
+        SELECT s.*, u.username, u.email, u.role, u.is_2fa_enabled, u.must_change_password, u.passkeys_json, u.recovery_codes_json
         FROM user_sessions s
         JOIN users u ON s.user_id = u.id
         WHERE s.token_hash = ? AND s.is_revoked = 0 AND s.expires_at > ?
         """,
         (token_hash, now_iso),
     )
+    dur_ms = round((time.perf_counter() - t0) * 1000.0, 2)
+    req_id = ""
+    try:
+        from flask import g
+        req_id = getattr(g, "request_id", "")
+    except Exception:
+        pass
+    if dur_ms > 200.0:
+        logger.warning("[DB_SESSION_LOOKUP] [req_id=%s] [duration=%0.2fms] Slower session lookup (found=%s)", req_id, dur_ms, bool(rows))
+    else:
+        logger.debug("[DB_SESSION_LOOKUP] [req_id=%s] [duration=%0.2fms] found=%s", req_id, dur_ms, bool(rows))
     return rows[0] if rows else None
 
 

@@ -360,6 +360,15 @@ async function handleProxy(req: NextRequest, ctx: { params?: { path: string[] } 
 
   const latencyMs = Math.round(performance.now() - startTime);
 
+  // Bounded duration logging for proxy requests (never logging secrets, cookies, or tokens)
+  if (finalResponse) {
+    if (latencyMs > 1500 || !finalResponse.ok) {
+      console.log(`[BFF_PROXY] [req_id=${requestId}] [latency=${latencyMs}ms] ${req.method} /api/${subPath} -> ${finalResponse.status}`);
+    }
+  } else {
+    console.warn(`[BFF_PROXY_FAIL] [req_id=${requestId}] [latency=${latencyMs}ms] ${req.method} /api/${subPath} -> ${lastError?.name || "Error"}: ${lastError?.message || String(lastError)}`);
+  }
+
   // If we got a valid response from any candidate URL
   if (finalResponse) {
     const contentType = finalResponse.headers.get("content-type") || "";

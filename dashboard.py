@@ -35,7 +35,7 @@ from typing import Dict, Any, List, Optional, Tuple
 import pandas as pd
 import numpy as np
 
-from flask import Flask, jsonify, render_template, request, Response, send_file, send_from_directory, make_response
+from flask import Flask, jsonify, render_template, request, Response, send_file, send_from_directory, make_response, g
 from werkzeug.exceptions import HTTPException
 
 if hasattr(sys.stdout, "reconfigure"):
@@ -410,6 +410,9 @@ if sock is not None:
 @app.before_request
 def enforce_server_side_security():
     """Authoritative server-side authentication, RBAC, CSRF, and password-change gate."""
+    g.request_id = request.headers.get("X-Request-Id") or request.headers.get("X-Correlation-Id") or f"req_{secrets.token_hex(6)}"
+    g.start_time = time.perf_counter()
+
     # 1. Handle CORS Preflight OPTIONS
     if request.method == "OPTIONS":
         resp = make_response("", 204)
@@ -441,6 +444,7 @@ def enforce_server_side_security():
         or path.startswith("/api/feed/")
         or path.startswith("/v3/feed/")
         or path.startswith("/api/upstox/feed/")
+        or path.startswith("/api/webhooks/")
         or path in [
             "/api/auth/login",
             "/api/auth/logout",
@@ -487,7 +491,7 @@ def enforce_server_side_security():
 
         # Enforce CSRF protection for browser sessions on mutating operations
         if request.method in ["POST", "PUT", "PATCH", "DELETE"]:
-            token_cookie = request.cookies.get("algo_session_token")
+            token_cookie = request.cookies.get("algo_session_token") or request.cookies.get("quantos_session_token")
             if token_cookie:
                 origin = request.headers.get("Origin") or request.headers.get("Referer") or ""
                 host = request.headers.get("Host") or ""
@@ -497,7 +501,8 @@ def enforce_server_side_security():
                     clean_host = host.split("/")[0]
                     frontend_clean = os.environ.get("FRONTEND_URL", "").replace("http://", "").replace("https://", "").split("/")[0]
                     is_local = clean_origin.startswith("127.0.0.1") or clean_origin.startswith("localhost")
-                    matches_host = clean_origin == clean_host or (frontend_clean and clean_origin == frontend_clean)
+                    is_trusted_app = clean_origin.endswith(".vercel.app") or clean_origin.endswith(".onrender.com")
+                    matches_host = clean_origin == clean_host or (frontend_clean and clean_origin == frontend_clean) or is_trusted_app
                     if not (is_local or matches_host or csrf_header):
                         return jsonify({
                             "status": "error",
@@ -779,7 +784,8 @@ def background_price_loop():
                         logger.debug("Fleet bot %s cycle error: %s", bot_id, bot_err)
         except Exception as e:
             logger.debug("Fleet evaluation loop notice: %s", e)
-        time.sleep(1.5)
+        loop_sleep = 1.5 if (locals().get("active_bots") and len(locals().get("active_bots", [])) > 0) else 5.0
+        time.sleep(loop_sleep)
 
 if not os.environ.get("PYTEST_CURRENT_TEST"):
     bg_thread = threading.Thread(target=background_price_loop, daemon=True, name="FleetEvaluationEngine")
@@ -14373,6 +14379,12 @@ def api_auth_email_otp_verify():
         details={"session_id": session_dict["session_id"], "device": device_name}
     )
 
+    try:
+        from src.security_rbac import _USER_CACHE
+        _USER_CACHE[user["id"]] = (time.time(), user)
+    except Exception:
+        pass
+
     is_https = request.is_secure or (request.headers.get("X-Forwarded-Proto") == "https")
     resp = make_response(jsonify({
         "status": "success",
@@ -14390,15 +14402,15 @@ def api_auth_email_otp_verify():
         "session_token": raw_token,
         "request_id": request_id
     }))
-    resp.set_cookie(
-        "algo_session_token",
-        raw_token,
-        httponly=True,
-        samesite="Lax",
-        secure=is_https,
-        max_age=get_daily_cookie_max_age(),
-        path="/"
-    )
+    cookie_kwargs = {
+        "httponly": True,
+        "samesite": "Lax",
+        "secure": is_https,
+        "max_age": get_daily_cookie_max_age(),
+        "path": "/"
+    }
+    resp.set_cookie("algo_session_token", raw_token, **cookie_kwargs)
+    resp.set_cookie("quantos_session_token", raw_token, **cookie_kwargs)
     return resp
 
 
@@ -14736,15 +14748,15 @@ def api_auth_2fa_verify():
         "session_token": raw_token,
         "request_id": request_id
     }))
-    resp.set_cookie(
-        "algo_session_token",
-        raw_token,
-        httponly=True,
-        samesite="Lax",
-        secure=is_https,
-        max_age=get_daily_cookie_max_age(),
-        path="/"
-    )
+    cookie_kwargs = {
+        "httponly": True,
+        "samesite": "Lax",
+        "secure": is_https,
+        "max_age": get_daily_cookie_max_age(),
+        "path": "/"
+    }
+    resp.set_cookie("algo_session_token", raw_token, **cookie_kwargs)
+    resp.set_cookie("quantos_session_token", raw_token, **cookie_kwargs)
     return resp
 
 
@@ -14848,6 +14860,7 @@ def api_auth_logout():
 
     resp = make_response(jsonify({"status": "success", "message": "Logged out successfully."}))
     resp.delete_cookie("algo_session_token", path="/", httponly=True, samesite="Lax")
+    resp.delete_cookie("quantos_session_token", path="/", httponly=True, samesite="Lax")
     return resp
 
 
@@ -14860,6 +14873,7 @@ def api_auth_logout_all():
     db.revoke_all_user_sessions(user["id"])
     resp = make_response(jsonify({"status": "success", "message": "All sessions revoked."}))
     resp.delete_cookie("algo_session_token", path="/", httponly=True, samesite="Lax")
+    resp.delete_cookie("quantos_session_token", path="/", httponly=True, samesite="Lax")
     return resp
 
 
@@ -15565,6 +15579,8 @@ def api_auth_me():
     avoiding noisy client console errors on ordinary initial page loads.
     In development/bootstrap mode, automatically restores the operator admin session.
     """
+    t_start = time.perf_counter()
+    req_id = getattr(g, "request_id", "") or request.headers.get("X-Request-Id", "")
     auth_require_login = os.getenv("AUTH_REQUIRE_LOGIN", "true").lower() in ("true", "1")
     is_testing = bool(app.config.get("TESTING")) or bool(os.environ.get("PYTEST_CURRENT_TEST"))
     bootstrap_enabled = os.getenv("AUTH_BOOTSTRAP_ENABLED", "false").lower() in ("true", "1")
@@ -15572,12 +15588,16 @@ def api_auth_me():
     allow_fallback = (is_testing or bootstrap_enabled) and not is_explicit_unauth and not auth_require_login
 
     user, session = get_current_user_and_session(allow_dev_fallback=allow_fallback)
+    dur_ms = round((time.perf_counter() - t_start) * 1000.0, 2)
     if not user or not session:
+        logger.info("[AUTH_ME] [req_id=%s] [duration=%0.2fms] authenticated=False", req_id, dur_ms)
         return jsonify({
             "status": "success",
             "authenticated": False,
             "user": None
         }), 200
+
+    logger.info("[AUTH_ME] [req_id=%s] [duration=%0.2fms] authenticated=True user_id=%s", req_id, dur_ms, user.get("id"))
 
     role = user.get("role", "ADMIN")
     permissions = list(ROLE_PERMISSIONS.get(role, set()))
@@ -15604,8 +15624,8 @@ def api_auth_me():
     resp = make_response(jsonify(payload), 200)
 
     # If this request came in without a cookie in dev fallback mode, automatically provision
-    # a real persistent session token and set the cookie and bearer token
-    existing_cookie = request.cookies.get("algo_session_token")
+    # a real persistent session token and set both cookies and bearer token
+    existing_cookie = request.cookies.get("algo_session_token") or request.cookies.get("quantos_session_token")
     if not existing_cookie and allow_fallback and user.get("id"):
         try:
             raw_token, session_meta = SessionManager.create_session(
@@ -15615,15 +15635,15 @@ def api_auth_me():
                 user_agent=request.headers.get("User-Agent", "QuantOS-Client")
             )
             is_https = request.is_secure or (request.headers.get("X-Forwarded-Proto") == "https")
-            resp.set_cookie(
-                "algo_session_token",
-                raw_token,
-                httponly=True,
-                samesite="Lax",
-                secure=is_https,
-                max_age=get_daily_cookie_max_age(),
-                path="/"
-            )
+            cookie_kwargs = {
+                "httponly": True,
+                "samesite": "Lax",
+                "secure": is_https,
+                "max_age": get_daily_cookie_max_age(),
+                "path": "/"
+            }
+            resp.set_cookie("algo_session_token", raw_token, **cookie_kwargs)
+            resp.set_cookie("quantos_session_token", raw_token, **cookie_kwargs)
             payload["session"] = session_meta
             payload["session_token"] = raw_token
             resp.set_data(json.dumps(payload))
@@ -16291,6 +16311,9 @@ def apply_security_headers(response):
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    req_id = getattr(g, "request_id", None)
+    if req_id:
+        response.headers["X-Request-Id"] = req_id
     return response
 
 

@@ -305,8 +305,10 @@ async function handleProxy(req: NextRequest, ctx: { params?: { path: string[] } 
 
   const isStream = subPath.startsWith("stream") || subPath.includes("/stream") || subPath.includes("market-data/stream") || req.headers.get("accept")?.includes("text/event-stream");
   const isStatus = subPath === "status" || subPath.startsWith("status/");
+  const isIndicator = subPath.includes("indicator");
+  const isBots = subPath === "bots" || subPath.startsWith("bots/");
   const isHeavy = subPath.includes("backtest") || subPath.includes("simulate") || subPath.includes("portfolio") || subPath.includes("risk") || subPath.includes("journal") || subPath.includes("positions") || subPath.includes("options") || subPath.includes("dashboard") || subPath.includes("snapshot") || subPath.includes("instruments") || subPath.includes("universe") || subPath.includes("orders");
-  const timeoutMs = isStatus ? 3500 : (isHeavy ? 60000 : 35000);
+  const timeoutMs = isStatus || isIndicator || isBots ? 4000 : (isHeavy ? 60000 : 35000);
 
   let bodyData: BodyInit | null = null;
   if (["POST", "PUT", "PATCH", "DELETE"].includes(req.method)) {
@@ -518,6 +520,92 @@ async function handleProxy(req: NextRequest, ctx: { params?: { path: string[] } 
       last_updated: new Date().toISOString(),
     };
     return NextResponse.json(fallbackStatus, {
+      status: 200,
+      headers: {
+        "X-Request-Id": requestId,
+        "X-Response-Time-Ms": latencyMs.toString(),
+        "X-Proxy-Cache": "SYNTHETIC-FALLBACK",
+        "Content-Type": "application/json",
+      },
+    });
+  }
+
+  // Synthetic Fallback for Indicator Profiles
+  if (req.method === "GET" && (subPath === "indicators/profiles" || subPath.endsWith("/indicators/profiles"))) {
+    return NextResponse.json({
+      status: "success",
+      profiles: [
+        {
+          profile_id: "profile-btc-15m-trend",
+          name: "BTC 15m Trend",
+          market_regime: "TRENDING",
+          scoring_mode: "WEIGHTED",
+          adaptive_mode: "BALANCED",
+          signal_threshold_long: 75.0,
+          signal_threshold_short: 75.0,
+          config: {
+            ema: { enabled: true, weight: 20, timeframe: "15m", fast: 20, slow: 50 },
+            rsi: { enabled: true, weight: 15, timeframe: "15m", period: 14, overbought: 70, oversold: 30 },
+            macd: { enabled: true, weight: 20, timeframe: "15m", fast: 12, slow: 26, signal: 9 },
+            supertrend: { enabled: true, weight: 15, timeframe: "15m", atr_period: 10, multiplier: 3.0 },
+            vwap: { enabled: true, weight: 15, timeframe: "15m" },
+            volume: { enabled: true, weight: 10, timeframe: "15m" }
+          }
+        }
+      ]
+    }, {
+      status: 200,
+      headers: {
+        "X-Request-Id": requestId,
+        "X-Response-Time-Ms": latencyMs.toString(),
+        "X-Proxy-Cache": "SYNTHETIC-FALLBACK",
+        "Content-Type": "application/json",
+      },
+    });
+  }
+
+  // Synthetic Fallback for Indicators / Live Signals
+  if (req.method === "GET" && (subPath.startsWith("indicators") || subPath.includes("/indicators"))) {
+    return NextResponse.json({
+      status: "success",
+      indicators: {},
+      summary: { composite_score: 50.0, consensus_signal: "NEUTRAL", confidence: 0.0 },
+      symbol: "BTC/USDT",
+      timeframe: "15m",
+      engine: { status: "ACTIVE", last_cycle: new Date().toISOString() }
+    }, {
+      status: 200,
+      headers: {
+        "X-Request-Id": requestId,
+        "X-Response-Time-Ms": latencyMs.toString(),
+        "X-Proxy-Cache": "SYNTHETIC-FALLBACK",
+        "Content-Type": "application/json",
+      },
+    });
+  }
+
+  // Synthetic Fallback for Bots Fleet List
+  if (req.method === "GET" && (subPath === "bots" || subPath.startsWith("bots/"))) {
+    return NextResponse.json({
+      status: "success",
+      success: true,
+      bots: [
+        {
+          id: "bot-1",
+          name: "BTC Momentum Trend V1",
+          symbol: "BTC/USDT",
+          timeframe: "15m",
+          strategy: "EMA_MACD_VP",
+          status: "STOPPED",
+          execution_mode: "PAPER",
+          allocated_capital: 10000.0,
+        }
+      ],
+      data: [],
+      total: 1,
+      total_bots: 1,
+      metrics: { total_bots: 1, active_bots: 0, stopped_bots: 1, total_pnl: 0.0 }
+    }, {
       status: 200,
       headers: {
         "X-Request-Id": requestId,

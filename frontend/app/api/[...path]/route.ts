@@ -424,7 +424,7 @@ async function handleProxy(req: NextRequest, ctx: { params?: { path: string[] } 
     }
 
     const responseString = JSON.stringify(jsonBody ?? {});
-    if (finalResponse.ok && req.method === "GET" && (subPath.includes("instruments") || subPath.includes("universe") || subPath.includes("providers") || subPath.includes("expiries") || subPath.includes("status"))) {
+    if (finalResponse.ok && req.method === "GET" && (subPath.includes("instruments") || subPath.includes("universe") || subPath.includes("providers") || subPath.includes("expiries") || subPath.includes("status") || subPath.includes("indicators"))) {
       const entry: CacheEntry = {
         body: responseString,
         contentType: "application/json",

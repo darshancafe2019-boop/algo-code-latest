@@ -145,8 +145,8 @@ export function IndicatorCenter() {
       };
     },
 
-    staleTime: 3000,
-    refetchInterval: 6000,
+    staleTime: 15000,
+    refetchInterval: 30000,
     refetchOnWindowFocus: false,
   });
 
@@ -181,7 +181,7 @@ export function IndicatorCenter() {
           []) as IndicatorProfile[];
       },
 
-      staleTime: 10000,
+      staleTime: 30000,
       refetchOnWindowFocus: false,
     });
 
@@ -217,8 +217,8 @@ export function IndicatorCenter() {
       return response.json();
     },
 
-    staleTime: 3000,
-    refetchInterval: 5000,
+    staleTime: 15000,
+    refetchInterval: 30000,
     refetchOnWindowFocus: false,
   });
 

@@ -211,3 +211,42 @@ def test_database_pool_configuration_bounds():
     """Verify db pool parameters have resilient timeouts and warm pool minimums."""
     assert int(os.getenv("PG_POOL_MIN", "4")) >= 4
     assert int(os.getenv("PG_POOL_MAX", "20")) <= 30
+
+
+def test_indicator_endpoints_public_whitelist_and_caching(client):
+    """Verify /api/indicators, /api/indicators/status, and /api/indicators/profiles are public and cached."""
+    # 1. Unauthenticated request to /api/indicators must return 200 without requiring login
+    t0 = time.perf_counter()
+    res1 = client.get("/api/indicators?bot_id=bot-1&symbol=BTC/USDT&timeframe=15m")
+    t1 = time.perf_counter()
+    assert res1.status_code == 200
+    data1 = res1.get_json()
+    assert data1["status"] == "success"
+    assert "indicators" in data1
+    assert "market_summary" in data1
+
+    # 2. Second request must hit in-memory cache and return substantially faster (< 50ms)
+    t2 = time.perf_counter()
+    res2 = client.get("/api/indicators?bot_id=bot-1&symbol=BTC/USDT&timeframe=15m")
+    t3 = time.perf_counter()
+    assert res2.status_code == 200
+    assert (t3 - t2) < 0.05, f"Cached response took {t3 - t2}s, expected < 0.05s"
+
+    # 3. /api/indicators/status must return 200 and be cached
+    st_res = client.get("/api/indicators/status?bot_id=bot-1")
+    assert st_res.status_code == 200
+    assert st_res.get_json()["status"] == "success"
+
+    # 4. /api/indicators/profiles must return 200 and be cached
+    prof_res = client.get("/api/indicators/profiles")
+    assert prof_res.status_code == 200
+    assert prof_res.get_json()["status"] == "success"
+
+
+def test_api_status_public_whitelist(client):
+    """Verify /api/status is publicly accessible without active session."""
+    res = client.get("/api/status")
+    assert res.status_code == 200
+    data = res.get_json()
+    assert "bot_id" in data or "status" in data
+

@@ -140,7 +140,15 @@ const TaxIntelligenceTab = dynamic(
 
 
 function MainApp() {
-  const [activeTab, setActiveTab] = useState<string>("home");
+  const [activeTab, setActiveTab] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const urlParams = new URLSearchParams(window.location.search);
+        return urlParams.get("tab") || "home";
+      } catch {}
+    }
+    return "home";
+  });
 
   // Read URL query parameter ?tab=... on initial mount & listen to browser back/forward buttons
   useEffect(() => {

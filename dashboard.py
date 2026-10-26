@@ -439,7 +439,12 @@ def enforce_server_side_security():
         or path.startswith("/api/strategies/")
         or path.startswith("/api/instruments/")
         or path.startswith("/api/contracts/")
+        or path == "/api/indicators"
         or path.startswith("/api/indicators/")
+        or path == "/api/status"
+        or path.startswith("/api/status/")
+        or path == "/api/bots"
+        or (path.startswith("/api/bots/") and request.method == "GET")
         or path.startswith("/feed/")
         or path.startswith("/api/feed/")
         or path.startswith("/v3/feed/")
@@ -2699,6 +2704,38 @@ def api_indicators_catalog():
     return jsonify({"status": "success", "catalog": configs})
 
 
+_INDICATORS_RESPONSE_CACHE: Dict[str, Tuple[float, Dict[str, Any]]] = {}
+_INDICATORS_CACHE_TTL = 20.0  # seconds
+
+_INDICATORS_OHLCV_CACHE: Dict[str, Tuple[float, pd.DataFrame]] = {}
+_INDICATORS_OHLCV_TTL = 30.0  # seconds
+
+
+def _safe_fetch_indicator_ohlcv(symbol: str, timeframe: str, limit: int = 200) -> pd.DataFrame:
+    """Non-blocking OHLCV fetch with candle cache and strict 2.0s timeout to protect Gunicorn threads."""
+    ohlcv_key = f"{symbol}:{timeframe}"
+    now = time.time()
+    cached = _INDICATORS_OHLCV_CACHE.get(ohlcv_key)
+    if cached and (now - cached[0] < _INDICATORS_OHLCV_TTL) and not cached[1].empty:
+        return cached[1]
+
+    try:
+        from src.data_fetcher import get_mainnet_fetcher
+        fetcher = get_mainnet_fetcher()
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            future = pool.submit(fetcher.fetch_live_ohlcv, symbol, timeframe, limit)
+            df = future.result(timeout=2.0)
+            if df is not None and not df.empty:
+                _INDICATORS_OHLCV_CACHE[ohlcv_key] = (now, df)
+                return df
+    except Exception as exc:
+        logger.warning(f"Fast indicator OHLCV fetch timed out or failed for {symbol}: {exc}")
+
+    if cached and not cached[1].empty:
+        return cached[1]
+    return pd.DataFrame()
+
+
 @app.route("/api/indicators", methods=["GET"])
 def api_indicators_list():
     """Returns all indicator configurations for a specific bot following priority hierarchy (BOT OVERRIDE > PROFILE > GLOBAL DEFAULT)."""
@@ -2715,6 +2752,12 @@ def api_indicators_list():
             symbol = symbol or "BTC/USDT"
             timeframe = timeframe or "15m"
 
+    cache_key = f"{bot_id}:{symbol}:{timeframe}"
+    now = time.time()
+    cached = _INDICATORS_RESPONSE_CACHE.get(cache_key)
+    if cached and (now - cached[0] < _INDICATORS_CACHE_TTL):
+        return jsonify(cached[1])
+
     configs = db.get_bot_effective_indicator_configs(bot_id, symbol, timeframe)
     market_summary = {
         "decision": "HOLD",
@@ -2730,10 +2773,8 @@ def api_indicators_list():
     
     # Calculate real-time signals using live data and bot's effective configuration
     try:
-        from src.data_fetcher import get_mainnet_fetcher
         from src.indicators import evaluate_profile_confluence
-        fetcher = get_mainnet_fetcher()
-        df = fetcher.fetch_live_ohlcv(symbol, timeframe, limit=200)
+        df = _safe_fetch_indicator_ohlcv(symbol, timeframe, limit=200)
 
         cfg_map = {c["indicator_id"]: c for c in configs}
         eval_res = evaluate_profile_confluence(df, {"config": cfg_map, "signal_threshold_long": 75.0, "signal_threshold_short": 75.0})
@@ -2790,14 +2831,16 @@ def api_indicators_list():
             c["formatted_value"] = "—"
             c["status"] = "INITIALIZING"
 
-    return jsonify({
+    payload = {
         "status": "success",
         "bot_id": bot_id,
         "symbol": symbol,
         "timeframe": timeframe,
         "indicators": configs,
         "market_summary": market_summary
-    })
+    }
+    _INDICATORS_RESPONSE_CACHE[cache_key] = (now, payload)
+    return jsonify(payload)
 
 
 @app.route("/api/indicators/effective-config", methods=["GET"])
@@ -5636,10 +5679,22 @@ def api_ai_command_nlp():
     })
 
 
+_INDICATOR_STATUS_CACHE: Dict[str, Tuple[float, Dict[str, Any]]] = {}
+_INDICATOR_STATUS_TTL = 15.0  # seconds
+
+_INDICATOR_PROFILES_CACHE: Optional[Tuple[float, List[Dict[str, Any]]]] = None
+_INDICATOR_PROFILES_TTL = 30.0  # seconds
+
+
 @app.route("/api/indicators/status", methods=["GET"])
 def api_indicators_status():
     """Returns top dashboard bar status metrics (Active indicators count, regime, active profile, confidence %, bias, volatility)."""
     bot_id = request.args.get("bot_id", "bot-1")
+    now = time.time()
+    cached = _INDICATOR_STATUS_CACHE.get(bot_id)
+    if cached and (now - cached[0] < _INDICATOR_STATUS_TTL):
+        return jsonify(cached[1])
+
     profile = db.get_bot_indicator_profile(bot_id) or db.get_indicator_profile_by_id("profile-btc-15m-trend")
     profile_cfg = profile.get("config", {}) if profile else {}
 
@@ -5650,7 +5705,7 @@ def api_indicators_status():
     conf = float(last_decision.get("confluence_pct", 78.0)) if last_decision else 78.0
     dec = last_decision.get("decision", "HOLD") if last_decision else "HOLD"
 
-    return jsonify({
+    status_data = {
         "status": "success",
         "bot_id": bot_id,
         "active_indicators_count": active_count,
@@ -5661,13 +5716,17 @@ def api_indicators_status():
         "long_bias": "Positive" if dec in ["LONG", "HOLD"] else "Neutral",
         "short_bias": "Negative" if dec == "LONG" else ("Positive" if dec == "SHORT" else "Neutral"),
         "volatility": "Moderate"
-    })
+    }
+    _INDICATOR_STATUS_CACHE[bot_id] = (now, status_data)
+    return jsonify(status_data)
 
 
 @app.route("/api/indicators/profiles", methods=["GET", "POST"])
 def api_indicators_profiles():
     """GET list of indicator profiles or POST to create/update a profile."""
+    global _INDICATOR_PROFILES_CACHE
     if request.method == "POST":
+        _INDICATOR_PROFILES_CACHE = None
         payload = request.get_json(silent=True) or {}
         ok, pid_or_err = db.save_indicator_profile(payload)
         if ok:
@@ -5675,7 +5734,12 @@ def api_indicators_profiles():
         else:
             return jsonify({"status": "error", "message": f"Failed to save profile: {pid_or_err}"}), 400
 
+    now = time.time()
+    if _INDICATOR_PROFILES_CACHE and (now - _INDICATOR_PROFILES_CACHE[0] < _INDICATOR_PROFILES_TTL):
+        return jsonify({"status": "success", "profiles": _INDICATOR_PROFILES_CACHE[1]})
+
     profiles = db.get_indicator_profiles()
+    _INDICATOR_PROFILES_CACHE = (now, profiles)
     return jsonify({"status": "success", "profiles": profiles})
 
 

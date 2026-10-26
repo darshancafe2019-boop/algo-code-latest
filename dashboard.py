@@ -777,9 +777,9 @@ def background_price_loop():
                 bot_id = b.get("id")
                 if not bot_id:
                     continue
-                # Throttle evaluation to every 4.0 seconds per bot for responsive real-time updates without CPU saturation
+                # Throttle evaluation to every 10.0 seconds per bot for responsive updates without CPU saturation
                 last_run = last_bot_run_times.get(bot_id, 0.0)
-                if now - last_run >= 4.0:
+                if now - last_run >= 10.0:
                     last_bot_run_times[bot_id] = now
                     try:
                         runner = LiveRunner(bot_id=bot_id)
@@ -789,8 +789,7 @@ def background_price_loop():
                         logger.debug("Fleet bot %s cycle error: %s", bot_id, bot_err)
         except Exception as e:
             logger.debug("Fleet evaluation loop notice: %s", e)
-        loop_sleep = 1.5 if (locals().get("active_bots") and len(locals().get("active_bots", [])) > 0) else 5.0
-        time.sleep(loop_sleep)
+        time.sleep(5.0)
 
 if not os.environ.get("PYTEST_CURRENT_TEST"):
     bg_thread = threading.Thread(target=background_price_loop, daemon=True, name="FleetEvaluationEngine")
@@ -1672,18 +1671,26 @@ def api_orderbook():
 # ============================================================================
 # SECTION 2: BOT CONTROL ENDPOINTS
 # ============================================================================
+_API_STATUS_RESPONSE_CACHE: Dict[str, Tuple[float, Dict[str, Any]]] = {}
+_API_STATUS_CACHE_TTL = 4.0  # seconds
+
+
 @app.route("/api/status")
 def api_status():
     """Get bot live status, uptime, balance, and heartbeat."""
     from src.process_manager import multi_bot_manager
     
-    bot_id_arg = request.args.get("bot_id", "").strip()
-    if not bot_id_arg:
-        first_bot = safe_query_one("SELECT id FROM bot_instances WHERE COALESCE(is_deleted, 0) = 0 ORDER BY created_at ASC LIMIT 1")
-        if first_bot:
-            bot_id_arg = first_bot["id"]
-        else:
-            bot_id_arg = "bot-1"
+    bot_id_arg = request.args.get("bot_id", "").strip() or "bot-1"
+    mode_arg = str(request.args.get("mode") or getattr(config, "TRADING_MODE", "PAPER")).upper()
+    cache_key = f"{bot_id_arg}:{mode_arg}"
+    now = time.time()
+    cached = _API_STATUS_RESPONSE_CACHE.get(cache_key)
+    if cached and (now - cached[0] < _API_STATUS_CACHE_TTL):
+        return jsonify(cached[1])
+
+    first_bot = safe_query_one("SELECT id FROM bot_instances WHERE COALESCE(is_deleted, 0) = 0 ORDER BY created_at ASC LIMIT 1")
+    if first_bot and not request.args.get("bot_id"):
+        bot_id_arg = first_bot["id"]
 
     mgr = multi_bot_manager.get_manager(bot_id_arg)
     bot_status = mgr.get_status()
@@ -1708,7 +1715,7 @@ def api_status():
     last_heartbeat = heartbeats[0] if heartbeats else None
 
     # Fetch Canonical Authoritative Portfolio Snapshot for consistent metrics
-    current_mode = str(request.args.get("mode") or bot_status.get("execution_mode") or getattr(config, "TRADING_MODE", "PAPER")).upper()
+    current_mode = mode_arg
     try:
         from src.global_data_engine import GlobalDataEngine
         snapshot = GlobalDataEngine.get_instance().get_portfolio_snapshot(mode=current_mode)
@@ -1815,8 +1822,7 @@ def api_status():
     if cand and cand.get("close"):
         live_price = float(cand["close"])
 
-
-    return jsonify({
+    resp_payload = {
         "status": "success",
         "bot": bot_status,
         "heartbeat": last_heartbeat,
@@ -1836,7 +1842,9 @@ def api_status():
         "live_price": live_price,
         "allow_shorts": config.ALLOW_SHORTS,
         "last_updated": datetime.now(timezone.utc).isoformat()
-    })
+    }
+    _API_STATUS_RESPONSE_CACHE[cache_key] = (now, resp_payload)
+    return jsonify(resp_payload)
 
 
 

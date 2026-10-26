@@ -808,6 +808,14 @@ def _async_startup_maintenance():
         db.seed_default_bots_if_empty()
     except Exception as ex:
         logger.debug(f"Default bots seeding notice: {ex}")
+    try:
+        for m in ["PAPER", "LIVE"]:
+            p = _build_status_payload("bot-1", m)
+            with _API_STATUS_LOCK:
+                _API_STATUS_RESPONSE_CACHE[f"bot-1:{m}"] = (time.time(), p)
+        logger.info("Startup status response cache successfully pre-warmed.")
+    except Exception as ex:
+        logger.debug(f"Status pre-seed notice: {ex}")
 
 if not os.environ.get("PYTEST_CURRENT_TEST"):
     threading.Thread(target=_async_startup_maintenance, daemon=True, name="StartupDBAudit").start()
@@ -1672,53 +1680,66 @@ def api_orderbook():
 # SECTION 2: BOT CONTROL ENDPOINTS
 # ============================================================================
 _API_STATUS_RESPONSE_CACHE: Dict[str, Tuple[float, Dict[str, Any]]] = {}
-_API_STATUS_CACHE_TTL = 4.0  # seconds
+_API_STATUS_CACHE_TTL = 15.0  # seconds fresh
+_API_STATUS_LOCK = threading.Lock()
+_API_STATUS_UPDATING: set = set()
 
 
-@app.route("/api/status")
-def api_status():
-    """Get bot live status, uptime, balance, and heartbeat."""
+def _build_status_payload(bot_id_arg: str, mode_arg: str) -> Dict[str, Any]:
+    """Builds authoritative system status payload safely with isolated DB queries."""
     from src.process_manager import multi_bot_manager
-    
-    bot_id_arg = request.args.get("bot_id", "").strip() or "bot-1"
-    mode_arg = str(request.args.get("mode") or getattr(config, "TRADING_MODE", "PAPER")).upper()
-    cache_key = f"{bot_id_arg}:{mode_arg}"
-    now = time.time()
-    cached = _API_STATUS_RESPONSE_CACHE.get(cache_key)
-    if cached and (now - cached[0] < _API_STATUS_CACHE_TTL):
-        return jsonify(cached[1])
+    try:
+        first_bot = safe_query_one("SELECT id FROM bot_instances WHERE COALESCE(is_deleted, 0) = 0 ORDER BY created_at ASC LIMIT 1")
+        if first_bot and not bot_id_arg:
+            bot_id_arg = first_bot["id"]
+    except Exception:
+        pass
 
-    first_bot = safe_query_one("SELECT id FROM bot_instances WHERE COALESCE(is_deleted, 0) = 0 ORDER BY created_at ASC LIMIT 1")
-    if first_bot and not request.args.get("bot_id"):
-        bot_id_arg = first_bot["id"]
-
-    mgr = multi_bot_manager.get_manager(bot_id_arg)
-    bot_status = mgr.get_status()
+    try:
+        mgr = multi_bot_manager.get_manager(bot_id_arg)
+        bot_status = mgr.get_status()
+    except Exception:
+        bot_status = {
+            "status": "STOPPED",
+            "is_running": False,
+            "is_paused": False,
+            "kill_switch_active": config.KILL_SWITCH_FILE.exists(),
+            "uptime_seconds": 0,
+            "uptime_formatted": "0m 0s",
+            "pid": None,
+            "last_error": ""
+        }
 
     # Enrich bot_status with DB bot_instance metadata
-    bot_row = safe_query_one("SELECT * FROM bot_instances WHERE id = ?", (bot_id_arg,))
-    if bot_row:
-        bot_status["name"] = bot_row.get("name") or bot_status.get("bot_id")
-        bot_status["symbol"] = bot_row.get("symbol") or "BTC/USDT"
-        bot_status["timeframe"] = bot_row.get("timeframe") or "15m"
-        bot_status["strategy"] = bot_row.get("strategy") or "EMA_MACD_VP"
-        bot_status["execution_mode"] = bot_row.get("execution_mode") or "PAPER"
-        bot_status["allocated_capital"] = float(bot_row.get("allocated_capital") or 10000.0)
-        bot_status["last_scan_at"] = bot_row.get("last_scan_at")
-        bot_status["scan_count"] = int(bot_row.get("scan_count") or 0)
-        bot_status["current_signal"] = bot_row.get("current_signal") or "HOLD"
-        bot_status["signal_confidence"] = float(bot_row.get("signal_confidence") or 0.0)
-        bot_status["required_confidence"] = float(bot_row.get("required_confidence") or 75.0)
+    try:
+        bot_row = safe_query_one("SELECT * FROM bot_instances WHERE id = ?", (bot_id_arg,))
+        if bot_row:
+            bot_status["name"] = bot_row.get("name") or bot_status.get("bot_id")
+            bot_status["symbol"] = bot_row.get("symbol") or "BTC/USDT"
+            bot_status["timeframe"] = bot_row.get("timeframe") or "15m"
+            bot_status["strategy"] = bot_row.get("strategy") or "EMA_MACD_VP"
+            bot_status["execution_mode"] = bot_row.get("execution_mode") or "PAPER"
+            bot_status["allocated_capital"] = float(bot_row.get("allocated_capital") or 10000.0)
+            bot_status["last_scan_at"] = bot_row.get("last_scan_at")
+            bot_status["scan_count"] = int(bot_row.get("scan_count") or 0)
+            bot_status["current_signal"] = bot_row.get("current_signal") or "HOLD"
+            bot_status["signal_confidence"] = float(bot_row.get("signal_confidence") or 0.0)
+            bot_status["required_confidence"] = float(bot_row.get("required_confidence") or 75.0)
+    except Exception:
+        pass
 
     # Read heartbeat log from DB
-    heartbeats = safe_query("SELECT timestamp, status, details FROM heartbeat_log ORDER BY id DESC LIMIT 1")
-    last_heartbeat = heartbeats[0] if heartbeats else None
+    try:
+        heartbeats = safe_query("SELECT timestamp, status, details FROM heartbeat_log ORDER BY id DESC LIMIT 1")
+        last_heartbeat = heartbeats[0] if heartbeats else None
+    except Exception:
+        last_heartbeat = None
 
     # Fetch Canonical Authoritative Portfolio Snapshot for consistent metrics
     current_mode = mode_arg
     try:
         from src.global_data_engine import GlobalDataEngine
-        snapshot = GlobalDataEngine.get_instance().get_portfolio_snapshot(mode=current_mode)
+        snapshot = GlobalDataEngine.get_instance().get_portfolio_snapshot(mode=current_mode, max_age_sec=15.0)
     except Exception as gde_err:
         logger.warning(f"Failed to fetch GlobalDataEngine snapshot for api_status: {gde_err}")
         snapshot = {}
@@ -1758,15 +1779,21 @@ def api_status():
     }
 
     # Open trade check for specific bot_id
-    open_trade = safe_query_one("SELECT * FROM trades_log WHERE bot_id = ? AND status IN ('OPEN', 'RUNNING', 'PARTIAL') ORDER BY id DESC LIMIT 1", (bot_id_arg,))
+    try:
+        open_trade = safe_query_one("SELECT * FROM trades_log WHERE bot_id = ? AND status IN ('OPEN', 'RUNNING', 'PARTIAL') ORDER BY id DESC LIMIT 1", (bot_id_arg,))
+    except Exception:
+        open_trade = None
 
     # Aggregate system summary across all active bot instances
-    all_bots = safe_query("SELECT status FROM bot_instances WHERE COALESCE(is_deleted, 0) = 0")
-    running_cnt = sum(1 for b in all_bots if b["status"] == "RUNNING")
-    stopped_cnt = sum(1 for b in all_bots if b["status"] == "STOPPED")
-    stalled_cnt = sum(1 for b in all_bots if b["status"] == "STALLED")
-    error_cnt = sum(1 for b in all_bots if b["status"] == "ERROR")
-    paused_cnt = sum(1 for b in all_bots if b["status"] == "PAUSED")
+    try:
+        all_bots = safe_query("SELECT status FROM bot_instances WHERE COALESCE(is_deleted, 0) = 0")
+    except Exception:
+        all_bots = []
+    running_cnt = sum(1 for b in all_bots if b.get("status") == "RUNNING")
+    stopped_cnt = sum(1 for b in all_bots if b.get("status") == "STOPPED")
+    stalled_cnt = sum(1 for b in all_bots if b.get("status") == "STALLED")
+    error_cnt = sum(1 for b in all_bots if b.get("status") == "ERROR")
+    paused_cnt = sum(1 for b in all_bots if b.get("status") == "PAUSED")
 
     kill_switch_active = config.KILL_SWITCH_FILE.exists()
     if kill_switch_active:
@@ -1812,17 +1839,23 @@ def api_status():
     target_sym = bot_status.get("symbol", config.SYMBOL)
 
     # Fetch last evaluated signal
-    last_signal = safe_query_one("SELECT timestamp, signal_type, price, reason FROM signals_log WHERE symbol = ? ORDER BY id DESC LIMIT 1", (target_sym,))
-    if not last_signal:
-        last_signal = safe_query_one("SELECT timestamp, signal_type, price, reason FROM signals_log ORDER BY id DESC LIMIT 1")
+    try:
+        last_signal = safe_query_one("SELECT timestamp, signal_type, price, reason FROM signals_log WHERE symbol = ? ORDER BY id DESC LIMIT 1", (target_sym,))
+        if not last_signal:
+            last_signal = safe_query_one("SELECT timestamp, signal_type, price, reason FROM signals_log ORDER BY id DESC LIMIT 1")
+    except Exception:
+        last_signal = None
 
     # Get live price from cached candle
     live_price = None
-    cand = safe_query_one("SELECT close FROM candles_cache WHERE symbol = ? ORDER BY id DESC LIMIT 1", (target_sym,))
-    if cand and cand.get("close"):
-        live_price = float(cand["close"])
+    try:
+        cand = safe_query_one("SELECT close FROM candles_cache WHERE symbol = ? ORDER BY id DESC LIMIT 1", (target_sym,))
+        if cand and cand.get("close"):
+            live_price = float(cand["close"])
+    except Exception:
+        live_price = None
 
-    resp_payload = {
+    return {
         "status": "success",
         "bot": bot_status,
         "heartbeat": last_heartbeat,
@@ -1843,8 +1876,51 @@ def api_status():
         "allow_shorts": config.ALLOW_SHORTS,
         "last_updated": datetime.now(timezone.utc).isoformat()
     }
-    _API_STATUS_RESPONSE_CACHE[cache_key] = (now, resp_payload)
-    return jsonify(resp_payload)
+
+
+@app.route("/api/status")
+def api_status():
+    """Get bot live status, uptime, balance, and heartbeat with Stale-While-Revalidate caching."""
+    bot_id_arg = request.args.get("bot_id", "").strip() or "bot-1"
+    mode_arg = str(request.args.get("mode") or getattr(config, "TRADING_MODE", "PAPER")).upper()
+    cache_key = f"{bot_id_arg}:{mode_arg}"
+    now = time.time()
+
+    with _API_STATUS_LOCK:
+        cached = _API_STATUS_RESPONSE_CACHE.get(cache_key)
+        if not cached and bot_id_arg == "bot-1":
+            for k, v in _API_STATUS_RESPONSE_CACHE.items():
+                if k.endswith(f":{mode_arg}"):
+                    cached = v
+                    break
+
+    if cached:
+        cached_ts, cached_payload = cached
+        # Return immediately if fresh (< 15s)
+        if now - cached_ts < _API_STATUS_CACHE_TTL:
+            return jsonify(cached_payload)
+
+        # Stale-While-Revalidate: return cached response in 0ms, refresh asynchronously
+        if now - cached_ts < 300.0:
+            if cache_key not in _API_STATUS_UPDATING:
+                _API_STATUS_UPDATING.add(cache_key)
+                def _bg_worker(k=cache_key, b_id=bot_id_arg, m=mode_arg):
+                    try:
+                        p = _build_status_payload(b_id, m)
+                        with _API_STATUS_LOCK:
+                            _API_STATUS_RESPONSE_CACHE[k] = (time.time(), p)
+                    except Exception as exc:
+                        logger.debug("Background status update error: %s", exc)
+                    finally:
+                        _API_STATUS_UPDATING.discard(k)
+                threading.Thread(target=_bg_worker, daemon=True, name=f"StatusBgRefresh-{cache_key}").start()
+            return jsonify(cached_payload)
+
+    # Cold cache miss: compute synchronously and store
+    payload = _build_status_payload(bot_id_arg, mode_arg)
+    with _API_STATUS_LOCK:
+        _API_STATUS_RESPONSE_CACHE[cache_key] = (now, payload)
+    return jsonify(payload)
 
 
 

@@ -61,13 +61,13 @@ export const GlobalHeader = memo(function GlobalHeader({
 
   // Fetch backend status
   const { data: statusData } = useQuery({
-    queryKey: ["globalHeaderStatus"],
+    queryKey: ["systemStatus"],
     queryFn: async () => {
-      const res = await apiClient.get<any>("/api/status", { timeoutMs: 4000 });
+      const res = await apiClient.get<any>("/api/status", { timeoutMs: 10000 });
       return res.ok ? res.data : null;
     },
-    staleTime: 6000,
-    refetchInterval: 10000,
+    staleTime: 15000,
+    refetchInterval: 20000,
   });
 
   const isKillSwitchActive = Boolean(

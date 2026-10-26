@@ -64,12 +64,12 @@ export function EcoPositionsView() {
   const { data: systemStatusData } = useQuery({
     queryKey: ["systemStatus"],
     queryFn: async () => {
-      const res = await apiClient.get<any>("/api/status", { timeoutMs: 5000 });
+      const res = await apiClient.get<any>("/api/status", { timeoutMs: 10000 });
       if (!res.ok) return { trading_mode: tradingMode, system_summary: { kill_switch_active: false } };
       return res.data || { trading_mode: tradingMode, system_summary: { kill_switch_active: false } };
     },
-    staleTime: 4000,
-    refetchInterval: 6000,
+    staleTime: 15000,
+    refetchInterval: 20000,
     placeholderData: (prev) => prev,
   });
 

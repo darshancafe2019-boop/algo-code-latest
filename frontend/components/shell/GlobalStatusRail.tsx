@@ -34,13 +34,13 @@ export const GlobalStatusRail = memo(function GlobalStatusRail({
 
   // Query lightweight live status
   const { data: statusData } = useQuery({
-    queryKey: ["globalStatusRailData"],
+    queryKey: ["systemStatus"],
     queryFn: async () => {
-      const res = await apiClient.get<any>("/api/status", { timeoutMs: 3000 });
+      const res = await apiClient.get<any>("/api/status", { timeoutMs: 10000 });
       return res.ok ? res.data : null;
     },
-    staleTime: 5000,
-    refetchInterval: 8000,
+    staleTime: 15000,
+    refetchInterval: 20000,
   });
 
   const liveProvidersCount = Array.isArray(providers)

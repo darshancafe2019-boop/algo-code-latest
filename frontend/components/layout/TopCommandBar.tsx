@@ -57,16 +57,16 @@ export const TopCommandBar = memo(function TopCommandBar({
     };
   }, []);
 
-  // Fetch lightweight system status (staleTime: 6s, placeholderData: prev)
+  // Fetch lightweight system status (staleTime: 15s, placeholderData: prev)
   const { data: statusData } = useQuery({
     queryKey: ["systemStatus"],
     queryFn: async () => {
-      const res = await apiClient.get<any>("/api/status", { timeoutMs: 5000 });
+      const res = await apiClient.get<any>("/api/status", { timeoutMs: 10000 });
       if (!res.ok) return {};
       return res.data;
     },
-    staleTime: 6000,
-    refetchInterval: isBrowserOnline ? 8000 : 25000,
+    staleTime: 15000,
+    refetchInterval: isBrowserOnline ? 20000 : 35000,
     placeholderData: (prev) => prev,
   });
 

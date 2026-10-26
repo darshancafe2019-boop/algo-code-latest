@@ -80,12 +80,13 @@ export function TradeOperationsWorkspace() {
 
   // ── 4. Telemetry & Health Queries ──────────────────────────────
   const { data: statusData } = useQuery({
-    queryKey: ["tradeWorkspaceStatus"],
+    queryKey: ["systemStatus"],
     queryFn: async () => {
-      const res = await apiClient.get<any>("/api/status", { timeoutMs: 4000 });
+      const res = await apiClient.get<any>("/api/status", { timeoutMs: 10000 });
       return res.ok ? res.data : null;
     },
-    refetchInterval: 4000,
+    staleTime: 15000,
+    refetchInterval: 20000,
   });
 
   const { data: healthData } = useQuery({

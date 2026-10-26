@@ -1,6 +1,7 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from "react";
+
 
 export interface AuthUser {
   id: string;
@@ -95,6 +96,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLocked, setIsLocked] = useState<boolean>(false);
   const [failedAttempts, setFailedAttempts] = useState<number>(0);
   const [lockoutUntil, setLockoutUntil] = useState<number | null>(null);
+  const loginTimestampRef = useRef<number>(0);
+
 
   // Quick fill is strictly permitted ONLY in development when NEXT_PUBLIC_AUTH_DEMO_MODE is true
   const isQuickFillAvailable =
@@ -120,20 +123,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const todayStr = getLocalCalendarDate();
       const headers: Record<string, string> = { Accept: "application/json" };
       try {
-        const storedDate = localStorage.getItem("quantos_session_date");
-        // Strict Daily Login Enforcement:
-        // If session was issued on a previous calendar day, invalidate and require fresh login today
-        if (storedDate && storedDate !== todayStr) {
-          clearSessionState();
-          setIsLoading(false);
-          return false;
-        }
-
         const storedToken = localStorage.getItem("quantos_session_token") || sessionStorage.getItem("quantos_session_token");
         if (storedToken) {
           headers["Authorization"] = `Bearer ${storedToken}`;
         }
       } catch {}
+
 
       const res = await fetch("/api/auth/me", {
         method: "GET",
@@ -208,6 +203,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     const handleAuthRequired = () => {
+      // Grace period: within 15 seconds of explicit login, ignore background 401s
+      if (Date.now() - loginTimestampRef.current < 15000) {
+        console.warn("[AUTH] Suppressing auth_required during post-login initialization grace window.");
+        return;
+      }
       clearSessionState();
       setIsLoading(false);
     };
@@ -216,17 +216,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     window.addEventListener("quantos:auth_required", handleAuthRequired);
 
     // Periodic & Tab-Focus Daily Session Guard:
-    // If midnight passes while the tab is open, immediately invalidate and present Login Gateway
+    // Re-verify with authoritative backend instead of blindly nuking local session on string mismatch
     const verifyDailySessionStatus = () => {
       try {
         const storedDate = localStorage.getItem("quantos_session_date");
         const todayStr = getLocalCalendarDate();
         if (storedDate && storedDate !== todayStr) {
-          clearSessionState();
-          setIsLoading(false);
+          checkSession();
         }
       } catch {}
     };
+
 
     const intervalId = setInterval(verifyDailySessionStatus, 30000);
     const handleVisibilityChange = () => {
@@ -342,6 +342,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setIsLocked(false);
         setFailedAttempts(0);
         setLockoutUntil(null);
+        loginTimestampRef.current = Date.now();
+
         if (data.session_token) {
           try {
             const todayStr = getLocalCalendarDate();
@@ -440,6 +442,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setIsLocked(false);
         setFailedAttempts(0);
         setLockoutUntil(null);
+        loginTimestampRef.current = Date.now();
+
         if (data.session_token) {
           try {
             const todayStr = getLocalCalendarDate();

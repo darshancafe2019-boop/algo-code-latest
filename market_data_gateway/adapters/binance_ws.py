@@ -37,6 +37,24 @@ BINANCE_REST_BASE = "https://api.binance.com/api/v3"
 MAX_STREAMS_PER_CONNECTION = 200
 MAX_BACKOFF_SEC = 60.0
 
+DEFAULT_CRYPTO_SYMBOLS = [
+    "BTCUSDT",
+    "ETHUSDT",
+    "SOLUSDT",
+    "BNBUSDT",
+    "XRPUSDT",
+    "ADAUSDT",
+    "DOGEUSDT",
+    "AVAXUSDT",
+    "LINKUSDT",
+    "DOTUSDT",
+    "MATICUSDT",
+    "LTCUSDT",
+    "NEARUSDT",
+    "APTUSDT",
+    "SUIUSDT",
+]
+
 
 def _canonical_to_binance(symbol: str) -> Optional[str]:
     """Convert 'BTC/USDT' or 'BINANCE:BTC/USDT' or 'BINANCE:BTC/USDT:SPOT' -> 'btcusdt' for Binance stream naming."""
@@ -76,7 +94,9 @@ class BinanceWSAdapter(BaseProviderAdapter):
         self._running = False
         self._retry_count = 0
         self._last_msg_time: float = 0.0
-        # Cache of latest quotes for REST snapshot fallback
+        # Initialize with core crypto universe symbols so ticks stream from gateway start
+        self._subscribed_symbols = set(DEFAULT_CRYPTO_SYMBOLS)
+        # Cache of latest quotes for instant snapshot retrieval
         self._quote_cache: Dict[str, NormalizedQuote] = {}
 
     # ─── Connection lifecycle ─────────────────────────────────────────────────
@@ -88,7 +108,8 @@ class BinanceWSAdapter(BaseProviderAdapter):
             return
         self._running = True
         self._status = "LIVE"
-        logger.info("BinanceWSAdapter initialized (lazy WS connection on first subscribe)")
+        logger.info("BinanceWSAdapter initialized with %d default streams", len(self._subscribed_symbols))
+        await self._restart_ws()
 
     async def disconnect(self) -> None:
         self._running = False
@@ -110,18 +131,56 @@ class BinanceWSAdapter(BaseProviderAdapter):
         for s in new_syms:
             self._subscribed_symbols.add(s)
         logger.info("Subscribed %d new symbols. Total: %d", len(new_syms), len(self._subscribed_symbols))
+        # If WS is active, send dynamic SUBSCRIBE frame to avoid dropping active streams
+        if self._ws is not None and getattr(self._ws, "closed", True) is False:
+            stream_names = [
+                f"{_canonical_to_binance(s)}@ticker"
+                for s in new_syms
+                if _canonical_to_binance(s)
+            ]
+            if stream_names:
+                try:
+                    payload = json.dumps({
+                        "method": "SUBSCRIBE",
+                        "params": stream_names,
+                        "id": int(time.time() * 1000) % 1000000,
+                    })
+                    await self._ws.send(payload)
+                    logger.info("Dynamic Binance WS subscribe sent for %d streams", len(stream_names))
+                    return
+                except Exception as exc:
+                    logger.warning("Dynamic WS subscribe failed (%s), restarting WS loop", exc)
         # Restart WS task with updated subscription set
         await self._restart_ws()
 
     async def unsubscribe(self, symbols: List[str]) -> None:
-        for s in symbols:
+        to_unsub = [s for s in symbols if s in self._subscribed_symbols]
+        for s in to_unsub:
             self._subscribed_symbols.discard(s)
             self._quote_cache.pop(s, None)
+            canon = _binance_to_canonical(s)
+            self._quote_cache.pop(canon, None)
+            self._quote_cache.pop(f"BINANCE:{s}", None)
+            self._quote_cache.pop(f"BINANCE:{canon}", None)
         logger.info("Unsubscribed %d symbols. Remaining: %d", len(symbols), len(self._subscribed_symbols))
+        if to_unsub and self._ws is not None and getattr(self._ws, "closed", True) is False:
+            stream_names = [
+                f"{_canonical_to_binance(s)}@ticker"
+                for s in to_unsub
+                if _canonical_to_binance(s)
+            ]
+            if stream_names:
+                try:
+                    payload = json.dumps({
+                        "method": "UNSUBSCRIBE",
+                        "params": stream_names,
+                        "id": int(time.time() * 1000) % 1000000,
+                    })
+                    await self._ws.send(payload)
+                except Exception:
+                    pass
         if not self._subscribed_symbols:
             await self._stop_ws()
-        else:
-            await self._restart_ws()
 
     # ─── Data fetching ────────────────────────────────────────────────────────
 
@@ -131,8 +190,16 @@ class BinanceWSAdapter(BaseProviderAdapter):
         need_rest: List[str] = []
 
         for sym in symbols:
-            if sym in self._quote_cache:
-                result[sym] = self._quote_cache[sym]
+            s_clean = sym.strip().upper()
+            cached = (
+                self._quote_cache.get(s_clean)
+                or self._quote_cache.get(_binance_to_canonical(s_clean))
+                or self._quote_cache.get(s_clean.replace("/", ""))
+                or self._quote_cache.get(f"BINANCE:{s_clean}")
+                or self._quote_cache.get(f"BINANCE:{_binance_to_canonical(s_clean)}")
+            )
+            if cached:
+                result[sym] = cached
             else:
                 need_rest.append(sym)
 
@@ -238,7 +305,7 @@ class BinanceWSAdapter(BaseProviderAdapter):
 
             latency_ms = (recv_ts.timestamp() * 1000 - event_ts_ms) if event_ts_ms else 0.0
 
-            raw_sym = data.get("s", "")
+            raw_sym = data.get("s", "").upper()
             canon_sym = _binance_to_canonical(raw_sym)
 
             quote = NormalizedQuote(
@@ -260,6 +327,9 @@ class BinanceWSAdapter(BaseProviderAdapter):
                 data_mode="REAL_TIME",
             )
             self._quote_cache[canon_sym] = quote
+            self._quote_cache[raw_sym] = quote
+            self._quote_cache[f"BINANCE:{raw_sym}"] = quote
+            self._quote_cache[f"BINANCE:{canon_sym}"] = quote
             self._last_msg_time = time.time()
             self._last_latency_ms = latency_ms
             self._emit(quote)

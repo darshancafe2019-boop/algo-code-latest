@@ -68,20 +68,12 @@ class NseService:
         try:
             info = self.utils.price_info(symbol_clean)
             if not info:
-                base_price = 24350.0 if "NIFTY" in symbol_clean else (2950.0 if "RELIANCE" in symbol_clean else 1500.0)
-                info = {
-                    "Symbol": symbol_clean,
-                    "LastTradedPrice": base_price,
-                    "PreviousClose": base_price * 0.995,
-                    "Change": +(base_price * 0.005),
-                    "PercentChange": +0.50,
-                    "Open": base_price * 0.998,
-                    "Close": base_price,
-                    "High": base_price * 1.008,
-                    "Low": base_price * 0.992,
-                    "VWAP": base_price * 1.001,
-                    "UpperCircuit": round(base_price * 1.10, 2),
-                    "LowerCircuit": round(base_price * 0.90, 2),
+                return {
+                    "status": "unavailable",
+                    "symbol": symbol_clean,
+                    "data": None,
+                    "error": f"No market data returned from NSE for {symbol_clean}",
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
                 }
 
             result = {
@@ -94,9 +86,9 @@ class NseService:
             return result
         except Exception as e:
             return {
-                "status": "warning",
+                "status": "error",
                 "symbol": symbol_clean,
-                "data": {"Symbol": symbol_clean, "LastTradedPrice": 24350.0},
+                "data": None,
                 "error": str(e),
                 "timestamp": datetime.now(timezone.utc).isoformat(),
             }

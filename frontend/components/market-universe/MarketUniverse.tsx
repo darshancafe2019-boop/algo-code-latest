@@ -352,6 +352,23 @@ export function MarketUniverse() {
     status: "ALL",
   });
 
+  const handleResetAllFilters = () => {
+    setSearchQuery("");
+    setSelectedProvider("ALL");
+    setFilters({
+      exchange: "ALL",
+      minPrice: "",
+      maxPrice: "",
+      minVolume: "",
+      status: "ALL",
+    });
+    setOptionsUnderlyingFilter("ALL");
+    setFuturesUnderlyingFilter("ALL");
+    if (activeCategory === "WATCHLISTS" || activeCategory === "WATCHLIST") {
+      setActiveCategory("ALL");
+    }
+  };
+
   // Watchlist Hook
   const {
     watchlists,
@@ -882,6 +899,7 @@ export function MarketUniverse() {
               onCloseColumnSettings={() => setShowColumnSettings(false)}
               onOpenOptions={handleLaunchOptionChainDirect}
               onOpenTrade={handleLaunchTradeDirect}
+              onResetFilters={handleResetAllFilters}
             />
           </div>
         )}

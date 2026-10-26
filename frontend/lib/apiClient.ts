@@ -335,13 +335,6 @@ class ResilientApiClient {
           "X-Request-Id": this.generateRequestId(),
         };
         try {
-          const todayStr = getLocalCalendarDate();
-          const storedDate = localStorage.getItem("quantos_session_date");
-          if (storedDate && storedDate !== todayStr) {
-            localStorage.removeItem("quantos_session_token");
-            localStorage.removeItem("quantos_session_date");
-            sessionStorage.removeItem("quantos_session_token");
-          }
           const storedToken = localStorage.getItem("quantos_session_token") || sessionStorage.getItem("quantos_session_token");
           if (storedToken) {
             headers["Authorization"] = `Bearer ${storedToken}`;
@@ -353,8 +346,9 @@ class ResilientApiClient {
           headers,
           credentials: "include",
           cache: "no-store",
-          signal: AbortSignal.timeout(4000),
+          signal: AbortSignal.timeout(10000),
         });
+
 
         if (res.ok) {
           const data = await res.json().catch(() => ({}));
@@ -651,7 +645,7 @@ class ResilientApiClient {
     options: RequestOptions,
     requestId: string
   ): Promise<ApiResponse<T>> {
-    const timeoutMs = options.timeoutMs || 8000;
+    const timeoutMs = options.timeoutMs || 25000;
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -663,20 +657,13 @@ class ResilientApiClient {
 
     if (typeof window !== "undefined" && !headers["Authorization"]) {
       try {
-        const todayStr = getLocalCalendarDate();
-        const storedDate = localStorage.getItem("quantos_session_date");
-        if (storedDate && storedDate !== todayStr) {
-          localStorage.removeItem("quantos_session_token");
-          localStorage.removeItem("quantos_session_date");
-          sessionStorage.removeItem("quantos_session_token");
-        } else {
-          const storedToken = localStorage.getItem("quantos_session_token") || sessionStorage.getItem("quantos_session_token");
-          if (storedToken) {
-            headers["Authorization"] = `Bearer ${storedToken}`;
-          }
+        const storedToken = localStorage.getItem("quantos_session_token") || sessionStorage.getItem("quantos_session_token");
+        if (storedToken) {
+          headers["Authorization"] = `Bearer ${storedToken}`;
         }
       } catch {}
     }
+
 
     if (options.idempotencyKey) {
       headers["X-Idempotency-Key"] = options.idempotencyKey;

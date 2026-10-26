@@ -57,6 +57,20 @@ from src.upstox_service import (
 logger = logging.getLogger("MDGateway.UpstoxWS")
 MAX_BACKOFF_SEC = 30.0
 
+# Permanent Core Benchmark Instrument Keys: Always kept active on WebSocket
+PINNED_BENCHMARK_KEYS = frozenset({
+    "NSE_INDEX|Nifty 50",
+    "NSE_INDEX|Nifty Bank",
+    "NSE_INDEX|Nifty Fin Service",
+    "NSE_INDEX|NIFTY MID SELECT",
+    "NSE_INDEX|NIFTY MIDCAP 100",
+    "NSE_INDEX|Nifty 100",
+    "NSE_INDEX|Nifty 500",
+    "NSE_INDEX|Nifty 200",
+    "BSE_INDEX|SENSEX",
+    "NSE_INDEX|India VIX",
+})
+
 
 def is_indian_market_open() -> bool:
     """Delegates to universal exchange session engine for NSE session state."""
@@ -78,7 +92,10 @@ class UpstoxWSAdapter(BaseProviderAdapter):
         self._retry_count = 0
         self._last_latency_ms: float = 0.0
         self._quote_cache: Dict[str, NormalizedQuote] = {}
-        self._subscribed_keys: Set[str] = set()
+        # Core benchmark indices are permanently pinned so they never stop streaming
+        self._subscribed_keys: Set[str] = set(PINNED_BENCHMARK_KEYS)
+        self._active_socket_keys: Set[str] = set()
+        self._send_lock = asyncio.Lock()
         self._subscribed_modes: Dict[str, str] = {}  # symbol -> mode
 
         # Diagnostic Timestamps
@@ -170,6 +187,7 @@ class UpstoxWSAdapter(BaseProviderAdapter):
         return True
 
     async def subscribe(self, symbols: List[str], mode: str = "full") -> None:
+        new_keys: List[str] = []
         for s in symbols:
             clean = s.strip().upper()
             self._subscribed_symbols.add(clean)
@@ -177,13 +195,15 @@ class UpstoxWSAdapter(BaseProviderAdapter):
             ik = global_upstox_service.resolve_instrument_key(clean)
             if ik:
                 self._subscribed_keys.add(ik)
+                if ik not in self._active_socket_keys:
+                    new_keys.append(ik)
 
         if self._running:
             if global_upstox_service.is_authenticated and not self._ws_task:
                 self._ws_task = asyncio.create_task(self._ws_loop(), name="UpstoxWSLoop")
 
-            if self.is_connected:
-                await self._send_subscription(mode=mode)
+            if self.is_connected and new_keys:
+                await self._send_keys(new_keys, mode=mode)
 
     async def unsubscribe(self, symbols: List[str]) -> None:
         keys_to_unsub: List[str] = []
@@ -193,22 +213,33 @@ class UpstoxWSAdapter(BaseProviderAdapter):
             self._subscribed_modes.pop(clean, None)
             ik = global_upstox_service.resolve_instrument_key(clean)
             if ik:
+                # Core benchmark indices must NEVER be unsubscribed from WebSocket
+                if ik in PINNED_BENCHMARK_KEYS:
+                    continue
                 self._subscribed_keys.discard(ik)
-                keys_to_unsub.append(ik)
+                if ik in self._active_socket_keys:
+                    self._active_socket_keys.discard(ik)
+                    keys_to_unsub.append(ik)
 
         if self._ws is not None and self.is_connected and keys_to_unsub:
-            payload = {
-                "guid": f"quantos_unsub_{int(time.time() * 1000)}",
-                "method": "unsub",
-                "data": {
-                    "instrumentKeys": keys_to_unsub,
-                },
-            }
-            try:
-                await self._ws.send(json.dumps(payload).encode("utf-8"))
-                logger.info("Sent Upstox V3 binary unsubscribe for %d instruments", len(keys_to_unsub))
-            except Exception as e:
-                logger.warning("Failed to send Upstox unsubscribe: %s", e)
+            BATCH_SIZE = 100
+            for i in range(0, len(keys_to_unsub), BATCH_SIZE):
+                chunk = keys_to_unsub[i:i + BATCH_SIZE]
+                payload = {
+                    "guid": f"quantos_unsub_{int(time.time() * 1000)}_{i}",
+                    "method": "unsub",
+                    "data": {
+                        "instrumentKeys": chunk,
+                    },
+                }
+                try:
+                    binary_payload = json.dumps(payload).encode("utf-8")
+                    async with self._send_lock:
+                        if self._ws and self.is_connected:
+                            await self._ws.send(binary_payload)
+                    logger.info("Sent Upstox V3 binary unsubscribe for %d instruments", len(chunk))
+                except Exception as e:
+                    logger.warning("Failed to send Upstox unsubscribe: %s", e)
 
     async def change_mode(self, symbols: List[str], mode: str = "ltpc") -> None:
         keys_to_change: List[str] = []
@@ -220,38 +251,59 @@ class UpstoxWSAdapter(BaseProviderAdapter):
                 keys_to_change.append(ik)
 
         if self._ws is not None and self.is_connected and keys_to_change:
+            BATCH_SIZE = 100
+            for i in range(0, len(keys_to_change), BATCH_SIZE):
+                chunk = keys_to_change[i:i + BATCH_SIZE]
+                payload = {
+                    "guid": f"quantos_mode_{int(time.time() * 1000)}_{i}",
+                    "method": "change_mode",
+                    "data": {
+                        "mode": mode.lower(),
+                        "instrumentKeys": chunk,
+                    },
+                }
+                try:
+                    binary_payload = json.dumps(payload).encode("utf-8")
+                    async with self._send_lock:
+                        if self._ws and self.is_connected:
+                            await self._ws.send(binary_payload)
+                    logger.info("Sent Upstox V3 binary change_mode (%s) for %d instruments", mode, len(chunk))
+                except Exception as e:
+                    logger.warning("Failed to send Upstox change_mode: %s", e)
+
+    async def _send_keys(self, keys: List[str], mode: str = "full") -> None:
+        """Send subscription for specific instrument keys in batches of at most 100 over send_lock."""
+        if self._ws is None or not self.is_connected or not keys:
+            return
+        unique_keys = list(dict.fromkeys(keys))
+        BATCH_SIZE = 100
+        for i in range(0, len(unique_keys), BATCH_SIZE):
+            chunk = unique_keys[i:i + BATCH_SIZE]
             payload = {
-                "guid": f"quantos_mode_{int(time.time() * 1000)}",
-                "method": "change_mode",
+                "guid": f"quantos_sub_{int(time.time() * 1000)}_{i}",
+                "method": "sub",
                 "data": {
                     "mode": mode.lower(),
-                    "instrumentKeys": keys_to_change,
+                    "instrumentKeys": chunk,
                 },
             }
             try:
-                await self._ws.send(json.dumps(payload).encode("utf-8"))
-                logger.info("Sent Upstox V3 binary change_mode (%s) for %d instruments", mode, len(keys_to_change))
+                binary_payload = json.dumps(payload).encode("utf-8")
+                async with self._send_lock:
+                    if self._ws and self.is_connected:
+                        await self._ws.send(binary_payload)
+                        self._active_socket_keys.update(chunk)
+                logger.info("Sent Upstox V3 binary WebSocket subscription for %d instruments (%s mode)", len(chunk), mode)
             except Exception as e:
-                logger.warning("Failed to send Upstox change_mode: %s", e)
+                logger.warning("Failed to send Upstox subscription chunk: %s", e)
+            if i + BATCH_SIZE < len(unique_keys):
+                await asyncio.sleep(0.04)
 
     async def _send_subscription(self, mode: str = "full") -> None:
-        if self._ws is None or not self.is_connected or not self._subscribed_keys:
+        """Full subscription resync for all registered keys (called upon initial connect/reconnect)."""
+        if not self._subscribed_keys:
             return
-        payload = {
-            "guid": f"quantos_sub_{int(time.time() * 1000)}",
-            "method": "sub",
-            "data": {
-                "mode": mode.lower(),
-                "instrumentKeys": list(self._subscribed_keys),
-            },
-        }
-        try:
-            # Strict Upstox V3 requirement: Send payload as binary UTF-8 bytes
-            binary_payload = json.dumps(payload).encode("utf-8")
-            await self._ws.send(binary_payload)
-            logger.info("Sent Upstox V3 binary WebSocket subscription for %d instruments (%s mode)", len(self._subscribed_keys), mode)
-        except Exception as e:
-            logger.warning("Failed to send Upstox subscription: %s", e)
+        await self._send_keys(list(self._subscribed_keys), mode=mode)
 
     # ─── Live WebSocket Loop ─────────────────────────────────────────────────
 
@@ -308,7 +360,8 @@ class UpstoxWSAdapter(BaseProviderAdapter):
                     self._status = "CONNECTED"
                     self._retry_count = 0
                     self._auth_error_reason = None
-                    logger.info("Connected to Upstox Live WebSocket feed.")
+                    self._active_socket_keys.clear()
+                    logger.info("Connected to Upstox Live WebSocket feed. Syncing %d registered subscriptions...", len(self._subscribed_keys))
 
                     # Send subscriptions
                     await self._send_subscription()
@@ -328,6 +381,7 @@ class UpstoxWSAdapter(BaseProviderAdapter):
             except asyncio.CancelledError:
                 break
             except Exception as e:
+                self._active_socket_keys.clear()
                 self._status = "DEGRADED"
                 self._retry_count += 1
                 if self._retry_count > 5:
@@ -377,8 +431,10 @@ class UpstoxWSAdapter(BaseProviderAdapter):
 
                 close_float = float(close_val) if close_val is not None and float(close_val) > 0 else None
                 change_pct = None
+                change_val = None
                 if close_float is not None and close_float > 0:
                     change_pct = round(((ltp_val - close_float) / close_float * 100.0), 2)
+                    change_val = round(ltp_val - close_float, 2)
 
                 bid_val = float(feed_data["bid"]) if feed_data.get("bid") is not None and float(feed_data["bid"]) > 0 else None
                 ask_val = float(feed_data["ask"]) if feed_data.get("ask") is not None and float(feed_data["ask"]) > 0 else None
@@ -396,19 +452,23 @@ class UpstoxWSAdapter(BaseProviderAdapter):
                 if greeks_data:
                     self._last_valid_greeks_at = time.time()
 
+                ex = "BSE" if (ik.startswith("BSE_") or "BSE" in ik) else "NSE"
+
                 q = NormalizedQuote(
                     symbol=sym,
-                    exchange="NSE",
+                    exchange=ex,
                     provider="upstox",
                     instrument_key=ik,
                     last_price=ltp_val,
                     bid=bid_val,
                     ask=ask_val,
+                    spread=round(ask_val - bid_val, 2) if (ask_val is not None and bid_val is not None) else None,
                     volume=volume_val,
                     open=open_val,
                     high=high_val,
                     low=low_val,
                     close=close_float,
+                    change=change_val,
                     change_pct=change_pct,
                     oi=oi_val,
                     depth=depth_data,
@@ -423,11 +483,44 @@ class UpstoxWSAdapter(BaseProviderAdapter):
                 self._quote_cache[sym] = q
                 self._quote_cache[sym.upper()] = q
                 self._quote_cache[sym.replace(" ", "")] = q
-                self._quote_cache[f"NSE:{sym}"] = q
+                self._quote_cache[f"{ex}:{sym}"] = q
                 self._quote_cache[f"UPSTOX:{sym}"] = q
                 self._quote_cache[ik] = q
                 self._quote_cache[ik.upper()] = q
                 self._quote_cache[ik.replace("|", ":")] = q
+
+                # Symmetrical benchmark index alias indexing
+                if ik == "NSE_INDEX|Nifty 50":
+                    for a in ["NIFTY", "NIFTY50", "NIFTY 50", "NSE:NIFTY", "NSE:NIFTY50", "UPSTOX:NIFTY", "UPSTOX:NIFTY50"]:
+                        self._quote_cache[a] = q
+                elif ik == "NSE_INDEX|Nifty Bank":
+                    for a in ["BANKNIFTY", "NIFTY BANK", "NIFTYBANK", "NSE:BANKNIFTY", "UPSTOX:BANKNIFTY"]:
+                        self._quote_cache[a] = q
+                elif ik == "NSE_INDEX|Nifty Fin Service":
+                    for a in ["FINNIFTY", "NIFTY FIN SERVICE", "NSE:FINNIFTY", "UPSTOX:FINNIFTY"]:
+                        self._quote_cache[a] = q
+                elif ik == "NSE_INDEX|NIFTY MID SELECT":
+                    for a in ["MIDCPNIFTY", "NIFTY MID SELECT", "NSE:MIDCPNIFTY", "UPSTOX:MIDCPNIFTY"]:
+                        self._quote_cache[a] = q
+                elif ik == "NSE_INDEX|NIFTY MIDCAP 100":
+                    for a in ["MIDCAP", "NIFTY MIDCAP 100", "NIFTYMIDCAP100", "NSE:MIDCAP", "UPSTOX:MIDCAP"]:
+                        self._quote_cache[a] = q
+                elif ik == "NSE_INDEX|Nifty 100":
+                    for a in ["NIFTY100", "NIFTY 100", "NSE:NIFTY100", "UPSTOX:NIFTY100"]:
+                        self._quote_cache[a] = q
+                elif ik == "NSE_INDEX|Nifty 500":
+                    for a in ["NIFTY500", "NIFTY 500", "NSE:NIFTY500", "UPSTOX:NIFTY500"]:
+                        self._quote_cache[a] = q
+                elif ik == "NSE_INDEX|Nifty 200":
+                    for a in ["NIFTY200", "NIFTY 200", "NSE:NIFTY200", "UPSTOX:NIFTY200"]:
+                        self._quote_cache[a] = q
+                elif ik == "BSE_INDEX|SENSEX":
+                    for a in ["SENSEX", "BSE SENSEX", "BSESENSEX", "BSE:SENSEX", "UPSTOX:SENSEX"]:
+                        self._quote_cache[a] = q
+                elif ik == "NSE_INDEX|India VIX":
+                    for a in ["INDIA VIX", "INDIAVIX", "NSE:INDIAVIX", "UPSTOX:INDIAVIX"]:
+                        self._quote_cache[a] = q
+
                 self._emit(q)
 
         except Exception as exc:

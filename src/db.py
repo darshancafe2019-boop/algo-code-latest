@@ -238,7 +238,16 @@ _pg_consecutive_failures = 0
 
 
 def _is_pg_pool_timeout(exc: Exception) -> bool:
-    return type(exc).__name__ == "PoolTimeout"
+    is_timeout = type(exc).__name__ == "PoolTimeout"
+    if is_timeout and _pg_pool is not None and hasattr(_pg_pool, "_waiting") and hasattr(_pg_pool, "_lock"):
+        try:
+            with _pg_pool._lock:
+                active_waiting = [w for w in _pg_pool._waiting if not (getattr(w, "conn", None) or getattr(w, "error", None))]
+                _pg_pool._waiting.clear()
+                _pg_pool._waiting.extend(active_waiting)
+        except Exception:
+            pass
+    return is_timeout
 
 
 def _trip_pg_circuit_breaker(duration_sec: float = 60.0, reason: str = ""):
@@ -364,16 +373,26 @@ def get_db_pool_stats() -> Dict[str, Any]:
             "status": "IDLE",
         }
     try:
+        if hasattr(pool, "_waiting") and hasattr(pool, "_lock"):
+            try:
+                with pool._lock:
+                    active_waiting = [w for w in pool._waiting if not (getattr(w, "conn", None) or getattr(w, "error", None))]
+                    if len(active_waiting) != len(pool._waiting):
+                        pool._waiting.clear()
+                        pool._waiting.extend(active_waiting)
+            except Exception:
+                pass
         stats = pool.get_stats() if hasattr(pool, "get_stats") else {}
+        active_waiting_count = len(getattr(pool, "_waiting", [])) if hasattr(pool, "_waiting") else stats.get("requests_waiting", 0)
         return {
             "configured": True,
             "engine": "postgresql",
             "pool_min": stats.get("pool_min", 1),
-            "pool_max": stats.get("pool_max", 10),
+            "pool_max": stats.get("pool_max", 20),
             "pool_size": stats.get("pool_size", 0),
             "pool_available": stats.get("pool_available", 0),
-            "requests_waiting": stats.get("requests_waiting", 0),
-            "requests_queued": stats.get("requests_queued", stats.get("requests_waiting", 0)),
+            "requests_waiting": active_waiting_count,
+            "requests_queued": stats.get("requests_queued", active_waiting_count),
             "connection_errors": stats.get("errors", 0),
             "usage_ms": stats.get("usage_ms", 0),
         }

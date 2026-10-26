@@ -32,8 +32,8 @@ YAHOO_SYMBOL_MAP: Dict[str, str] = {
     # U.S. Indices
     "SPX": "^GSPC", "NDX": "^NDX", "DJI": "^DJI", "VIX": "^VIX", "RUT": "^RUT",
     # Global Indices
-    "FTSE100": "^FTSE", "DAX": "^GDAXI", "CAC40": "^FCHI",
-    "NIKKEI225": "^N225", "HANGSENG": "^HSI", "ASX200": "^AXJO",
+    "FTSE100": "^FTSE", "FTSE": "^FTSE", "DAX": "^GDAXI", "CAC40": "^FCHI", "CAC": "^FCHI",
+    "NIKKEI225": "^N225", "N225": "^N225", "HANGSENG": "^HSI", "HSI": "^HSI", "ASX200": "^AXJO",
     "SHANGCOMP": "000001.SS",
     # Indian Indices (delayed)
     "NIFTY": "^NSEI", "BANKNIFTY": "^NSEBANK", "SENSEX": "^BSESN",
@@ -72,6 +72,8 @@ def normalize_to_yahoo_ticker(raw_symbol: str) -> Optional[str]:
     s = raw_symbol.strip()
     if s.startswith("$"):
         s = s[1:].strip()
+    if ":" in s:
+        s = s.split(":")[-1].strip()
     s_upper = s.upper()
 
     # Skip options and derivative tokens
@@ -263,6 +265,14 @@ class YahooFallbackAdapter(BaseProviderAdapter):
                     last_price = getattr(info, "last_price", None) or getattr(info, "regularMarketPrice", None) or 0.0
                     if not last_price or last_price <= 0:
                         continue
+                    prev_close = getattr(info, "previous_close", None) or getattr(info, "regularMarketPreviousClose", None)
+                    prev_close_float = float(prev_close) if prev_close and float(prev_close) > 0 else None
+                    open_price = getattr(info, "open", None) or getattr(info, "regularMarketOpen", None)
+                    open_float = float(open_price) if open_price and float(open_price) > 0 else None
+
+                    change_val = round(float(last_price) - prev_close_float, 2) if prev_close_float else None
+                    change_pct = round(((float(last_price) - prev_close_float) / prev_close_float * 100.0), 2) if prev_close_float else None
+
                     quote = NormalizedQuote(
                         symbol=canon_sym,
                         exchange=getattr(info, "exchange", "UNKNOWN"),
@@ -271,15 +281,23 @@ class YahooFallbackAdapter(BaseProviderAdapter):
                         bid=float(getattr(info, "bid", 0) or 0),
                         ask=float(getattr(info, "ask", 0) or 0),
                         volume=float(getattr(info, "three_month_average_volume", 0) or 0),
+                        open=open_float,
+                        close=prev_close_float,
+                        change=change_val,
+                        change_pct=change_pct,
                         high=float(getattr(info, "day_high", 0) or 0) or None,
                         low=float(getattr(info, "day_low", 0) or 0) or None,
                         event_timestamp=recv_iso,
                         received_timestamp=recv_iso,
                         data_mode="DELAYED",
+                        is_stale=False,
                         feed_latency_ms=0.0,
                     )
                     result[canon_sym] = quote
                     self._quote_cache[canon_sym] = quote
+                    self._quote_cache[canon_sym.upper()] = quote
+                    self._quote_cache[f"YAHOO:{canon_sym}"] = quote
+                    self._quote_cache[f"TWELVE_DATA:{canon_sym}"] = quote
                 except Exception:
                     pass
         except Exception as exc:

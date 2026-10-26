@@ -174,7 +174,7 @@ class NseUtils:
             return df
         except Exception:
             fallback = ["RELIANCE", "TCS", "HDFCBANK", "INFY", "ICICIBANK"]
-            return fallback if list_only else pd.DataFrame([{"symbol": s, "lastPrice": 1500.0} for s in fallback])
+            return fallback if list_only else pd.DataFrame([{"symbol": s, "lastPrice": None} for s in fallback])
 
     # 5. Holidays
     def clearing_holidays(self, list_only: bool = False) -> Union[List[str], pd.DataFrame]:
@@ -261,21 +261,7 @@ class NseUtils:
                 }
         except Exception:
             pass
-        base_price = 24350.0 if "NIFTY" in symbol else 1500.0
-        return {
-            "Symbol": symbol.upper(),
-            "LastTradedPrice": base_price,
-            "PreviousClose": base_price * 0.995,
-            "Change": round(base_price * 0.005, 2),
-            "PercentChange": 0.50,
-            "Open": base_price * 0.998,
-            "Close": base_price,
-            "High": base_price * 1.008,
-            "Low": base_price * 0.992,
-            "VWAP": base_price * 1.001,
-            "UpperCircuit": round(base_price * 1.10, 2),
-            "LowerCircuit": round(base_price * 0.90, 2),
-        }
+        return None
 
     # 7. Market Depth
     def get_market_depth(self, symbol: str) -> Dict[str, Any]:

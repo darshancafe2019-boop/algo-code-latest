@@ -19419,13 +19419,6 @@ def api_market_quotes_snapshot():
     if not symbols:
         return jsonify({"error": "symbol or symbols parameter required"}), 400
 
-    if gateway_client.is_gateway_available():
-        quotes = gateway_client.get_snapshot(symbols)
-        if quotes:
-            if len(symbols) == 1 and symbol and symbol in quotes:
-                return jsonify({"status": "success", "quote": quotes[symbol], "data": quotes[symbol]})
-            return jsonify({"status": "success", "quotes": quotes, "data": quotes})
-
     now_t = time.time()
     now_dt = datetime.now(timezone.utc)
     # Indian market trading schedule: Monday-Friday 09:15-15:30 IST
@@ -19433,51 +19426,59 @@ def api_market_quotes_snapshot():
     ist_min = (now_dt.minute + 30) % 60
     is_indian_open = ((ist_hour == 9 and ist_min >= 15) or (10 <= ist_hour < 15) or (ist_hour == 15 and ist_min <= 30)) and now_dt.weekday() < 5
 
-    result = {}
-    missing_symbols = []
+    def _clean_sym(s: str) -> str:
+        return (
+            s.replace("BINANCE:", "")
+            .replace("NSE:", "")
+            .replace("BSE:", "")
+            .replace("NASDAQ:", "")
+            .replace("NYSE:", "")
+            .replace("OANDA:", "")
+            .replace(":SPOT", "")
+            .replace(":EQ", "")
+            .replace(":PERP", "")
+            .strip()
+        )
 
-    # 1. Check TTL cache (5.0 seconds)
-    with _SNAPSHOT_CACHE_LOCK:
-        for s in symbols:
-            clean = (
-                s.replace("BINANCE:", "")
-                .replace("NSE:", "")
-                .replace("BSE:", "")
-                .replace("NASDAQ:", "")
-                .replace("NYSE:", "")
-                .replace("OANDA:", "")
-                .replace(":SPOT", "")
-                .replace(":EQ", "")
-                .replace(":PERP", "")
-                .strip()
-            )
-            cached = _SNAPSHOT_QUOTE_CACHE.get(s) or _SNAPSHOT_QUOTE_CACHE.get(clean)
-            if cached and (now_t - cached[0]) < 5.0:
-                result[s] = cached[1]
-                result[clean] = cached[1]
-            else:
-                missing_symbols.append(s)
+    result: Dict[str, Any] = {}
 
-    # 2. Fetch missing symbols in parallel
+    # 1. Gateway Client Resolution (Partial-safe: never drops missing symbols)
+    if gateway_client.is_gateway_available():
+        try:
+            gw_quotes = gateway_client.get_snapshot(symbols)
+            if gw_quotes and isinstance(gw_quotes, dict):
+                for s in symbols:
+                    clean = _clean_sym(s)
+                    q = gw_quotes.get(s) or gw_quotes.get(clean)
+                    if q and isinstance(q, dict) and q.get("last_price") is not None and q.get("price_state") != "UNAVAILABLE":
+                        q_copy = dict(q)
+                        if "clean_symbol" not in q_copy:
+                            q_copy["clean_symbol"] = clean
+                        result[s] = q_copy
+                        result[clean] = q_copy
+        except Exception as gw_err:
+            logger.debug("Gateway client snapshot query error: %s", gw_err)
+
+    # 2. Check TTL Cache for any still-unresolved requested symbols (5.0s window)
+    unresolved_symbols = [s for s in symbols if s not in result and _clean_sym(s) not in result]
+    if unresolved_symbols:
+        with _SNAPSHOT_CACHE_LOCK:
+            for s in unresolved_symbols:
+                clean = _clean_sym(s)
+                cached = _SNAPSHOT_QUOTE_CACHE.get(s) or _SNAPSHOT_QUOTE_CACHE.get(clean)
+                if cached and (now_t - cached[0]) < 5.0:
+                    result[s] = cached[1]
+                    result[clean] = cached[1]
+
+    # 3. Parallel Fetch for remaining missing symbols
+    missing_symbols = [s for s in symbols if s not in result and _clean_sym(s) not in result]
     if missing_symbols:
         from src.binance_market_data_service import BinanceMarketDataService
         from market_data.stocks.quote_engine import LiveQuoteFetcher
         binance_svc = BinanceMarketDataService()
 
         def _fetch_single_symbol(s: str) -> Optional[Dict[str, Any]]:
-            clean = (
-                s.replace("BINANCE:", "")
-                .replace("NSE:", "")
-                .replace("BSE:", "")
-                .replace("NASDAQ:", "")
-                .replace("NYSE:", "")
-                .replace("OANDA:", "")
-                .replace(":SPOT", "")
-                .replace(":EQ", "")
-                .replace(":PERP", "")
-                .strip()
-            )
-
+            clean = _clean_sym(s)
             is_crypto = (
                 s.startswith("BINANCE:")
                 or s.startswith("DELTA:")
@@ -19542,6 +19543,8 @@ def api_market_quotes_snapshot():
                         "market_status": "OPEN",
                         "price_state": "LIVE",
                         "status_label": "LIVE",
+                        "data_quality": "LIVE",
+                        "is_stale": False,
                         "timestamp": ts,
                     }
                 return None
@@ -19556,10 +19559,58 @@ def api_market_quotes_snapshot():
             elif clean in ["GOLD", "XAUUSD", "SILVER", "CRUDEOIL"]:
                 exchange = "COMMODITY"
 
+            # Primary direct broker query for Indian instruments: Upstox
+            if exchange in ["NSE", "BSE"] or clean in ["NIFTY", "BANKNIFTY", "SENSEX", "FINNIFTY", "MIDCPNIFTY"]:
+                try:
+                    from src.upstox_service import upstox_service
+                    if upstox_service.is_authenticated or upstox_service.is_configured:
+                        up_q = upstox_service.get_full_market_quote(clean)
+                        if up_q and up_q.get("last_price") and float(up_q["last_price"]) > 0:
+                            lp = float(up_q["last_price"])
+                            open_p = float(up_q.get("open") or lp)
+                            high_p = float(up_q.get("high") or lp)
+                            low_p = float(up_q.get("low") or lp)
+                            prev_p = float(up_q.get("close") or up_q.get("previous_close") or open_p or lp)
+                            chg_pct = float(up_q.get("change_pct") or (round(((lp - prev_p)/prev_p * 100), 2) if prev_p else 0.0))
+                            chg_abs = round(lp - prev_p, 2)
+                            vol = float(up_q.get("volume") or 0.0)
+                            status_open = is_indian_open
+                            p_state = "LIVE" if status_open else "LAST_TRADED"
+                            return {
+                                "symbol": s,
+                                "clean_symbol": clean,
+                                "exchange": exchange,
+                                "provider": "UPSTOX",
+                                "last_price": lp,
+                                "lastPrice": lp,
+                                "open": open_p,
+                                "high": high_p,
+                                "low": low_p,
+                                "close": prev_p,
+                                "previous_close": prev_p,
+                                "change_pct": chg_pct,
+                                "changePercent": chg_pct,
+                                "change": chg_abs,
+                                "volume": vol,
+                                "bid": float(up_q.get("bid") or lp),
+                                "ask": float(up_q.get("ask") or lp),
+                                "market_status": "OPEN" if status_open else "CLOSED",
+                                "price_state": p_state,
+                                "status_label": "LIVE" if (status_open and p_state == "LIVE") else "MARKET CLOSED / LAST CLOSE",
+                                "data_quality": p_state,
+                                "is_stale": not status_open,
+                                "timestamp": up_q.get("timestamp") or now_dt.isoformat(),
+                            }
+                except Exception as up_err:
+                    logger.debug("Upstox snapshot query note for %s: %s", clean, up_err)
+
             live = LiveQuoteFetcher.fetch_live_data(clean, exchange)
             if live and live.get("last_price"):
                 lp = live.get("last_price")
                 status_open = is_indian_open if exchange in ["NSE", "BSE"] else True
+                p_state = live.get("data_quality") or ("LIVE" if status_open else "LAST_TRADED")
+                if p_state == "LIVE" and not status_open and exchange in ["NSE", "BSE"]:
+                    p_state = "LAST_TRADED"
                 return {
                     "symbol": s,
                     "clean_symbol": clean,
@@ -19579,8 +19630,10 @@ def api_market_quotes_snapshot():
                     "bid": lp,
                     "ask": lp,
                     "market_status": "OPEN" if status_open else "CLOSED",
-                    "price_state": "LIVE" if status_open else "LAST_TRADED",
-                    "status_label": "LIVE" if status_open else "MARKET CLOSED / LAST CLOSE",
+                    "price_state": p_state,
+                    "status_label": "LIVE" if (status_open and p_state == "LIVE") else "MARKET CLOSED / LAST CLOSE",
+                    "data_quality": p_state,
+                    "is_stale": p_state != "LIVE",
                     "timestamp": now_dt.isoformat(),
                 }
             return None
@@ -19602,8 +19655,52 @@ def api_market_quotes_snapshot():
                 except Exception as ex:
                     logger.debug("Parallel quote fetch error for %s: %s", orig_s, ex)
 
-    if len(symbols) == 1 and symbol in result:
-        return jsonify({"status": "success", "quote": result[symbol], "data": result[symbol], "quotes": result})
+    # 4. Standardized Explicit UNAVAILABLE fallback for instruments that could not be fetched
+    for s in symbols:
+        clean = _clean_sym(s)
+        if s not in result and clean not in result:
+            ex = "CRYPTO" if (s.startswith("BINANCE:") or s.startswith("DELTA:") or any(coin in clean for coin in ["BTC", "ETH", "SOL", "USDT"])) else ("NSE" if not s.startswith("BSE:") else "BSE")
+            if s.startswith("NASDAQ:") or clean in ["NVDA", "AAPL", "MSFT", "TSLA"]:
+                ex = "NASDAQ"
+            unavail_quote = {
+                "symbol": s,
+                "clean_symbol": clean,
+                "exchange": ex,
+                "provider": "UNAVAILABLE",
+                "last_price": None,
+                "lastPrice": None,
+                "open": None,
+                "high": None,
+                "low": None,
+                "close": None,
+                "previous_close": None,
+                "change_pct": 0.0,
+                "changePercent": 0.0,
+                "change": 0.0,
+                "volume": 0.0,
+                "bid": None,
+                "ask": None,
+                "market_status": "CLOSED",
+                "price_state": "UNAVAILABLE",
+                "status_label": "DATA UNAVAILABLE",
+                "data_quality": "UNAVAILABLE",
+                "is_stale": True,
+                "error": f"No market data provider available for {clean}",
+                "timestamp": now_dt.isoformat(),
+            }
+            result[s] = unavail_quote
+            result[clean] = unavail_quote
+
+    # 5. Format response containing all requested symbols
+    if len(symbols) == 1 and symbol:
+        target_quote = result.get(symbol) or result.get(_clean_sym(symbol))
+        if target_quote:
+            return jsonify({
+                "status": "success",
+                "quote": target_quote,
+                "data": target_quote,
+                "quotes": result,
+            })
     return jsonify({"status": "success", "quotes": result, "data": result})
 
 

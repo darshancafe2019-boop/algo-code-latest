@@ -134,13 +134,20 @@ export function getBackendConfigStatus(): BackendConfigStatus {
   }
 
   // Local development
-  const devUrl = cleanUrl || "http://127.0.0.1:5050";
+  let devUrl = cleanUrl || "http://127.0.0.1:5050";
+  if (devUrl.includes("onrender.com") && process.env.FORCE_REMOTE_BACKEND !== "true") {
+    console.warn(
+      `[QUANT.OS CONFIG] Remote cloud URL detected in local development. Defaulting to local backend http://127.0.0.1:5050. Set FORCE_REMOTE_BACKEND=true to force remote.`
+    );
+    devUrl = "http://127.0.0.1:5050";
+  }
   return {
     configured: Boolean(cleanUrl),
     valid: true,
     url: devUrl,
     isProduction: false,
   };
+
 }
 
 /**

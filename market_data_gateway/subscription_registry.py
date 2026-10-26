@@ -19,6 +19,10 @@ logger = logging.getLogger("MDGateway.SubscriptionRegistry")
 
 VALID_REASONS = frozenset({
     "WATCHLIST",          # user's manual watchlist (default: ltpc)
+    "WATCHLIST_VIEW",     # watchlist table view
+    "MARKET_UNIVERSE",    # market universe table stream
+    "SUBSCRIPTION_SYNC",  # frontend debounced batch subscription sync
+    "INDEX_BENCHMARK",    # persistent core market benchmarks
     "RUNNING_BOT",        # symbol monitored by an active bot instance (default: full)
     "OPEN_POSITION",      # symbol with an open trade (default: full)
     "CHART_VIEW",         # currently open chart in UI (default: full)
@@ -101,12 +105,12 @@ class SubscriptionRegistry:
     def subscribe(self, symbol: str, reason: str, source: str = "", mode: str = "full") -> None:
         """Register a subscription for a symbol with a given reason and mode."""
         sym = symbol.upper()
+        effective_reason = reason if reason in VALID_REASONS else "WATCHLIST"
         if reason not in VALID_REASONS:
-            logger.warning("Unknown subscription reason '%s' for %s - rejected", reason, sym)
-            return
+            logger.debug("Remapping custom subscription reason '%s' to '%s' for %s", reason, effective_reason, sym)
 
         clean_mode = mode.lower() if mode.lower() in MODE_PRIORITY else "full"
-        sub_key = self._make_key(reason, source)
+        sub_key = self._make_key(effective_reason, source)
 
         with self._lock:
             # Cancel any pending debounced unsubscribe for this client source

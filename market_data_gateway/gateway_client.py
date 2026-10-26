@@ -30,7 +30,10 @@ class GatewayClient:
     """
 
     def __init__(self, base_url: str = _GATEWAY_URL, timeout: float = _DEFAULT_TIMEOUT):
-        self._base_url = base_url.rstrip("/")
+        raw_url = (base_url or _GATEWAY_URL).strip().rstrip("/")
+        if raw_url and not (raw_url.startswith("http://") or raw_url.startswith("https://")):
+            raw_url = f"http://{raw_url}"
+        self._base_url = raw_url
         self._timeout = timeout
         self._headers = {"X-Gateway-Secret": _GATEWAY_SECRET}
         self._is_available: Optional[bool] = None

@@ -274,21 +274,21 @@ export function getMarketRowStatus({
     (rawQuote != null && rawQuote.last_price != null && rawQuote.last_price > 0) ||
     (instrument.last_price != null && instrument.last_price > 0);
 
-  // If no provider resolved and no usable real price
-  if (!provider && !hasCachedPrice) {
+  const pLabel = providerLabel || (provider ? provider.toUpperCase() : "FEED");
+
+  // Explicit check for unavailable data or missing prices
+  if (rawQuote?.price_state === "UNAVAILABLE" || (!hasCachedPrice && !hasLiveTick)) {
     return {
-      label: "NO LIVE PROVIDER",
+      label: "DATA UNAVAILABLE",
       state: "unavailable",
-      provider: null,
-      providerLabel: null,
+      provider: provider || null,
+      providerLabel: pLabel || "NONE",
       marketSession,
       priceState: "UNAVAILABLE",
       isLive: false,
-      isStale: false,
+      isStale: true,
     };
   }
-
-  const pLabel = providerLabel || (provider ? provider.toUpperCase() : "FEED");
 
   // 1. Reconnecting / Disconnected State
   if (connectionStatus === "RECONNECTING" || connectionStatus === "CONNECTING") {

@@ -58,7 +58,6 @@ DEFAULT_USDM_SYMBOLS = [
     "LINKUSDT",
     "NEARUSDT",
     "SUIUSDT",
-    "PEPEUSDT",
 ]
 
 

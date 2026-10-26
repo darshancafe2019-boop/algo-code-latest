@@ -32,6 +32,7 @@ interface SimpleMarketTableProps {
   onCloseColumnSettings?: () => void;
   onOpenOptions?: (underlying: string, exchange?: string, provider?: string) => void;
   onOpenTrade?: (inst: MarketInstrument) => void;
+  onResetFilters?: () => void;
 }
 
 export const COMPREHENSIVE_OPTION_UNDERLYINGS = new Set([
@@ -172,6 +173,7 @@ export function SimpleMarketTable({
   onCloseColumnSettings,
   onOpenOptions,
   onOpenTrade,
+  onResetFilters,
 }: SimpleMarketTableProps) {
   const router = useRouter();
   const [sortField, setSortField] = useState<string>("volume_24h");
@@ -418,6 +420,15 @@ export function SimpleMarketTable({
                   <td colSpan={12} className="py-12 text-center text-slate-500 font-mono">
                     <p className="text-sm">No instruments match your current filters.</p>
                     <p className="text-xs text-slate-600 mt-1">Try switching category tabs or resetting filters.</p>
+                    {onResetFilters && (
+                      <button
+                        type="button"
+                        onClick={onResetFilters}
+                        className="mt-3.5 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/40 text-[12px] font-bold transition shadow-sm hover:scale-[1.02] active:scale-[0.98]"
+                      >
+                        Reset Filters & Clear Search
+                      </button>
+                    )}
                   </td>
                 </tr>
               ) : (
@@ -491,7 +502,8 @@ const MemoizedMarketRow = memo(function MarketRow({
   // Reactive subscription to real-time live ticks for this instrument (strictly provider-scoped with bare symbol fallback)
   const primaryTick = useSymbolQuote(sym, instrument.exchange, instrument.provider);
   const providerTick = useSymbolQuote(providerSym || undefined, instrument.exchange, instrument.provider);
-  const liveTick = primaryTick || providerTick;
+  const bareTick = useSymbolQuote(bareSym !== sym ? bareSym : undefined, instrument.exchange, instrument.provider);
+  const liveTick = primaryTick || providerTick || bareTick;
 
   // Derive authoritative raw quote from reactive tick or gateway context cache
   const rawQuote = liveTick ? {

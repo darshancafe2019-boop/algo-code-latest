@@ -851,12 +851,36 @@ class MarketDataGateway:
         result: Dict[str, Any] = {}
         for sym in symbols:
             aliases = [sym]
+            clean = sym.split(":")[-1] if ":" in sym else sym
+            aliases.extend([
+                clean,
+                clean.replace(" ", ""),
+                f"UPSTOX:{clean}",
+                f"NSE:{clean}",
+                f"BSE:{clean}",
+                f"TWELVE_DATA:{clean}",
+                f"YAHOO:{clean}",
+            ])
             if "/" in sym:
                 aliases.append(sym.replace("/", ""))
             elif sym.endswith("USDT") and len(sym) > 4:
                 aliases.append(f"{sym[:-4]}/USDT")
             elif sym.endswith("USD") and len(sym) > 3:
                 aliases.append(f"{sym[:-3]}/USD")
+
+            # Benchmark index specific aliases
+            if clean in ("NIFTY", "NIFTY50", "NIFTY 50"):
+                aliases.extend(["NIFTY", "NIFTY50", "NIFTY 50", "NSE_INDEX|Nifty 50"])
+            elif clean in ("BANKNIFTY", "NIFTY BANK"):
+                aliases.extend(["BANKNIFTY", "NIFTY BANK", "NSE_INDEX|Nifty Bank"])
+            elif clean in ("SENSEX", "BSE SENSEX"):
+                aliases.extend(["SENSEX", "BSE SENSEX", "BSE_INDEX|SENSEX"])
+            elif clean in ("MIDCAP", "NIFTY MIDCAP 100", "MIDCPNIFTY"):
+                aliases.extend(["MIDCAP", "NIFTY MIDCAP 100", "NSE_INDEX|NIFTY MIDCAP 100", "MIDCPNIFTY", "NSE_INDEX|NIFTY MID SELECT"])
+            elif clean in ("NIFTY100", "NIFTY 100"):
+                aliases.extend(["NIFTY100", "NIFTY 100", "NSE_INDEX|Nifty 100"])
+            elif clean in ("NIFTY500", "NIFTY 500"):
+                aliases.extend(["NIFTY500", "NIFTY 500", "NSE_INDEX|Nifty 500"])
 
             matched_q: Optional[NormalizedQuote] = None
             for a in aliases:
@@ -888,12 +912,46 @@ class MarketDataGateway:
                 except Exception:
                     pass
 
+        missing = [s for s in symbols if s not in result]
+        for s in missing:
+            clean = s.split(":")[-1] if ":" in s else s
+            ex = "CRYPTO" if (s.startswith("BINANCE:") or s.startswith("DELTA:") or any(c in clean for c in ["BTC", "ETH", "SOL", "USDT"])) else ("NSE" if not s.startswith("BSE:") else "BSE")
+            if s.startswith("NASDAQ:") or clean in ["NVDA", "AAPL", "MSFT", "TSLA"]:
+                ex = "NASDAQ"
+            result[s] = {
+                "symbol": s,
+                "clean_symbol": clean,
+                "exchange": ex,
+                "provider": "UNAVAILABLE",
+                "last_price": None,
+                "lastPrice": None,
+                "open": None,
+                "high": None,
+                "low": None,
+                "close": None,
+                "previous_close": None,
+                "change_pct": 0.0,
+                "changePercent": 0.0,
+                "change": 0.0,
+                "volume": 0.0,
+                "bid": None,
+                "ask": None,
+                "market_status": "CLOSED",
+                "price_state": "UNAVAILABLE",
+                "status_label": "DATA UNAVAILABLE",
+                "data_quality": "UNAVAILABLE",
+                "data_mode": "UNAVAILABLE",
+                "is_stale": True,
+                "error": f"No market data provider available for {s}",
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+
         return web.json_response({
             "status": "success",
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "quotes": result,
             "totalCount": len(result),
-            "missing": [s for s in symbols if s not in result],
+            "missing": missing,
         })
 
     async def handle_movers(self, request: web.Request) -> web.Response:
@@ -1215,12 +1273,23 @@ class MarketDataGateway:
                             for sym in syms:
                                 subscriptions.add(sym)
                                 self.subscription_registry.subscribe(sym, reason, source=client_id)
-                            # Send current quotes immediately
+                            # Send current quotes immediately with alias resolution
                             for sym in syms:
-                                if sym in self._quote_cache:
+                                q = self._quote_cache.get(sym)
+                                if not q:
+                                    clean_sym = sym.split(":")[-1] if ":" in sym else sym
+                                    q = (
+                                        self._quote_cache.get(clean_sym)
+                                        or self._quote_cache.get(f"UPSTOX:{clean_sym}")
+                                        or self._quote_cache.get(f"NSE:{clean_sym}")
+                                        or self._quote_cache.get(f"BSE:{clean_sym}")
+                                        or self._quote_cache.get(f"TWELVE_DATA:{clean_sym}")
+                                        or self._quote_cache.get(f"YAHOO:{clean_sym}")
+                                    )
+                                if q:
                                     await ws.send_str(json.dumps({
                                         "type": "QUOTE",
-                                        "data": self._quote_cache[sym].to_dict(),
+                                        "data": q.to_dict(),
                                     }))
                         elif action == "unsubscribe":
                             for sym in syms:

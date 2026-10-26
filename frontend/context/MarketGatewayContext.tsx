@@ -1050,9 +1050,9 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
                 event_timestamp: eventTs,
                 received_timestamp: new Date().toISOString(),
                 feed_latency_ms: q.feed_latency_ms ?? q.feedLatencyMs ?? 15,
-                data_mode: "REAL_TIME",
-                is_stale: false,
-                age_seconds: 0,
+                data_mode: q.data_mode || (q.price_state === "UNAVAILABLE" ? "UNAVAILABLE" : (q.price_state === "LAST_TRADED" || q.price_state === "STALE" ? "CACHED" : "REAL_TIME")),
+                is_stale: Boolean(q.is_stale ?? (q.price_state === "UNAVAILABLE" || q.price_state === "STALE")),
+                age_seconds: q.age_seconds ?? 0,
               };
 
               const incomingTs = new Date(eventTs).getTime();
@@ -1084,7 +1084,7 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
                 eventTimestamp: normalizedQuote.event_timestamp,
                 feedLatencyMs: normalizedQuote.feed_latency_ms,
                 dataMode: normalizedQuote.data_mode,
-                isStale: false,
+                isStale: normalizedQuote.is_stale,
                 ageMs: 0,
               });
 
@@ -1119,7 +1119,7 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
     };
 
     pollFallbackSnapshots();
-    fallbackPollTimerRef.current = setInterval(pollFallbackSnapshots, 3000);
+    fallbackPollTimerRef.current = setInterval(pollFallbackSnapshots, FALLBACK_SNAPSHOT_POLL_MS);
     return () => {
       if (fallbackPollTimerRef.current) {
         clearInterval(fallbackPollTimerRef.current);

@@ -555,8 +555,8 @@ class DeltaOptionsWSAdapter(BaseProviderAdapter):
 
         # Seed default crypto majors and INR pairs
         for sym in (
-            "BTC", "ETH", "SOL", "XRP", "DOGE", "PEPE", "SHIB", "BNB",
-            "BTCUSD", "ETHUSD", "SOLUSD", "XRPUSD", "DOGEUSD", "1000PEPEUSD", "1000SHIBUSD",
+            "BTC", "ETH", "SOL", "XRP", "DOGE", "BNB",
+            "BTCUSD", "ETHUSD", "SOLUSD", "XRPUSD", "DOGEUSD",
             "BTC_INR", "ETH_INR"
         ):
             self.sub_mgr.add_ticker(sym)

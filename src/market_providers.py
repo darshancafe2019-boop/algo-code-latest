@@ -1089,18 +1089,16 @@ class CCXTCryptoProvider(BaseMarketProvider):
             ("LINK", "Chainlink", 12.80, 4200000.0, 1.6, 0.001, 0.1, 28000000),
             ("DOT", "Polkadot", 4.90, 8500000.0, 0.8, 0.001, 0.1, 22000000),
             ("MATIC", "Polygon", 0.5200, 18000000.0, 1.9, 0.0001, 1.0, 31000000),
-            ("SHIB", "Shiba Inu", 0.0000185, 450000000000.0, 5.2, 0.00000001, 1000.0, 42000000),
             ("LTC", "Litecoin", 72.50, 1100000.0, 0.7, 0.01, 0.01, 18000000),
             ("NEAR", "NEAR Protocol", 5.20, 12000000.0, 3.4, 0.001, 0.1, 29000000),
             ("APT", "Aptos", 7.80, 9500000.0, 4.1, 0.001, 0.1, 35000000),
-            ("SUI", "Sui", 1.95, 35000000.0, 6.8, 0.0001, 1.0, 85000000),
-            ("PEPE", "Pepe", 0.0000115, 850000000000.0, 8.4, 0.00000001, 1000.0, 95000000)
+            ("SUI", "Sui", 1.95, 35000000.0, 6.8, 0.0001, 1.0, 85000000)
         ]
 
         for base, comp, ltp, vol, chg, tick, lot, oi in crypto_catalog:
             sym = f"{base}/USDT"
             canon = f"{base}USDT"
-            vol_score = 85.0 if base in ["PEPE", "SUI", "SHIB", "DOGE"] else (65.0 if base in ["SOL", "AVAX", "APT"] else 45.0)
+            vol_score = 85.0 if base in ["SUI", "DOGE"] else (65.0 if base in ["SOL", "AVAX", "APT"] else 45.0)
 
             # Spot Instrument
             instruments.append({

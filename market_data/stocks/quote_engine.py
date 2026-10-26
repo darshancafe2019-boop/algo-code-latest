@@ -6,6 +6,7 @@ Integrates live market data feeds across Indian Equities (NSE/BSE) and Global Eq
 """
 
 import logging
+import os
 import time
 import concurrent.futures
 from typing import Dict, List, Optional, Any, Tuple
@@ -22,7 +23,7 @@ class LiveQuoteFetcher:
     """Fetches real-time / authoritative market quotes using live providers."""
 
     _live_cache: Dict[str, Tuple[float, Dict[str, Any]]] = {}
-    CACHE_TTL_SEC = 30.0
+    CACHE_TTL_SEC = 5.0
 
     @classmethod
     def get_ticker_symbol(cls, symbol: str, exchange: str) -> str:
@@ -68,15 +69,25 @@ class LiveQuoteFetcher:
 
         data = None
         ticker_str = cls.get_ticker_symbol(symbol, exchange)
+        sym_upper = symbol.strip().upper()
+        ex_upper = exchange.strip().upper()
 
-        # 0. Primary Authoritative Feed: Market Data Gateway (port 5051) in local dev
-        if not os.environ.get("RENDER") and not os.environ.get("VERCEL"):
+        now_dt = datetime.now(timezone.utc)
+        ist_hour = (now_dt.hour + 5 + (now_dt.minute + 30) // 60) % 24
+        ist_min = (now_dt.minute + 30) % 60
+        is_indian_open = ((ist_hour == 9 and ist_min >= 15) or (10 <= ist_hour < 15) or (ist_hour == 15 and ist_min <= 30)) and now_dt.weekday() < 5
+
+        # 0. Primary Authoritative Feed: Market Data Gateway
+        gw_base = os.environ.get("MARKET_GATEWAY_URL", "http://127.0.0.1:5051").strip().rstrip("/")
+        if gw_base and not (gw_base.startswith("http://") or gw_base.startswith("https://")):
+            gw_base = f"http://{gw_base}"
+        if gw_base:
             try:
                 import urllib.request
                 import json
-                gw_url = f"http://127.0.0.1:5051/api/market/quote?symbol={symbol}"
+                gw_url = f"{gw_base}/api/market/quote?symbol={symbol}"
                 req = urllib.request.Request(gw_url, headers={"User-Agent": "StockQuoteEngine"})
-                with urllib.request.urlopen(req, timeout=0.25) as resp:
+                with urllib.request.urlopen(req, timeout=0.8) as resp:
                     if resp.status == 200:
                         gw_data = json.loads(resp.read().decode("utf-8"))
                         if gw_data.get("ok") and gw_data.get("price"):
@@ -100,13 +111,51 @@ class LiveQuoteFetcher:
                                 "high_52w": round(float(gw_data.get("high_52w") or p * 1.25), 2),
                                 "low_52w": round(float(gw_data.get("low_52w") or p * 0.75), 2),
                                 "market_cap": None,
-                                "data_quality": "LIVE",
+                                "data_quality": "LIVE" if (is_indian_open if ex_upper in ["NSE", "BSE"] else True) else "LAST_TRADED",
                                 "provider": "Upstox-Live" if gw_data.get("source") == "UPSTOX" else (gw_data.get("source") or "Live-Market-Feed"),
                             }
             except Exception as e:
                 logger.debug(f"Gateway live fetch note for {symbol}: {e}")
 
-        # 1. Secondary Live Feed: YFinance Fast Info (if gateway had no quote)
+        # 1. Direct Upstox REST Feed for Indian Equities / Indices
+        is_indian = (
+            ex_upper in ["NSE", "BSE", "NFO"]
+            or sym_upper in ["NIFTY", "BANKNIFTY", "SENSEX", "FINNIFTY", "MIDCPNIFTY", "RELIANCE", "TCS", "INFY", "HDFCBANK", "SBIN", "BHARTIARTL", "ITC"]
+            or (ticker_str and (ticker_str.endswith(".NS") or ticker_str.endswith(".BO") or ticker_str.startswith("^NSE") or ticker_str.startswith("^BSE")))
+        )
+        if not data and is_indian:
+            try:
+                from src.upstox_service import upstox_service
+                if upstox_service.is_authenticated or upstox_service.is_configured:
+                    up_res = upstox_service.get_full_market_quote(sym_upper)
+                    if up_res and up_res.get("last_price") and float(up_res["last_price"]) > 0:
+                        p = float(up_res["last_price"])
+                        open_p = float(up_res.get("open") or p)
+                        high_p = float(up_res.get("high") or p)
+                        low_p = float(up_res.get("low") or p)
+                        prev_close = float(up_res.get("close") or up_res.get("previous_close") or open_p or p)
+                        chg_pct = float(up_res.get("change_pct") or (round(((p - prev_close) / prev_close * 100.0), 2) if prev_close > 0 else 0.0))
+                        chg_abs = round(p - prev_close, 2)
+                        vol = float(up_res.get("volume") or 0.0)
+                        data = {
+                            "last_price": round(p, 2),
+                            "open": round(open_p, 2),
+                            "high": round(high_p, 2),
+                            "low": round(low_p, 2),
+                            "previous_close": round(prev_close, 2),
+                            "change_pct": chg_pct,
+                            "change_abs": chg_abs,
+                            "volume": vol,
+                            "high_52w": round(float(up_res.get("high_52w") or p * 1.25), 2),
+                            "low_52w": round(float(up_res.get("low_52w") or p * 0.75), 2),
+                            "market_cap": None,
+                            "data_quality": "LIVE" if is_indian_open else "LAST_TRADED",
+                            "provider": "Upstox-Live",
+                        }
+            except Exception as up_err:
+                logger.debug(f"Upstox live fetch note for {sym_upper}: {up_err}")
+
+        # 2. Secondary Live Feed: YFinance Fast Info (if gateway & upstox had no quote)
         if not data and ticker_str:
             try:
                 import logging as _log
@@ -134,6 +183,7 @@ class LiveQuoteFetcher:
                     else:
                         chg_abs = 0.0
 
+                    status_open = is_indian_open if ex_upper in ["NSE", "BSE"] else True
                     data = {
                         "last_price": round(float(last_p), 2),
                         "open": round(float(open_p), 2) if open_p is not None else round(float(last_p), 2),
@@ -146,20 +196,20 @@ class LiveQuoteFetcher:
                         "high_52w": round(float(h52), 2) if h52 is not None else round(float(last_p) * 1.25, 2),
                         "low_52w": round(float(l52), 2) if l52 is not None else round(float(last_p) * 0.75, 2),
                         "market_cap": float(mcap) if mcap is not None else None,
-                        "data_quality": "LIVE",
-                        "provider": "NSE-Live" if exchange == "NSE" else ("BSE-Live" if exchange == "BSE" else "Live-Market-Feed"),
+                        "data_quality": "LIVE" if status_open else "LAST_TRADED",
+                        "provider": "NSE-Live" if ex_upper == "NSE" else ("BSE-Live" if ex_upper == "BSE" else "Live-Market-Feed"),
                     }
             except Exception as e:
                 logger.debug(f"Live fetch note for {ticker_str}: {e}")
 
         # 3. Tertiary Fallback for Indian Equities: NseService
-        if not data and exchange == "NSE":
+        if not data and ex_upper == "NSE":
             try:
                 from src.nse_service import NseService
                 res = NseService.get_instance().get_quote(symbol)
                 qdata = res.get("data", {}) if isinstance(res, dict) else {}
                 ltp = qdata.get("LastTradedPrice") or qdata.get("lastPrice")
-                if ltp is not None and float(ltp) > 0:
+                if ltp is not None and float(ltp) > 0 and not qdata.get("_is_fallback"):
                     p = float(ltp)
                     prev = float(qdata.get("previousClose") or p)
                     chg = float(qdata.get("PercentChange") or qdata.get("change") or 0.0)
@@ -175,7 +225,7 @@ class LiveQuoteFetcher:
                         "high_52w": round(float(qdata.get("high52") or p * 1.25), 2),
                         "low_52w": round(float(qdata.get("low52") or p * 0.75), 2),
                         "market_cap": None,
-                        "data_quality": "LIVE",
+                        "data_quality": "LIVE" if is_indian_open else "LAST_TRADED",
                         "provider": "NSE-Service",
                     }
             except Exception as e:
@@ -238,7 +288,7 @@ class StockQuoteEngine:
                     "high_52w": q["high_52w"],
                     "low_52w": q["low_52w"],
                     "market_cap": q["mcap"],
-                    "data_quality": "LIVE",
+                    "data_quality": "STALE",
                 },
                 instrument_id=inst_id,
                 symbol=sym,
@@ -284,7 +334,7 @@ class StockQuoteEngine:
                 "high_52w": h52,
                 "low_52w": l52,
                 "market_cap": mcap,
-                "data_quality": "LIVE",
+                "data_quality": "STALE",
             },
             instrument_id=inst.instrument_id,
             symbol=inst.symbol,

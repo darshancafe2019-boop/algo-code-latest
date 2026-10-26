@@ -231,6 +231,13 @@ curl -i -X OPTIONS https://quantos-backend.onrender.com/api/bots \
   8. In Vercel, set server-only `BACKEND_INTERNAL_URL=https://algo-code-latest.onrender.com` (or the supported `BACKEND_API_URL` fallback) for the relevant environment. Auth uses same-origin `/api/auth/*` proxies; do not expose backend secrets via `NEXT_PUBLIC_*` variables or set an `.onrender.com` cookie domain.
   9. Redeploy only after reviewing the target database and data plan. Verify both Render and Vercel health routes report the backend as ready and PostgreSQL as active, then complete the UI end-to-end OTP check below.
 
+### Incident 5: Backend Health Checks and OTP Requests Time Out
+- **Symptom:** Vercel reports 503 for `/api/health/live` and 504 for OTP send/resend requests.
+- **Interpretation:** OTP requests need database access (and email delivery); a timeout is not evidence that the OTP was sent. A subsequent verification 400 can occur if no active challenge was created or the challenge expired. Check the OTP response's `error_code` and matching Render logs.
+- **Liveness behavior:** `/health/live` is a process liveness probe and returns 200 while the backend process can respond, even if its database is unhealthy. Database state remains in the response for diagnosis. Use `/health/ready` to determine whether required dependencies, including PostgreSQL, are usable. This prevents a database outage from being misclassified as a dead process by Render's `healthCheckPath`.
+- **Database recovery:** A repository log dated September 16, 2026 records Neon rejecting PostgreSQL connections because the project's data-transfer quota was exceeded. This is historical evidence, not proof of the current incident. Check the active Neon project's current quota, billing, and connection status; restore/raise the quota or move to a verified database with a backup and migration plan. Do not work around database failure by switching production to SQLite or an empty database.
+- **After recovery:** Confirm the backend `/health/ready` reports PostgreSQL healthy, then confirm `/api/health/live` through both Render and Vercel. Request a fresh OTP once; verify it using the new `challenge_id` returned by that successful request.
+
 ### Safe SQLite-to-PostgreSQL cutover
 1. Identify the actual SQLite file from the effective `DB_PATH` (default: `data/trading_bot.db`) and confirm whether that filesystem survives service restarts. Do not assume a Render disk is attached.
 2. Stop writes or schedule a maintenance window. Use SQLite's online backup API against the actual file, store the backup outside the Render service filesystem, and verify the backup with `PRAGMA integrity_check`.

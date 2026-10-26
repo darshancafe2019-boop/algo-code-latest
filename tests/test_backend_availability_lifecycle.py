@@ -108,6 +108,25 @@ def test_02_health_live_not_blocked_by_csrf(client):
     assert data["status"] == "ok"
 
 
+def test_health_live_remains_ok_when_database_is_unhealthy(client, monkeypatch):
+    """Liveness describes the process; database failures belong to readiness."""
+    monkeypatch.setattr(
+        db,
+        "check_database_health",
+        lambda: {"status": "UNHEALTHY", "engine": "postgresql", "corrupted": False},
+    )
+    monkeypatch.setattr(db, "is_database_healthy", lambda: False)
+
+    resp = client.get("/api/health/live")
+
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["status"] == "ok"
+    assert data["success"] is True
+    assert data["database"] == "UNHEALTHY"
+    assert data["db"]["status"] == "UNHEALTHY"
+
+
 def test_03_health_live_not_blocked_by_rate_limiter(client):
     """3. health/live is not blocked by sliding-window rate limiter."""
     for _ in range(15):

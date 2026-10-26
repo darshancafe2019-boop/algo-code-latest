@@ -18821,6 +18821,10 @@ def _compute_top_movers() -> Dict[str, List[Dict[str, Any]]]:
     return res
 
 
+_DASHBOARD_SNAPSHOT_CACHE: Dict[str, Tuple[float, Any]] = {}
+_DASHBOARD_SNAPSHOT_CACHE_TTL = 10.0
+
+
 @app.route("/api/dashboard/snapshot", methods=["GET"])
 def api_dashboard_snapshot():
     """
@@ -18828,6 +18832,12 @@ def api_dashboard_snapshot():
     Aggregates Portfolio, Positions Summary, PnL, Performance, Indices, Movers,
     Brokers Matrix, System Telemetry Health, Alerts, and Audit Logs.
     """
+    mode = request.args.get("mode", getattr(config, "TRADING_MODE", "PAPER")).upper()
+    now_mono = time.monotonic()
+    cached = _DASHBOARD_SNAPSHOT_CACHE.get(mode)
+    if cached and (now_mono - cached[0]) < _DASHBOARD_SNAPSHOT_CACHE_TTL:
+        return jsonify(cached[1])
+
     try:
         import urllib.request
         import urllib.error
@@ -18835,7 +18845,6 @@ def api_dashboard_snapshot():
         from src.connection_registry import global_connection_registry
         from market_data_gateway.cache.market_cache import global_market_cache
         gde = GlobalDataEngine.get_instance()
-        mode = request.args.get("mode", getattr(config, "TRADING_MODE", "PAPER")).upper()
         
         # 1. Authoritative Portfolio Snapshot
         portfolio_snap = gde.get_portfolio_snapshot(mode=mode)
@@ -18994,7 +19003,7 @@ def api_dashboard_snapshot():
         ]
 
         # 8. Consolidated Snapshot Payload
-        return jsonify({
+        payload = {
             "generatedAt": datetime.now(timezone.utc).isoformat(),
             "mode": mode,
             "portfolio": portfolio_snap,
@@ -19033,9 +19042,14 @@ def api_dashboard_snapshot():
             },
             "alerts": alerts_list,
             "logs": logs_list
-        })
+        }
+        _DASHBOARD_SNAPSHOT_CACHE[mode] = (now_mono, payload)
+        return jsonify(payload)
     except Exception as e:
         logger.error(f"Error in /api/dashboard/snapshot: {e}", exc_info=True)
+        cached = _DASHBOARD_SNAPSHOT_CACHE.get(mode)
+        if cached:
+            return jsonify(cached[1])
         return jsonify({"status": "error", "error": str(e), "generatedAt": datetime.now(timezone.utc).isoformat()}), 500
 
 

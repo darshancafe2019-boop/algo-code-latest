@@ -179,6 +179,18 @@ threading.Thread(target=_start_engine_recovery_deferred, daemon=True, name="Engi
 # In-memory snapshot cache (bot_id -> (timestamp, snapshot_dict))
 _bot_snapshot_cache: Dict[str, Tuple[float, Dict[str, Any]]] = {}
 _live_quote_cache: Dict[str, Tuple[float, Dict[str, Any]]] = {}
+_list_bots_cache: Tuple[float, List[Dict[str, Any]]] = (0.0, [])
+
+
+def invalidate_bots_cache(bot_id: Optional[str] = None) -> None:
+    """Invalidates cached bot listings and snapshots on mutations."""
+    global _list_bots_cache
+    _list_bots_cache = (0.0, [])
+    if bot_id:
+        _bot_snapshot_cache.pop(bot_id, None)
+    else:
+        _bot_snapshot_cache.clear()
+
 
 
 # ── 1. WIZARD PRE-DEPLOYMENT VALIDATION ─────────────────────────────────────────
@@ -430,7 +442,7 @@ def deploy_wizard_bot(payload_data: Dict[str, Any]) -> Dict[str, Any]:
         "total": 0.0,
     }
     # Invalidate cache if exists
-    _bot_snapshot_cache.pop(bot_id, None)
+    invalidate_bots_cache(bot_id)
 
     # Persist in quant_bot_v2.db
     with _get_db_connection() as conn:
@@ -493,6 +505,11 @@ def list_bots() -> List[Dict[str, Any]]:
     Returns all configured bots with real-time status and metrics.
     Compatible with both source frontend expectations and legacy consumers.
     """
+    global _list_bots_cache
+    now_mono = time.monotonic()
+    if _list_bots_cache[0] > 0 and (now_mono - _list_bots_cache[0]) < 8.0:
+        return _list_bots_cache[1]
+
     bots_out: List[Dict[str, Any]] = []
 
     try:
@@ -624,6 +641,7 @@ def list_bots() -> List[Dict[str, Any]]:
     except Exception as e:
         logger.error(f"Error querying bots: {e}")
 
+    _list_bots_cache = (now_mono, bots_out)
     return bots_out
 
 
@@ -796,7 +814,7 @@ def get_bot_snapshot(bot_id: str) -> Dict[str, Any]:
 # ── 4. BOT LIFECYCLE OPERATIONS ───────────────────────────────────────────────
 
 def set_bot_status(bot_id: str, new_status: str, event_type: str, event_msg: str) -> Dict[str, Any]:
-    _bot_snapshot_cache.pop(bot_id, None)
+    invalidate_bots_cache(bot_id)
     with _get_db_connection() as conn:
         row = conn.execute("SELECT configuration_json FROM bots WHERE id = ?", (bot_id,)).fetchone()
         if not row:
@@ -877,7 +895,7 @@ def restart_bot(bot_id: str) -> Dict[str, Any]:
 
 
 def delete_bot(bot_id: str) -> bool:
-    _bot_snapshot_cache.pop(bot_id, None)
+    invalidate_bots_cache(bot_id)
     try:
         from src.quant_bot_engine import bot_engine_manager
         bot_engine_manager.stop_bot(bot_id)
@@ -907,7 +925,7 @@ def delete_bot(bot_id: str) -> bool:
 
 def start_all_bots() -> Dict[str, Any]:
     """Starts or resumes all configured bots across the fleet."""
-    _bot_snapshot_cache.clear()
+    invalidate_bots_cache()
     started_ids: List[str] = []
 
     with _get_db_connection() as conn:
@@ -958,7 +976,7 @@ def start_all_bots() -> Dict[str, Any]:
 
 def stop_all_bots() -> Dict[str, Any]:
     """Stops all running bots across the fleet."""
-    _bot_snapshot_cache.clear()
+    invalidate_bots_cache()
 
     # 1. Stop all active engines in memory immediately
     try:
@@ -1004,7 +1022,7 @@ def stop_all_bots() -> Dict[str, Any]:
 
 def delete_all_bots(force: bool = True) -> Dict[str, Any]:
     """Permanently delete ALL bot instances across both quant_bot_v2.db and trading_bot.db."""
-    _bot_snapshot_cache.clear()
+    invalidate_bots_cache()
     try:
         from src.quant_bot_engine import bot_engine_manager
         bot_engine_manager.stop_all()

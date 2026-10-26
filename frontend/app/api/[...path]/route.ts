@@ -304,8 +304,9 @@ async function handleProxy(req: NextRequest, ctx: { params?: { path: string[] } 
   }
 
   const isStream = subPath.startsWith("stream") || subPath.includes("/stream") || subPath.includes("market-data/stream") || req.headers.get("accept")?.includes("text/event-stream");
-  const isHeavy = subPath.includes("backtest") || subPath.includes("simulate") || subPath.includes("portfolio") || subPath.includes("risk") || subPath.includes("journal") || subPath.includes("positions") || subPath.includes("options") || subPath.includes("dashboard") || subPath.includes("snapshot") || subPath.includes("instruments") || subPath.includes("universe") || subPath.includes("orders") || subPath.includes("status");
-  const timeoutMs = isHeavy ? 60000 : 35000;
+  const isStatus = subPath === "status" || subPath.startsWith("status/");
+  const isHeavy = subPath.includes("backtest") || subPath.includes("simulate") || subPath.includes("portfolio") || subPath.includes("risk") || subPath.includes("journal") || subPath.includes("positions") || subPath.includes("options") || subPath.includes("dashboard") || subPath.includes("snapshot") || subPath.includes("instruments") || subPath.includes("universe") || subPath.includes("orders");
+  const timeoutMs = isStatus ? 3500 : (isHeavy ? 60000 : 35000);
 
   let bodyData: BodyInit | null = null;
   if (["POST", "PUT", "PATCH", "DELETE"].includes(req.method)) {

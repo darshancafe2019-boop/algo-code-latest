@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
   try {
     const upstreamRes = await fetch(targetUrl, {
       headers: getForwardHeaders(req, requestId),
-      signal: AbortSignal.timeout(25000),
+      signal: AbortSignal.timeout(4500),
       cache: "no-store",
     });
 

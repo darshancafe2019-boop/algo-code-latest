@@ -152,6 +152,11 @@ def parse_args():
         default=1000,
         help="Batch size for bulk insertion (default: 1000)"
     )
+    parser.add_argument(
+        "--truncate-first",
+        action="store_true",
+        help="Truncate target PostgreSQL tables before migrating to avoid duplicates from multiple runs"
+    )
     return parser.parse_args()
 
 
@@ -220,12 +225,12 @@ def build_pg_table_ddl(sqlite_conn: sqlite3.Connection, table_name: str) -> str:
                 escaped = str(dflt_val).replace("'", "''")
                 def_str += f" DEFAULT '{escaped}'"
                 
-        if notnull:
+        if notnull or pk >= 1:
             def_str += " NOT NULL"
             
-        if pk == 1 and notnull == 1 and table_name != "daily_statistics" and len([c for c in cols if c[5] >= 1]) == 1:
+        if pk == 1 and table_name != "daily_statistics" and len([c for c in cols if c[5] >= 1]) == 1:
             def_str += " PRIMARY KEY"
-        elif pk >= 1 and notnull == 1 and table_name != "daily_statistics":
+        elif pk >= 1 and table_name != "daily_statistics":
             pks.append(f'"{name}"')
             
         col_defs.append(def_str)
@@ -327,11 +332,20 @@ def get_table_col_info(sqlite_conn: sqlite3.Connection, table_name: str) -> List
     return [(col[1], (col[2] or "TEXT").upper()) for col in cur.fetchall()]
 
 
-def migrate_table(sqlite_conn: sqlite3.Connection, pg_conn, table_name: str, batch_size: int, dry_run: bool) -> Dict[str, Any]:
+def migrate_table(sqlite_conn: sqlite3.Connection, pg_conn, table_name: str, batch_size: int, dry_run: bool, truncate_first: bool = False) -> Dict[str, Any]:
     """Migrates rows for a single table from SQLite to PostgreSQL with type adaptation."""
     sq_cur = sqlite_conn.cursor()
     sq_cur.execute(f'SELECT COUNT(*) FROM "{table_name}"')
     source_count = sq_cur.fetchone()[0]
+
+    if truncate_first and not dry_run:
+        try:
+            with pg_conn.cursor() as cur:
+                cur.execute(f'TRUNCATE TABLE "{table_name}" CASCADE;')
+            pg_conn.commit()
+        except Exception as trunc_err:
+            pg_conn.rollback()
+            logger.debug(f"Truncate notice on {table_name}: {trunc_err}")
 
     if source_count == 0:
         return {"table": table_name, "source": 0, "target": 0, "status": "EMPTY"}
@@ -427,9 +441,9 @@ def verify_migration(sqlite_conn: sqlite3.Connection, pg_conn, tables: List[str]
     # 2. Total trades
     if "trades_log" in tables:
         sq_cur.execute("SELECT COUNT(*), COALESCE(SUM(result_pnl), 0) FROM trades_log")
-        sq_trades = sq_cur.fetchone()
+        sq_trades = tuple(sq_cur.fetchone())
         pg_cur.execute("SELECT COUNT(*), COALESCE(SUM(result_pnl), 0) FROM trades_log")
-        pg_trades = pg_cur.fetchone()
+        pg_trades = tuple(pg_cur.fetchone())
         if sq_trades[0] == pg_trades[0] and abs(float(sq_trades[1]) - float(pg_trades[1])) < 0.001:
             print(f"  [VERIFIED] Trades aggregate: {sq_trades[0]} trades, Cumulative PnL = {sq_trades[1]:.2f}")
         else:
@@ -540,7 +554,7 @@ def main():
     try:
         for t in all_tables:
             try:
-                res = migrate_table(sqlite_conn, pg_conn, t, args.batch_size, args.dry_run)
+                res = migrate_table(sqlite_conn, pg_conn, t, args.batch_size, args.dry_run, truncate_first=args.truncate_first)
                 results.append(res)
                 if res['source'] > 0:
                     print(f"[{res['status']:<7}] {t:<35} : {res['source']:>6} -> {res['target']:>6} rows")

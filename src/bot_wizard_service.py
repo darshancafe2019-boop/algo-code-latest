@@ -41,91 +41,80 @@ def _get_db_connection():
 
 
 def _ensure_schema():
-    """Ensure bots and related tables exist in quant_bot_v2.db."""
+    """Ensure bots and related tables exist in quant_bot_v2.db or PostgreSQL."""
     try:
         with _get_db_connection() as conn:
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS bots (
-                    id TEXT PRIMARY KEY,
-                    name TEXT NOT NULL,
-                    status TEXT NOT NULL,
-                    execution_mode TEXT NOT NULL DEFAULT 'PAPER',
-                    configuration_json TEXT NOT NULL,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            """)
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS bot_events (
-                    id TEXT PRIMARY KEY,
-                    bot_id TEXT NOT NULL,
-                    event_type TEXT NOT NULL,
-                    severity TEXT NOT NULL DEFAULT 'INFO',
-                    message TEXT NOT NULL,
-                    payload TEXT DEFAULT '{}',
-                    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            """)
             try:
-                event_cols = [r[1] for r in conn.execute("PRAGMA table_info(bot_events)").fetchall()]
-                if "payload" not in event_cols:
-                    conn.execute("ALTER TABLE bot_events ADD COLUMN payload TEXT DEFAULT '{}'")
-            except Exception as mig_err:
-                logger.debug(f"bot_events payload migration check: {mig_err}")
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS orders (
-                    id TEXT PRIMARY KEY,
-                    bot_id TEXT NOT NULL,
-                    symbol TEXT NOT NULL,
-                    side TEXT NOT NULL,
-                    quantity REAL NOT NULL,
-                    price REAL,
-                    status TEXT NOT NULL,
-                    order_type TEXT DEFAULT 'MARKET',
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            """)
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS positions (
-                    id TEXT PRIMARY KEY,
-                    bot_id TEXT NOT NULL,
-                    symbol TEXT NOT NULL,
-                    side TEXT NOT NULL,
-                    quantity REAL NOT NULL,
-                    entry_price REAL NOT NULL,
-                    current_price REAL,
-                    unrealized_pnl REAL DEFAULT 0.0,
-                    realized_pnl REAL DEFAULT 0.0,
-                    status TEXT DEFAULT 'OPEN',
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            """)
-            try:
-                pos_cols = [r[1] for r in conn.execute("PRAGMA table_info(positions)").fetchall()]
-                if "realized_pnl" not in pos_cols:
-                    conn.execute("ALTER TABLE positions ADD COLUMN realized_pnl REAL DEFAULT 0.0")
-            except Exception as mig_err:
-                logger.debug(f"positions realized_pnl migration check: {mig_err}")
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS bots (
+                        id TEXT PRIMARY KEY,
+                        name TEXT NOT NULL,
+                        status TEXT NOT NULL,
+                        execution_mode TEXT NOT NULL DEFAULT 'PAPER',
+                        configuration_json TEXT NOT NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """)
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS bot_events (
+                        id TEXT PRIMARY KEY,
+                        bot_id TEXT NOT NULL,
+                        event_type TEXT NOT NULL,
+                        severity TEXT NOT NULL DEFAULT 'INFO',
+                        message TEXT NOT NULL,
+                        payload TEXT DEFAULT '{}',
+                        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """)
+            except Exception as ddl_err:
+                logger.warning(f"Schema creation notice: {ddl_err}")
 
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS trades (
-                    id TEXT PRIMARY KEY,
-                    bot_id TEXT NOT NULL,
-                    symbol TEXT NOT NULL,
-                    side TEXT NOT NULL,
-                    quantity REAL NOT NULL,
-                    price REAL NOT NULL,
-                    realized_pnl REAL DEFAULT 0.0,
-                    fees REAL DEFAULT 0.0,
-                    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            """)
             try:
-                trade_cols = [r[1] for r in conn.execute("PRAGMA table_info(trades)").fetchall()]
-                if "fees" not in trade_cols:
-                    conn.execute("ALTER TABLE trades ADD COLUMN fees REAL DEFAULT 0.0")
-            except Exception as mig_err:
-                logger.debug(f"trades fees migration check: {mig_err}")
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS orders (
+                        id TEXT PRIMARY KEY,
+                        bot_id TEXT NOT NULL,
+                        symbol TEXT NOT NULL,
+                        side TEXT NOT NULL,
+                        quantity REAL NOT NULL,
+                        price REAL,
+                        status TEXT NOT NULL,
+                        order_type TEXT DEFAULT 'MARKET',
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """)
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS positions (
+                        id TEXT PRIMARY KEY,
+                        bot_id TEXT NOT NULL,
+                        symbol TEXT NOT NULL,
+                        side TEXT NOT NULL,
+                        quantity REAL NOT NULL,
+                        entry_price REAL NOT NULL,
+                        current_price REAL,
+                        unrealized_pnl REAL DEFAULT 0.0,
+                        realized_pnl REAL DEFAULT 0.0,
+                        status TEXT DEFAULT 'OPEN',
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """)
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS trades (
+                        id TEXT PRIMARY KEY,
+                        bot_id TEXT NOT NULL,
+                        symbol TEXT NOT NULL,
+                        side TEXT NOT NULL,
+                        quantity REAL NOT NULL,
+                        price REAL NOT NULL,
+                        realized_pnl REAL DEFAULT 0.0,
+                        fees REAL DEFAULT 0.0,
+                        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """)
+                conn.commit()
+            except Exception as ext_err:
+                logger.debug(f"Extended schema creation notice: {ext_err}")
 
             conn.commit()
     except Exception as e:
@@ -514,7 +503,14 @@ def list_bots() -> List[Dict[str, Any]]:
 
     try:
         with _get_db_connection() as conn:
-            rows = conn.execute("SELECT id, name, status, execution_mode, configuration_json, created_at, updated_at FROM bots ORDER BY updated_at DESC").fetchall()
+            try:
+                rows = conn.execute("SELECT id, name, status, execution_mode, configuration_json, created_at, updated_at FROM bots ORDER BY updated_at DESC").fetchall()
+            except Exception as e:
+                err_str = str(e).lower()
+                if "does not exist" in err_str or "no such table" in err_str:
+                    logger.debug("Table 'bots' does not exist yet; returning empty bot fleet.")
+                    return []
+                raise
 
             # Pre-fetch aggregated metrics across all bots in bulk queries (eliminating sequential roundtrips)
             pos_open_map: Dict[str, Tuple[int, float, float]] = {}

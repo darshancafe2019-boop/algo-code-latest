@@ -14273,58 +14273,55 @@ def api_auth_login():
             (is_test_mode and not has_real_provider) or is_dev
         ))
 
-        # Dispatch real email via Resend
-        email_sent, email_err, msg_id = global_email_service.send_login_otp(
-            to_email=user_email,
-            otp_code=otp_code,
-            username=user["username"],
-            user_id=user["id"]
-        )
-
-        if not email_sent:
-            if include_dev_otp:
-                # In local development mode, activate the challenge so the developer can continue via Dev OTP
-                try:
-                    db.activate_auth_otp_challenge(
-                        challenge_id=challenge_id,
-                        user_id=user["id"],
-                        purpose="LOGIN",
-                        provider_message_id="dev_fallback",
-                        provider_status="DEV_FALLBACK"
-                    )
-                except Exception:
-                    return _auth_storage_unavailable(request_id, "activate_login_challenge")
-                logger.warning("[LOGIN_EMAIL_DEV_FALLBACK] Email delivery failed (%s), proceeding in dev mode with dev_otp.", email_err)
-                return jsonify({
-                    "status": "EMAIL_OTP_REQUIRED",
-                    "challenge_id": challenge_id,
-                    "destination": masked_dest,
-                    "message": "Verification code generated. Use Development OTP to enter terminal.",
-                    "dev_otp": otp_code,
-                    "dev_mode": True,
-                    "request_id": request_id
-                }), 200
-
-            db.mark_auth_otp_challenge_send_failed(challenge_id, error_details=email_err or "")
-            logger.error("[LOGIN_EMAIL_DELIVERY_FAILED] request_id=%s user=%s destination=%s error=%s", request_id, username, _mask_email_address(user_email), email_err)
-            return jsonify({
-                "status": "EMAIL_DELIVERY_FAILED",
-                "error_code": "EMAIL_DELIVERY_FAILED",
-                "message": "We couldn't deliver the verification code. Please request a new code.",
-                "request_id": request_id
-            }), 502
-
-        # Resend accepted: Atomically mark ACTIVE, record provider message ID, and invalidate prior active OTPs
+        # Atomically mark ACTIVE immediately and invalidate prior active OTPs so user can enter OTP immediately
         try:
             db.activate_auth_otp_challenge(
                 challenge_id=challenge_id,
                 user_id=user["id"],
                 purpose="LOGIN",
-                provider_message_id=msg_id or "",
-                provider_status="SUBMITTED"
+                provider_message_id="async_queued",
+                provider_status="PENDING"
             )
         except Exception:
             return _auth_storage_unavailable(request_id, "activate_login_challenge")
+
+        # Asynchronously dispatch email to prevent blocking the HTTP worker thread
+        def _async_send_login_email(target_email: str, code: str, username_val: str, user_id_val: str, chall_id: str):
+            try:
+                sent_ok, err_msg, email_msg_id = global_email_service.send_login_otp(
+                    to_email=target_email,
+                    otp_code=code,
+                    username=username_val,
+                    user_id=user_id_val
+                )
+                if sent_ok:
+                    try:
+                        db.safe_execute(
+                            "UPDATE auth_otp_challenges SET provider_message_id = ?, provider_status = 'SUBMITTED' WHERE id = ?",
+                            (email_msg_id or "", chall_id)
+                        )
+                    except Exception:
+                        pass
+                    logger.info("[LOGIN_OTP] Async email delivered to %s [Message ID: %s]", _mask_email_address(target_email), email_msg_id)
+                else:
+                    try:
+                        db.safe_execute(
+                            "UPDATE auth_otp_challenges SET provider_status = 'FAILED' WHERE id = ?",
+                            (chall_id,)
+                        )
+                    except Exception:
+                        pass
+                    logger.warning("[LOGIN_OTP] Async email delivery failed to %s: %s", _mask_email_address(target_email), err_msg)
+            except Exception as async_exc:
+                logger.error("[LOGIN_OTP] Async email delivery exception: %s", async_exc)
+
+        login_email_thread = threading.Thread(
+            target=_async_send_login_email,
+            args=(user_email, otp_code, user["username"], user["id"], challenge_id),
+            daemon=True,
+            name=f"login-email-{challenge_id[:12]}"
+        )
+        login_email_thread.start()
 
         db.log_security_audit_event(
             action="LOGIN_EMAIL_OTP_DISPATCHED",
@@ -14763,61 +14760,65 @@ def api_auth_email_otp_resend():
         (is_test_mode and not has_real_provider) or is_dev
     ))
 
-    # Send email through Resend
-    logger.info("[OTP] Sending email via configured provider")
-    if purpose == "PASSWORD_RESET":
-        sent, err, msg_id = global_email_service.send_password_reset_otp(user_email, otp_code, user["username"], user_id=user["id"])
-    else:
-        sent, err, msg_id = global_email_service.send_login_otp(user_email, otp_code, user["username"], user_id=user["id"])
-
-    if not sent:
-        if include_dev_otp:
-            try:
-                db.activate_auth_otp_challenge(
-                    challenge_id=new_challenge_id,
-                    user_id=user["id"],
-                    purpose=purpose,
-                    provider_message_id="dev_fallback",
-                    provider_status="DEV_FALLBACK"
-                )
-            except Exception:
-                return _auth_storage_unavailable(request_id, "activate_otp_challenge")
-            logger.warning("[OTP_RESEND_DEV_FALLBACK] Email delivery failed (%s), proceeding in dev mode with dev_otp.", err)
-            resend_payload = {
-                "status": "success",
-                "success": True,
-                "challenge_id": new_challenge_id,
-                "destination": masked_dest,
-                "message": "New verification code generated. Use Development OTP to proceed.",
-                "cooldown_seconds": 60,
-                "dev_otp": otp_code,
-                "dev_mode": True,
-                "request_id": request_id
-            }
-            return jsonify(resend_payload), 200
-
-        db.mark_auth_otp_challenge_send_failed(new_challenge_id, error_details=err or "")
-        logger.error("[OTP] [EMAIL_PROVIDER_ERROR] Failed delivering OTP email to %s: %s", _mask_email_address(user_email), err)
-        return jsonify({
-            "status": "EMAIL_DELIVERY_FAILED",
-            "success": False,
-            "error_code": "EMAIL_DELIVERY_FAILED",
-            "message": "We couldn't deliver the verification code. Please request a new code.",
-            "request_id": request_id
-        }), 502
-
-    # Atomically activate new challenge and invalidate all prior challenges for this user/purpose
+    # Atomically activate new challenge immediately and invalidate prior challenges so the client can verify without delay
     try:
         db.activate_auth_otp_challenge(
             challenge_id=new_challenge_id,
             user_id=user["id"],
             purpose=purpose,
-            provider_message_id=msg_id or "",
-            provider_status="SUBMITTED"
+            provider_message_id="async_queued",
+            provider_status="PENDING"
         )
     except Exception:
         return _auth_storage_unavailable(request_id, "activate_otp_challenge")
-    logger.info("[OTP] Email accepted by provider [Message ID: %s] | Challenge activated", msg_id)
+    logger.info("[OTP] Challenge %s activated immediately. Dispatching email asynchronously.", new_challenge_id)
+
+    # Asynchronous background email delivery to guarantee sub-second HTTP responses
+    def _async_send_otp_email(
+        target_email: str,
+        code: str,
+        username: str,
+        user_id_val: str,
+        chall_id: str,
+        otp_purpose: str
+    ):
+        try:
+            if otp_purpose == "PASSWORD_RESET":
+                sent_ok, err_msg, email_msg_id = global_email_service.send_password_reset_otp(
+                    target_email, code, username, user_id=user_id_val
+                )
+            else:
+                sent_ok, err_msg, email_msg_id = global_email_service.send_login_otp(
+                    target_email, code, username, user_id=user_id_val
+                )
+            if sent_ok:
+                try:
+                    db.safe_execute(
+                        "UPDATE auth_otp_challenges SET provider_message_id = ?, provider_status = 'SUBMITTED' WHERE id = ?",
+                        (email_msg_id or "", chall_id)
+                    )
+                except Exception:
+                    pass
+                logger.info("[OTP] Async email delivered successfully to %s [Message ID: %s]", _mask_email_address(target_email), email_msg_id)
+            else:
+                try:
+                    db.safe_execute(
+                        "UPDATE auth_otp_challenges SET provider_status = 'FAILED' WHERE id = ?",
+                        (chall_id,)
+                    )
+                except Exception:
+                    pass
+                logger.warning("[OTP] Async email delivery failed to %s: %s", _mask_email_address(target_email), err_msg)
+        except Exception as async_exc:
+            logger.error("[OTP] Async email delivery exception: %s", async_exc)
+
+    email_thread = threading.Thread(
+        target=_async_send_otp_email,
+        args=(user_email, otp_code, user["username"], user["id"], new_challenge_id, purpose),
+        daemon=True,
+        name=f"otp-email-{new_challenge_id[:12]}"
+    )
+    email_thread.start()
 
     resend_payload = {
         "status": "success",

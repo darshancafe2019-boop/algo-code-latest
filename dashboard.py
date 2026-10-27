@@ -866,14 +866,14 @@ if not os.environ.get("PYTEST_CURRENT_TEST"):
 @app.route("/diagnostics")
 @app.route("/tutorial")
 def index():
-    """Return backend API health and available routes (Next.js is frontend at port 3000)."""
+    fe_url = os.environ.get("FRONTEND_URL") or os.environ.get("APP_PUBLIC_URL") or getattr(config, "APP_PUBLIC_URL", "http://localhost:3100")
     return jsonify({
         "status": "healthy",
         "service": "alpha-algo-backend-api",
         "platform": "Alpha Algo Trading Platform",
-        "terminal": "http://localhost:3100",
+        "terminal": fe_url,
         "version": "2.0",
-        "frontend_url": "http://localhost:3100",
+        "frontend_url": fe_url,
         "endpoints": {
             "status": "/api/status",
             "market": "/api/market",
@@ -14265,13 +14265,13 @@ def api_auth_login():
         is_dev = os.getenv("APP_ENV") == "development" or os.getenv("FLASK_ENV") == "development"
         is_prod = config.IS_PRODUCTION
         has_real_provider = bool(config.RESEND_API_KEY or config.SMTP_HOST)
-        allow_dev_fallback = not is_prod and (
-            os.getenv("AUTH_BOOTSTRAP_ENABLED", "true").lower() in ("true", "1")
-            or os.getenv("ALLOW_DEV_OTP", "true").lower() in ("true", "1")
+        allow_dev_fallback = (
+            os.getenv("ALLOW_DEV_OTP", "false").lower() in ("true", "1")
+            or (not is_prod and os.getenv("AUTH_BOOTSTRAP_ENABLED", "true").lower() in ("true", "1"))
         )
-        include_dev_otp = not is_prod and (
-            (is_test_mode and not has_real_provider) or is_dev or allow_dev_fallback
-        )
+        include_dev_otp = allow_dev_fallback or (not is_prod and (
+            (is_test_mode and not has_real_provider) or is_dev
+        ))
 
         # Dispatch real email via Resend
         email_sent, email_err, msg_id = global_email_service.send_login_otp(
@@ -14755,13 +14755,13 @@ def api_auth_email_otp_resend():
     is_dev = os.getenv("APP_ENV") == "development" or os.getenv("FLASK_ENV") == "development"
     is_prod = config.IS_PRODUCTION
     has_real_provider = bool(config.RESEND_API_KEY or config.SMTP_HOST)
-    allow_dev_fallback = not is_prod and (
-        os.getenv("AUTH_BOOTSTRAP_ENABLED", "true").lower() in ("true", "1")
-        or os.getenv("ALLOW_DEV_OTP", "true").lower() in ("true", "1")
+    allow_dev_fallback = (
+        os.getenv("ALLOW_DEV_OTP", "false").lower() in ("true", "1")
+        or (not is_prod and os.getenv("AUTH_BOOTSTRAP_ENABLED", "true").lower() in ("true", "1"))
     )
-    include_dev_otp = not is_prod and (
-        (is_test_mode and not has_real_provider) or is_dev or allow_dev_fallback
-    )
+    include_dev_otp = allow_dev_fallback or (not is_prod and (
+        (is_test_mode and not has_real_provider) or is_dev
+    ))
 
     # Send email through Resend
     logger.info("[OTP] Sending email via configured provider")

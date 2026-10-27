@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "engines": {
-    "node": ">=18.17.0"
+    "node": ">=22.0.0"
   },
   "scripts": {
     "predev": "node -e \"const fs=require('fs');try{fs.rmSync('.next',{recursive:true,force:true});fs.rmSync('tsconfig.tsbuildinfo',{force:true});}catch(e){}\"",

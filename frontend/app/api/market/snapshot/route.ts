@@ -87,7 +87,7 @@ export async function GET(req: NextRequest) {
       signal: AbortSignal.timeout(20000),
     });
 
-    if (res.ok) {
+    if (res && res.ok) {
       const data = await res.json();
       const incomingQuotes = data.quotes || data.data || {};
       for (const [k, v] of Object.entries(incomingQuotes)) {

@@ -1572,6 +1572,34 @@ def init_db(force: bool = False) -> None:
 
                 cursor.execute(
                     """
+                    CREATE TABLE IF NOT EXISTS bots (
+                        id TEXT PRIMARY KEY,
+                        name TEXT NOT NULL,
+                        status TEXT NOT NULL,
+                        execution_mode TEXT NOT NULL DEFAULT 'PAPER',
+                        configuration_json TEXT NOT NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                    """
+                )
+
+                cursor.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS bot_events (
+                        id TEXT PRIMARY KEY,
+                        bot_id TEXT NOT NULL,
+                        event_type TEXT NOT NULL,
+                        severity TEXT NOT NULL DEFAULT 'INFO',
+                        message TEXT NOT NULL,
+                        payload TEXT DEFAULT '{}',
+                        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                    """
+                )
+
+                cursor.execute(
+                    """
                     CREATE TABLE IF NOT EXISTS bot_instances (
                         id TEXT PRIMARY KEY,
                         name TEXT NOT NULL,

@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import QueryProvider from "@/components/QueryProvider";
 import { AuthProvider } from "@/context/AuthContext";
@@ -8,6 +8,14 @@ import { ThemeProvider } from "@/context/ThemeContext";
 import { MarketGatewayProvider } from "@/context/MarketGatewayContext";
 import { GlobalDataProvider } from "@/context/GlobalDataContext";
 
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+  viewportFit: "cover",
+  themeColor: "#00F0FF",
+};
+
 export const metadata: Metadata = {
   title: "BTC/USDT | Alpha Algo Terminal",
   description: "Next-Generation Institutional Algorithmic Trading Terminal",
@@ -15,6 +23,11 @@ export const metadata: Metadata = {
     icon: "/favicon.ico",
   },
   manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Alpha Algo",
+  },
 };
 
 import { BackendAvailabilityBanner } from "@/components/common/BackendAvailabilityBanner";

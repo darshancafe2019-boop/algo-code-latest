@@ -443,18 +443,33 @@ def deploy_wizard_bot(payload_data: Dict[str, Any]) -> Dict[str, Any]:
         _log_bot_event(conn, bot_id, "BOT_CREATED", "INFO", f"Bot '{bot_name}' deployed in {exec_mode} mode.")
         conn.commit()
 
-    # Persist in data/trading_bot.db (bot_instances) so multi_bot_manager and live_runner can execute it
+    # Persist in authoritative bot_instances table so multi_bot_manager and live_runner can execute it
     try:
-        if ALGO_DB_PATH.exists():
+        strat_name = payload_data.get("trading_strategy", {}).get("strategy_name") or "Trend Pullback to EMA"
+        tf = payload_data.get("timeframe") or "5m"
+        raw_cap = payload_data.get("capital") or payload_data.get("allocated_capital") or payload_data.get("capital_allocation") or 10000.0
+        if isinstance(raw_cap, dict):
+            cap_val = float(raw_cap.get("allocated_amount") or raw_cap.get("amount") or raw_cap.get("allocated_capital") or 10000.0)
+        else:
+            cap_val = float(raw_cap or 10000.0)
+        risk_val = float(risk.get("risk_per_trade") or 2.0)
+
+        with _get_db_connection() as conn_inst:
+            conn_inst.execute("""
+                INSERT OR REPLACE INTO bot_instances (
+                    id, name, symbol, strategy, timeframe, asset_class, exchange,
+                    execution_mode, status, allocated_capital, current_equity,
+                    config_json, risk_per_trade, group_name, is_deleted, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Quant Wizard Bots', 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            """, (
+                bot_id, bot_name, symbol, strat_name, tf, asset_cls, exchange,
+                exec_mode, status, cap_val, cap_val, json.dumps(bot_config), risk_val
+            ))
+            conn_inst.commit()
+
+        # Also sync to local SQLite file if present in dev mode
+        if ALGO_DB_PATH.exists() and not getattr(config, "IS_POSTGRES", False):
             with sqlite3.connect(str(ALGO_DB_PATH), timeout=10.0) as conn_algo:
-                strat_name = payload_data.get("trading_strategy", {}).get("strategy_name") or "Trend Pullback to EMA"
-                tf = payload_data.get("timeframe") or "5m"
-                raw_cap = payload_data.get("capital") or payload_data.get("allocated_capital") or payload_data.get("capital_allocation") or 10000.0
-                if isinstance(raw_cap, dict):
-                    cap_val = float(raw_cap.get("allocated_amount") or raw_cap.get("amount") or raw_cap.get("allocated_capital") or 10000.0)
-                else:
-                    cap_val = float(raw_cap or 10000.0)
-                risk_val = float(risk.get("risk_per_trade") or 2.0)
                 conn_algo.execute("""
                     INSERT OR REPLACE INTO bot_instances (
                         id, name, symbol, strategy, timeframe, asset_class, exchange,
@@ -826,14 +841,17 @@ def set_bot_status(bot_id: str, new_status: str, event_type: str, event_msg: str
         _log_bot_event(conn, bot_id, event_type, "INFO", event_msg)
         conn.commit()
 
-        # Sync status to data/trading_bot.db (bot_instances)
+        # Sync status to bot_instances across authoritative DB and local SQLite
         try:
-            if ALGO_DB_PATH.exists():
+            with _get_db_connection() as conn_inst:
+                conn_inst.execute("UPDATE bot_instances SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", (new_status, bot_id))
+                conn_inst.commit()
+            if ALGO_DB_PATH.exists() and not getattr(config, "IS_POSTGRES", False):
                 with sqlite3.connect(str(ALGO_DB_PATH), timeout=10.0) as conn_algo:
                     conn_algo.execute("UPDATE bot_instances SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", (new_status, bot_id))
                     conn_algo.commit()
-        except Exception:
-            pass
+        except Exception as se:
+            logger.debug(f"Status sync to bot_instances notice: {se}")
 
         return cfg
 
@@ -903,7 +921,14 @@ def delete_bot(bot_id: str) -> bool:
     except Exception:
         pass
     try:
-        if ALGO_DB_PATH.exists():
+        with _get_db_connection() as conn_inst:
+            conn_inst.execute("UPDATE bot_instances SET is_deleted = 1, status = 'STOPPED', updated_at = CURRENT_TIMESTAMP WHERE id = ?", (bot_id,))
+            conn_inst.execute("DELETE FROM bot_instances WHERE id = ?", (bot_id,))
+            conn_inst.commit()
+    except Exception:
+        pass
+    try:
+        if ALGO_DB_PATH.exists() and not getattr(config, "IS_POSTGRES", False):
             with sqlite3.connect(str(ALGO_DB_PATH), timeout=10.0) as conn_algo:
                 conn_algo.execute("UPDATE bot_instances SET is_deleted = 1, status = 'STOPPED', updated_at = CURRENT_TIMESTAMP WHERE id = ?", (bot_id,))
                 conn_algo.execute("DELETE FROM bot_instances WHERE id = ?", (bot_id,))
@@ -929,6 +954,7 @@ def start_all_bots() -> Dict[str, Any]:
         started_ids = [str(r["id"]) for r in rows if r["id"] is not None]
         if started_ids:
             conn.execute("UPDATE bots SET status = 'RUNNING', updated_at = CURRENT_TIMESTAMP WHERE status != 'ARCHIVED'")
+            conn.execute("UPDATE bot_instances SET status = 'RUNNING', updated_at = CURRENT_TIMESTAMP WHERE status != 'ARCHIVED'")
             now_ts = datetime.now(timezone.utc).isoformat()
             event_entries = [
                 (f"evt-{uuid.uuid4().hex[:12]}", b_id, "BOT_STARTED", "INFO", "Fleet Run All executed.", "{}", now_ts)
@@ -937,7 +963,7 @@ def start_all_bots() -> Dict[str, Any]:
             conn.executemany("INSERT INTO bot_events (id, bot_id, event_type, severity, message, payload, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?)", event_entries)
             conn.commit()
 
-    if ALGO_DB_PATH.exists() and started_ids:
+    if ALGO_DB_PATH.exists() and started_ids and not getattr(config, "IS_POSTGRES", False):
         def _sync_start():
             try:
                 with sqlite3.connect(str(ALGO_DB_PATH), timeout=2.0) as conn_algo:
@@ -988,6 +1014,7 @@ def stop_all_bots() -> Dict[str, Any]:
         stopped_ids = [str(r["id"]) for r in rows if r["id"] is not None]
         if stopped_ids:
             conn.execute("UPDATE bots SET status = 'STOPPED', updated_at = CURRENT_TIMESTAMP WHERE status = 'RUNNING'")
+            conn.execute("UPDATE bot_instances SET status = 'STOPPED', updated_at = CURRENT_TIMESTAMP WHERE status = 'RUNNING'")
             now_ts = datetime.now(timezone.utc).isoformat()
             event_entries = [
                 (f"evt-{uuid.uuid4().hex[:12]}", b_id, "BOT_STOPPED", "INFO", "Fleet Stop All executed.", "{}", now_ts)
@@ -996,7 +1023,7 @@ def stop_all_bots() -> Dict[str, Any]:
             conn.executemany("INSERT INTO bot_events (id, bot_id, event_type, severity, message, payload, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?)", event_entries)
             conn.commit()
 
-    if ALGO_DB_PATH.exists() and stopped_ids:
+    if ALGO_DB_PATH.exists() and stopped_ids and not getattr(config, "IS_POSTGRES", False):
         def _sync_stop():
             try:
                 with sqlite3.connect(str(ALGO_DB_PATH), timeout=2.0) as conn_algo:
@@ -1042,7 +1069,7 @@ def delete_all_bots(force: bool = True) -> Dict[str, Any]:
         logger.warning(f"Error stopping data_core bots: {e}")
 
     deleted_count = 0
-    # 2. Delete from quant_bot_v2.db
+    # 2. Delete from authoritative database
     try:
         with _get_db_connection() as conn:
             cur = conn.execute("SELECT COUNT(*) FROM bots")
@@ -1053,13 +1080,14 @@ def delete_all_bots(force: bool = True) -> Dict[str, Any]:
             conn.execute("DELETE FROM positions")
             conn.execute("DELETE FROM orders")
             conn.execute("DELETE FROM trades")
+            conn.execute("DELETE FROM bot_instances")
             conn.commit()
     except Exception as e:
-        logger.error(f"Error deleting bots from quant_bot_v2.db: {e}")
+        logger.error(f"Error deleting bots from authoritative database: {e}")
 
-    # 3. Delete from ALGO_DB_PATH (data/trading_bot.db) if present
+    # 3. Delete from ALGO_DB_PATH (data/trading_bot.db) if present in dev
     try:
-        if ALGO_DB_PATH.exists():
+        if ALGO_DB_PATH.exists() and not getattr(config, "IS_POSTGRES", False):
             conn_algo = sqlite3.connect(str(ALGO_DB_PATH), timeout=10.0)
             conn_algo.execute("DELETE FROM bot_config_versions")
             conn_algo.execute("DELETE FROM bot_indicator_profiles")

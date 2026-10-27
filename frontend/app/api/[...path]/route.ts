@@ -310,7 +310,7 @@ async function handleProxy(req: NextRequest, ctx: { params?: { path: string[] } 
   const isSnapshot = subPath.includes("snapshot") || subPath.includes("dashboard");
   const isUniverse = subPath.includes("instruments") || subPath.includes("universe");
   const isHeavy = subPath.includes("backtest") || subPath.includes("simulate") || subPath.includes("risk") || subPath.includes("journal") || subPath.includes("positions") || subPath.includes("options") || subPath.includes("orders");
-  const timeoutMs = isStatus || isIndicator || isBots || isSnapshot || isUniverse ? 4000 : (isHeavy ? 60000 : 35000);
+  const timeoutMs = isStatus || isIndicator ? 6000 : (isHeavy ? 60000 : 35000);
 
   let bodyData: BodyInit | null = null;
   if (["POST", "PUT", "PATCH", "DELETE"].includes(req.method)) {

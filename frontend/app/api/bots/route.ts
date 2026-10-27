@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
   try {
     const upstreamRes = await fetch(targetUrl, {
       headers: getForwardHeaders(req, requestId),
-      signal: AbortSignal.timeout(4500),
+      signal: AbortSignal.timeout(35000),
       cache: "no-store",
     });
 
@@ -40,6 +40,7 @@ export async function GET(req: NextRequest) {
         bots: [],
         metrics: { total_bots: 0, active_bots: 0, stopped_bots: 0, total_pnl: 0 },
         notice: "fallback",
+        error: String(err?.message || err),
       },
       { status: 200, headers: { "X-Request-Id": requestId } }
     );

@@ -273,3 +273,27 @@ pre {
 .animate-ticker:hover {
   animation-play-state: paused;
 }
+
+/* ----------------------------------------------------------------------
+ * iOS WebKit & Mobile Viewport Compatibility
+ * ---------------------------------------------------------------------- */
+@supports (-webkit-touch-callout: none) {
+  /* iOS-specific momentum scrolling and 100dvh support */
+  body, html {
+    min-height: -webkit-fill-available;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+.ios-scroll-fix {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+}
+
+/* Ensure mobile cards and tables do not get clipped by container overflows */
+@media (max-width: 768px) {
+  .mobile-touch-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}

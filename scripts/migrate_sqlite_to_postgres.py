@@ -247,46 +247,51 @@ def create_pg_tables(sqlite_conn: sqlite3.Connection, pg_conn, tables: List[str]
         pg_cur.execute("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public';")
         existing_tables = {r[0] for r in pg_cur.fetchall()}
 
-        created = 0
-        for t in tables:
-            if t not in existing_tables:
-                ddl = build_pg_table_ddl(sqlite_conn, t)
-                try:
-                    pg_cur.execute(ddl)
-                    created += 1
-                except Exception as e:
-                    logger.warning(f"DDL creation note on table '{t}': {e}")
-                    pg_conn.rollback()
-
-        # 2. Add any missing columns across existing tables
-        alter_statements = []
-        for t in tables:
-            sq_cur = sqlite_conn.cursor()
-            sq_cur.execute(f'PRAGMA table_info("{t}");')
-            cols = sq_cur.fetchall()
-            for col in cols:
-                _, name, col_type, notnull, dflt_val, pk = col
-                if (t, name) not in existing_cols:
-                    col_type_upper = col_type.upper() if col_type else "TEXT"
-                    if "INT" in col_type_upper:
-                        pg_type = "BIGINT"
-                    elif any(f in col_type_upper for f in ("REAL", "FLOAT", "DOUBLE", "NUMERIC")):
-                        pg_type = "DOUBLE PRECISION"
-                    elif "BLOB" in col_type_upper:
-                        pg_type = "BYTEA"
-                    else:
-                        pg_type = "TEXT"
-                    alter_statements.append(f'ALTER TABLE "{t}" ADD COLUMN IF NOT EXISTS "{name}" {pg_type};')
-
-        for stmt in alter_statements:
+    created = 0
+    for t in tables:
+        if t not in existing_tables:
+            ddl = build_pg_table_ddl(sqlite_conn, t)
             try:
-                pg_cur.execute(stmt)
-            except Exception as ex:
-                logger.debug(f"Column sync notice: {ex}")
+                with pg_conn.cursor() as cur:
+                    cur.execute(ddl)
+                pg_conn.commit()
+                created += 1
+            except Exception as e:
+                logger.warning(f"DDL creation note on table '{t}': {e}")
                 pg_conn.rollback()
 
-        pg_conn.commit()
-        logger.info(f"Verified/Created {created} new tables and added {len(alter_statements)} missing columns in PostgreSQL.")
+    # 2. Add any missing columns across existing tables
+    alter_statements = []
+    for t in tables:
+        sq_cur = sqlite_conn.cursor()
+        sq_cur.execute(f'PRAGMA table_info("{t}");')
+        cols = sq_cur.fetchall()
+        for col in cols:
+            _, name, col_type, notnull, dflt_val, pk = col
+            if (t, name) not in existing_cols:
+                col_type_upper = col_type.upper() if col_type else "TEXT"
+                if "INT" in col_type_upper:
+                    pg_type = "BIGINT"
+                elif any(f in col_type_upper for f in ("REAL", "FLOAT", "DOUBLE", "NUMERIC")):
+                    pg_type = "DOUBLE PRECISION"
+                elif "BLOB" in col_type_upper:
+                    pg_type = "BYTEA"
+                else:
+                    pg_type = "TEXT"
+                alter_statements.append((t, f'ALTER TABLE "{t}" ADD COLUMN IF NOT EXISTS "{name}" {pg_type};'))
+
+    added_cols = 0
+    for t, stmt in alter_statements:
+        try:
+            with pg_conn.cursor() as cur:
+                cur.execute(stmt)
+            pg_conn.commit()
+            added_cols += 1
+        except Exception as ex:
+            logger.debug(f"Column sync notice on {t}: {ex}")
+            pg_conn.rollback()
+
+    logger.info(f"Verified/Created {created} new tables and added {added_cols} missing columns in PostgreSQL.")
 
 
 

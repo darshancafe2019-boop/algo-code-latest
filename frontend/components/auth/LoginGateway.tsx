@@ -68,7 +68,29 @@ export function LoginGateway() {
   const [isResending, setIsResending] = useState<boolean>(false);
 
   // UX Feedback
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [errorMessageRaw, setErrorMessageRaw] = useState<string | null>(null);
+  const setErrorMessage = useCallback((msg: string | null) => {
+    if (!msg) {
+      setErrorMessageRaw(null);
+      return;
+    }
+    if (
+      msg.includes("Unexpected token") ||
+      msg.includes("not valid JSON") ||
+      msg.includes("JSON.parse") ||
+      msg.includes("is not valid JSON") ||
+      msg.includes("SyntaxError")
+    ) {
+      setErrorMessageRaw("Authentication service is temporarily unavailable. Please try again shortly.");
+      return;
+    }
+    if (msg.includes("<html") || msg.includes("<!DOCTYPE") || msg.includes("<body")) {
+      setErrorMessageRaw("Authentication service returned an unexpected response. Please try again shortly.");
+      return;
+    }
+    setErrorMessageRaw(msg);
+  }, []);
+  const errorMessage = errorMessageRaw;
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 

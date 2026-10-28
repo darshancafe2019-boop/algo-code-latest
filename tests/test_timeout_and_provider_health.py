@@ -101,4 +101,6 @@ class TestTimeoutAndProviderHealth(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    unittest.main()
+    suite = unittest.TestLoader().loadTestsFromTestCase(TestTimeoutAndProviderHealth)
+    result = unittest.TextTestRunner(verbosity=2).run(suite)
+    os._exit(0 if result.wasSuccessful() else 1)

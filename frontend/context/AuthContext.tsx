@@ -88,6 +88,40 @@ export const getLocalCalendarDate = (): string => {
   return `${year}-${month}-${day}`;
 };
 
+// Safe helper to parse JSON from auth responses without throwing JSON parse syntax errors
+async function safeParseAuthResponse(res: Response): Promise<{ ok: boolean; status: number; data: any }> {
+  try {
+    const text = await res.text();
+    if (!text || !text.trim()) {
+      return {
+        ok: res.ok,
+        status: res.status,
+        data: {
+          success: res.ok,
+          message: res.ok ? "Success" : `Authentication server returned empty response (HTTP ${res.status}).`,
+        },
+      };
+    }
+    const data = JSON.parse(text);
+    return { ok: res.ok, status: res.status, data };
+  } catch {
+    const fallbackMessage =
+      res.status >= 500
+        ? "Authentication service is temporarily unavailable. Please try again shortly."
+        : `Authentication request failed (HTTP ${res.status}).`;
+    return {
+      ok: false,
+      status: res.status,
+      data: {
+        success: false,
+        status: "error",
+        message: fallbackMessage,
+        error: fallbackMessage,
+      },
+    };
+  }
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [session, setSession] = useState<AuthSession | null>(null);
@@ -137,8 +171,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
 
       if (res.ok) {
-        const data = await res.json();
-        if (data.status === "success" && data.user) {
+        const { ok, data } = await safeParseAuthResponse(res);
+        if (ok && data?.status === "success" && data?.user) {
           setUser(data.user);
           setSession(data.session || null);
           setIsAuthenticated(true);
@@ -292,7 +326,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }),
       });
 
-      const data = await res.json();
+      const { ok, data } = await safeParseAuthResponse(res);
 
       if (res.status === 429) {
         const retryAfter = data.retry_after || 60;
@@ -434,7 +468,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }),
       });
 
-      const data = await res.json();
+      const { ok, data } = await safeParseAuthResponse(res);
       if (res.ok && data.status === "success") {
         setUser(data.user);
         setSession(data.session || null);
@@ -486,7 +520,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         body: JSON.stringify({ challenge_id: challengeId }),
       });
 
-      const data = await res.json();
+      const { ok, data } = await safeParseAuthResponse(res);
       if (res.ok && data.status === "success") {
         return {
           success: true,
@@ -533,7 +567,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         body: JSON.stringify({ email: emailOrUsername.trim() }),
       });
 
-      const data = await res.json();
+      const { ok, data } = await safeParseAuthResponse(res);
       const requestId =
         data.request_id || data.requestId || data.error?.requestId;
       const errorMessage =
@@ -563,10 +597,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         cooldown_seconds: data.cooldown_seconds || 60,
       };
     } catch (err: any) {
+      const isSyntaxErr = err?.message?.includes("JSON") || err?.name === "SyntaxError";
       return {
         success: false,
         message: "Network error while requesting verification code.",
-        error: err?.message,
+        error: isSyntaxErr
+          ? "Authentication service is temporarily unavailable. Please try again shortly."
+          : (err?.message || "Authentication service is temporarily unavailable."),
       };
     }
   };
@@ -587,7 +624,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }),
       });
 
-      const data = await res.json();
+      const { ok, data } = await safeParseAuthResponse(res);
       if (res.ok && data.status === "success") {
         setUser(data.user);
         setSession(data.session || null);
@@ -637,7 +674,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         body: JSON.stringify({ email: emailOrUsername.trim() }),
       });
 
-      const data = await res.json();
+      const { ok, data } = await safeParseAuthResponse(res);
       return {
         success: res.ok && data.status === "success",
         message: data.message || "If that account exists, password recovery instructions have been dispatched.",
@@ -669,7 +706,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }),
       });
 
-      const data = await res.json();
+      const { ok, data } = await safeParseAuthResponse(res);
       if (res.ok && data.status === "success" && data.reset_token) {
         return {
           success: true,
@@ -706,7 +743,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }),
       });
 
-      const data = await res.json();
+      const { ok, data } = await safeParseAuthResponse(res);
       return {
         success: res.ok && data.status === "success",
         message: data.message || (res.ok ? "Password reset successful." : "Password reset failed."),
@@ -739,7 +776,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }),
       });
 
-      const data = await res.json();
+      const { ok, data } = await safeParseAuthResponse(res);
       if (res.ok && data.status === "success") {
         if (user) {
           setUser({ ...user, must_change_password: false });
@@ -821,7 +858,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         body: JSON.stringify({ password }),
       });
 
-      const data = await res.json();
+      const { ok, data } = await safeParseAuthResponse(res);
       if (res.ok && data.status === "success") {
         setIsLocked(false);
         try {

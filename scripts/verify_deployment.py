@@ -52,3 +52,4 @@ for label, url, is_stream in endpoints:
         print(f"[ERR   ] [{elapsed_ms:4d}ms] {label:<35} -> {type(e).__name__}: {e}", flush=True)
 
 print("\nDeployed endpoint verification complete.", flush=True)
+

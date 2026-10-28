@@ -306,8 +306,9 @@ async function handleProxy(req: NextRequest, ctx: { params?: { path: string[] } 
   const isStream = subPath.startsWith("stream") || subPath.includes("/stream") || subPath.includes("market-data/stream") || req.headers.get("accept")?.includes("text/event-stream");
   const isStatus = subPath === "status" || subPath.startsWith("status/") || subPath.includes("health");
   const isIndicator = subPath.includes("indicator");
+  const isAuth = subPath.startsWith("auth") || subPath.includes("/auth") || subPath.includes("auth/");
   const isHeavy = subPath.includes("backtest") || subPath.includes("simulate") || subPath.includes("risk/simulate");
-  const timeoutMs = isStream ? 5000 : (isStatus || isIndicator ? 4000 : (isHeavy ? 12000 : 8000));
+  const timeoutMs = isStream ? 5000 : (isStatus || isIndicator ? 4000 : (isAuth ? 15000 : (isHeavy ? 12000 : 8000)));
 
   let bodyData: BodyInit | null = null;
   if (["POST", "PUT", "PATCH", "DELETE"].includes(req.method)) {
@@ -390,15 +391,59 @@ async function handleProxy(req: NextRequest, ctx: { params?: { path: string[] } 
       try {
         jsonBody = JSON.parse(rawText);
       } catch {
-        return new NextResponse(rawText, {
+        // Upstream returned non-JSON text/html (e.g. Render / Cloudflare / Vercel error page)
+        const cleanSnippet = rawText.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 200);
+        const fallbackMsg = cleanSnippet || `Upstream service returned HTTP ${finalResponse.status}`;
+        return NextResponse.json(
+          {
+            ok: false,
+            success: false,
+            status: "error",
+            error: {
+              code: `UPSTREAM_HTTP_${finalResponse.status}`,
+              message: fallbackMsg,
+              status: finalResponse.status,
+            },
+            message: fallbackMsg,
+            requestId,
+            timestamp: new Date().toISOString(),
+            latencyMs,
+          },
+          {
+            status: finalResponse.status >= 400 ? finalResponse.status : 502,
+            headers: {
+              "X-Request-Id": requestId,
+              "X-Response-Time-Ms": latencyMs.toString(),
+              "Content-Type": "application/json",
+            },
+          }
+        );
+      }
+    } else if (!finalResponse.ok) {
+      return NextResponse.json(
+        {
+          ok: false,
+          success: false,
+          status: "error",
+          error: {
+            code: `UPSTREAM_HTTP_${finalResponse.status}`,
+            message: `Upstream service returned HTTP ${finalResponse.status}`,
+            status: finalResponse.status,
+          },
+          message: `Upstream service returned HTTP ${finalResponse.status}`,
+          requestId,
+          timestamp: new Date().toISOString(),
+          latencyMs,
+        },
+        {
           status: finalResponse.status,
           headers: {
             "X-Request-Id": requestId,
             "X-Response-Time-Ms": latencyMs.toString(),
-            "Content-Type": contentType || "text/plain",
+            "Content-Type": "application/json",
           },
-        });
-      }
+        }
+      );
     }
 
     const responseHeaders = new Headers();

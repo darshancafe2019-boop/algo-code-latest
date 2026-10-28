@@ -12,7 +12,7 @@
  */
 
 import { NextRequest } from "next/server";
-import { GET as handleProxyGet } from "../app/api/[...path]/route";
+import { GET as handleProxyGet, POST as handleProxyPost } from "../app/api/[...path]/route";
 import { GET as handleMarketProvidersGet } from "../app/api/market/providers/route";
 import { GET as handleProvidersGet } from "../app/api/providers/route";
 import { GET as handleMarketHealthGet } from "../app/api/market/health/route";
@@ -118,9 +118,9 @@ async function runRegressionTestSuite() {
     assert(dbErrRes.status === 500, "Upstream 500 on /api/bots passes through without fake bots list");
 
     // ─────────────────────────────────────────────────────────────────────────
-    // 4. Malformed Upstream Payloads
+    // 4. Malformed Upstream Payloads & Non-JSON Safety
     // ─────────────────────────────────────────────────────────────────────────
-    console.log("\n--- 4. Testing Malformed Upstream Payload Safety ---");
+    console.log("\n--- 4. Testing Malformed Upstream Payload Safety & Non-JSON Conversion ---");
     global.fetch = (async () => {
       return new Response("<html><body>502 Bad Gateway from Cloudflare</body></html>", {
         status: 502,
@@ -130,9 +130,32 @@ async function runRegressionTestSuite() {
 
     const malformedReq = new NextRequest("http://localhost:3100/api/orders");
     const malformedRes = await handleProxyGet(malformedReq, { params: { path: ["orders"] } });
-    assert(malformedRes.status === 502, "Malformed HTML 502 is preserved safely");
-    const malformedText = await malformedRes.text();
-    assert(malformedText.includes("502 Bad Gateway"), "HTML error content is preserved");
+    assert(malformedRes.status === 502, "Malformed HTML 502 returns HTTP 502");
+    assert(malformedRes.headers.get("content-type")?.includes("application/json") === true, "Non-JSON response converted to application/json");
+    const malformedJson = await malformedRes.json();
+    assert(malformedJson.ok === false, "Converted response has ok: false");
+    assert(malformedJson.error?.code === "UPSTREAM_HTTP_502", "Error code is UPSTREAM_HTTP_502");
+    assert(malformedJson.message.includes("502 Bad Gateway"), "HTML error content stripped and preserved in message");
+
+    // Also test POST /api/auth/send-otp with text/plain "An error occurred" (Render upstream error)
+    global.fetch = (async () => {
+      return new Response("An error occurred on the server while processing your request", {
+        status: 500,
+        headers: { "Content-Type": "text/plain" },
+      });
+    }) as any;
+
+    const authSendOtpReq = new NextRequest("http://localhost:3100/api/auth/send-otp", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: "ashishparadkar1999@gmail.com" }),
+    });
+    const authSendOtpRes = await handleProxyPost(authSendOtpReq, { params: { path: ["auth", "send-otp"] } });
+    assert(authSendOtpRes.status === 500, "Upstream plain-text 500 returns HTTP 500");
+    assert(authSendOtpRes.headers.get("content-type")?.includes("application/json") === true, "Send-OTP error is valid application/json");
+    const authSendOtpJson = await authSendOtpRes.json();
+    assert(authSendOtpJson.ok === false && authSendOtpJson.success === false, "Send-OTP error has success: false");
+    assert(authSendOtpJson.message.includes("An error occurred"), "Error message safely contained in JSON payload without throwing SyntaxError");
 
     // ─────────────────────────────────────────────────────────────────────────
     // 5. Disconnected Providers & Non-Fabrication

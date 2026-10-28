@@ -7750,99 +7750,8 @@ def health_dependencies():
 @app.route("/market/providers/health", methods=["GET"])
 @app.route("/api/providers/health", methods=["GET"])
 def api_market_providers_health():
-    """
-    Unified market data providers health endpoint.
-    Reports individual health status for Dhan, Upstox, Delta, Binance, Fyers.
-    A failure in any broker provider reports degraded/unconfigured for that provider
-    and NEVER crashes authentication or returns HTTP 500/503.
-    """
-    now_iso = datetime.now(timezone.utc).isoformat()
-    providers = {}
-
-    # 1. Binance
-    try:
-        binance_key = bool(os.getenv("BINANCE_API_KEY") or os.getenv("BINANCE_TESTNET_API_KEY"))
-        providers["binance"] = {
-            "id": "binance",
-            "name": "Binance Crypto",
-            "configured": binance_key,
-            "connected": binance_key,
-            "status": "HEALTHY" if binance_key else "NOT_CONFIGURED",
-            "latency_ms": 12.0 if binance_key else None
-        }
-    except Exception as e:
-        providers["binance"] = {"id": "binance", "name": "Binance Crypto", "configured": False, "connected": False, "status": "ERROR", "error": str(e)}
-
-    # 2. Upstox
-    try:
-        upstox_token = os.getenv("UPSTOX_ACCESS_TOKEN") or ""
-        upstox_configured = bool(upstox_token and len(upstox_token) > 20)
-        providers["upstox"] = {
-            "id": "upstox",
-            "name": "Upstox Equities & F&O",
-            "configured": upstox_configured,
-            "connected": upstox_configured,
-            "status": "HEALTHY" if upstox_configured else "NOT_CONFIGURED",
-            "latency_ms": 18.0 if upstox_configured else None
-        }
-    except Exception as e:
-        providers["upstox"] = {"id": "upstox", "name": "Upstox", "configured": False, "connected": False, "status": "ERROR", "error": str(e)}
-
-    # 3. Dhan
-    try:
-        dhan_client = os.getenv("DHAN_CLIENT_ID") or ""
-        dhan_token = os.getenv("DHAN_ACCESS_TOKEN") or ""
-        dhan_configured = bool(dhan_client and dhan_token)
-        providers["dhan"] = {
-            "id": "dhan",
-            "name": "Dhan Options & Equities",
-            "configured": dhan_configured,
-            "connected": dhan_configured,
-            "status": "HEALTHY" if dhan_configured else "NOT_CONFIGURED",
-            "latency_ms": 22.0 if dhan_configured else None
-        }
-    except Exception as e:
-        providers["dhan"] = {"id": "dhan", "name": "Dhan", "configured": False, "connected": False, "status": "ERROR", "error": str(e)}
-
-    # 4. Delta Exchange
-    try:
-        delta_key = bool(os.getenv("DELTA_API_KEY") or os.getenv("DELTA_REST_URL"))
-        providers["delta"] = {
-            "id": "delta",
-            "name": "Delta Exchange Crypto Derivatives",
-            "configured": delta_key,
-            "connected": delta_key,
-            "status": "HEALTHY" if delta_key else "NOT_CONFIGURED",
-            "latency_ms": 15.0 if delta_key else None
-        }
-    except Exception as e:
-        providers["delta"] = {"id": "delta", "name": "Delta Exchange", "configured": False, "connected": False, "status": "ERROR", "error": str(e)}
-
-    # 5. Fyers
-    try:
-        fyers_app = bool(os.getenv("FYERS_APP_ID") or os.getenv("FYERS_ACCESS_TOKEN"))
-        providers["fyers"] = {
-            "id": "fyers",
-            "name": "Fyers Securities",
-            "configured": fyers_app,
-            "connected": fyers_app,
-            "status": "HEALTHY" if fyers_app else "NOT_CONFIGURED",
-            "latency_ms": 20.0 if fyers_app else None
-        }
-    except Exception as e:
-        providers["fyers"] = {"id": "fyers", "name": "Fyers", "configured": False, "connected": False, "status": "ERROR", "error": str(e)}
-
-    return jsonify({
-        "status": "ok",
-        "service": "alpha-algo-backend",
-        "timestamp": now_iso,
-        "providers": providers,
-        "summary": {
-            "total": len(providers),
-            "configured": sum(1 for p in providers.values() if p.get("configured")),
-            "healthy": sum(1 for p in providers.values() if p.get("status") == "HEALTHY")
-        }
-    }), 200
+    """Unified market data providers health endpoint delegating to authoritative health matrix."""
+    return api_markets_providers_health()
 
 
 @app.route("/health/bot/<bot_id>", methods=["GET"])
@@ -19543,49 +19452,91 @@ def api_markets_providers_health():
     upstox_diag = global_upstox_service.get_safe_diagnostic()
     fyers_diag = global_fyers_adapter.get_safe_diagnostic()
 
-    # Public crypto feeds
-    binance_outbound_code = None
+    # Authoritative Binance telemetry (non-blocking)
     try:
-        import requests
-        r = requests.get("https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT", timeout=3.0)
-        binance_outbound_code = r.status_code
+        from src.binance_market_data_service import global_binance_market_data_service
+        b_health = global_binance_market_data_service.get_health_status()
+        b_sync_age = b_health.get("last_sync_age_seconds")
+        b_connected = b_health.get("connected", False)
+        b_last_sync = getattr(global_binance_market_data_service, "_last_successful_sync", 0.0)
+        b_last_tick = datetime.fromtimestamp(b_last_sync, timezone.utc).isoformat() if b_last_sync > 0 else None
+        b_status = b_health.get("status", "DEGRADED") if b_connected else "DISCONNECTED"
+        binance_diag = {
+            "configured": True,
+            "authentication_status": "PUBLIC_FEED",
+            "token_status": "N/A",
+            "token_expiry": None,
+            "data_entitlement": "ACTIVE",
+            "rest_status": "UP" if b_connected else "DOWN",
+            "websocket_status": "LIVE" if b_status == "LIVE" else "DISCONNECTED",
+            "subscription_status": "ACTIVE" if b_connected else "INACTIVE",
+            "decoder_status": "JSON_OK" if b_connected else "INACTIVE",
+            "last_real_tick_at": b_last_tick,
+            "last_tick_age_ms": int(b_sync_age * 1000) if b_sync_age is not None else None,
+            "error_code": None if b_connected else "SYNC_ERROR",
+            "safe_error_message": None if b_connected else "Binance data synchronization inactive",
+            "status": b_status,
+        }
     except Exception as e:
-        binance_outbound_code = f"Error: {e}"
+        binance_diag = {
+            "configured": True,
+            "authentication_status": "PUBLIC_FEED",
+            "token_status": "N/A",
+            "token_expiry": None,
+            "data_entitlement": "INACTIVE",
+            "rest_status": "DOWN",
+            "websocket_status": "DISCONNECTED",
+            "subscription_status": "INACTIVE",
+            "decoder_status": "INACTIVE",
+            "last_real_tick_at": None,
+            "last_tick_age_ms": None,
+            "error_code": "EXCEPTION",
+            "safe_error_message": str(e),
+            "status": "DISCONNECTED",
+        }
 
-    binance_diag = {
-        "configured": True,
-        "authentication_status": "PUBLIC_FEED",
-        "outbound_http_status": binance_outbound_code,
-        "token_status": "N/A",
-        "token_expiry": None,
-        "data_entitlement": "ACTIVE",
-        "rest_status": "UP" if binance_outbound_code == 200 else f"HTTP_{binance_outbound_code}",
-        "websocket_status": "LIVE",
-        "subscription_status": "ACTIVE",
-        "decoder_status": "JSON_OK",
-        "last_real_tick_at": datetime.now(timezone.utc).isoformat(),
-        "last_tick_age_ms": 120,
-        "error_code": None if binance_outbound_code == 200 else str(binance_outbound_code),
-        "safe_error_message": None if binance_outbound_code == 200 else f"Binance public endpoint returned {binance_outbound_code}",
-        "status": "LIVE" if binance_outbound_code == 200 else "DEGRADED",
-    }
-
-    delta_diag = {
-        "configured": True,
-        "authentication_status": "PUBLIC_FEED",
-        "token_status": "N/A",
-        "token_expiry": None,
-        "data_entitlement": "ACTIVE",
-        "rest_status": "UP",
-        "websocket_status": "LIVE",
-        "subscription_status": "ACTIVE",
-        "decoder_status": "JSON_OK",
-        "last_real_tick_at": datetime.now(timezone.utc).isoformat(),
-        "last_tick_age_ms": 180,
-        "error_code": None,
-        "safe_error_message": None,
-        "status": "LIVE",
-    }
+    # Authoritative Delta telemetry (non-blocking)
+    try:
+        from market_data_gateway.adapters.delta_options_ws import delta_options_ws_adapter
+        d_health = delta_options_ws_adapter.get_sync_health()
+        d_status = d_health.get("status", "DISCONNECTED")
+        d_last_tick = d_health.get("last_tick_time")
+        d_latency = d_health.get("latency_ms")
+        has_delta_cfg = bool(os.getenv("DELTA_API_KEY") or os.getenv("DELTA_INDIA_API_KEY"))
+        d_connected = d_status in ("LIVE", "CONNECTED")
+        delta_diag = {
+            "configured": has_delta_cfg,
+            "authentication_status": "CONFIGURED" if has_delta_cfg else "PUBLIC_FEED",
+            "token_status": "ACTIVE" if has_delta_cfg else "N/A",
+            "token_expiry": None,
+            "data_entitlement": "ACTIVE" if d_connected else "INACTIVE",
+            "rest_status": "UP" if d_connected else "DOWN",
+            "websocket_status": d_status if d_connected else "DISCONNECTED",
+            "subscription_status": "ACTIVE" if d_connected else "INACTIVE",
+            "decoder_status": "JSON_OK" if d_connected else "INACTIVE",
+            "last_real_tick_at": d_last_tick,
+            "last_tick_age_ms": int(d_latency) if (d_latency and d_latency < 9000) else None,
+            "error_code": None if d_connected else ("NOT_CONFIGURED" if not has_delta_cfg else "DISCONNECTED"),
+            "safe_error_message": None if d_connected else (d_health.get("message") or ("Delta credentials required" if not has_delta_cfg else "Delta feed disconnected")),
+            "status": d_status if d_connected else ("NOT_CONFIGURED" if not has_delta_cfg else "DISCONNECTED"),
+        }
+    except Exception as e:
+        delta_diag = {
+            "configured": False,
+            "authentication_status": "MISSING_CREDENTIALS",
+            "token_status": "MISSING",
+            "token_expiry": None,
+            "data_entitlement": "INACTIVE",
+            "rest_status": "DOWN",
+            "websocket_status": "DISCONNECTED",
+            "subscription_status": "INACTIVE",
+            "decoder_status": "INACTIVE",
+            "last_real_tick_at": None,
+            "last_tick_age_ms": None,
+            "error_code": "EXCEPTION",
+            "safe_error_message": str(e),
+            "status": "DISCONNECTED",
+        }
 
     providers_map = {
         "binance": binance_diag,
@@ -19600,40 +19551,55 @@ def api_markets_providers_health():
             "provider_id": "binance_ws",
             "provider_name": "Binance WebSocket",
             "status": binance_diag["status"],
+            "connected": binance_diag.get("status") in ("LIVE", "CONNECTED"),
             "asset_classes": ["CRYPTO"],
-            "message": "Public WebSocket stream active (wss://stream.binance.com:9443)",
+            "message": binance_diag.get("safe_error_message") or "Public WebSocket stream active (wss://stream.binance.com:9443)",
+            "last_tick_at": binance_diag.get("last_real_tick_at"),
+            "last_tick_age_ms": binance_diag.get("last_tick_age_ms"),
             "diagnostic": binance_diag,
         },
         {
             "provider_id": "delta_options_ws",
             "provider_name": "Delta Exchange Options WebSocket",
             "status": delta_diag["status"],
+            "connected": delta_diag.get("status") in ("LIVE", "CONNECTED"),
             "asset_classes": ["CRYPTO_OPTIONS"],
-            "message": "Public WebSocket stream active (wss://public-socket.india.delta.exchange)",
+            "message": delta_diag.get("safe_error_message") or "Public WebSocket stream active (wss://public-socket.india.delta.exchange)",
+            "last_tick_at": delta_diag.get("last_real_tick_at"),
+            "last_tick_age_ms": delta_diag.get("last_tick_age_ms"),
             "diagnostic": delta_diag,
         },
         {
             "provider_id": "dhan_ws",
             "provider_name": "Dhan HQ Live Market Feed",
-            "status": dhan_diag["status"],
+            "status": dhan_diag.get("status", "DISCONNECTED"),
+            "connected": dhan_diag.get("websocket_status") in ("LIVE", "CONNECTED"),
             "asset_classes": ["INDIAN_INDICES", "INDIAN_EQUITIES", "OPTIONS", "FUTURES"],
             "message": dhan_diag.get("safe_error_message") or "Dhan HQ API v2 authenticated",
+            "last_tick_at": dhan_diag.get("last_real_tick_at"),
+            "last_tick_age_ms": dhan_diag.get("last_tick_age_ms"),
             "diagnostic": dhan_diag,
         },
         {
             "provider_id": "upstox_ws",
             "provider_name": "Upstox V3 WebSocket",
-            "status": upstox_diag["status"],
+            "status": upstox_diag.get("status", "DISCONNECTED"),
+            "connected": upstox_diag.get("websocket_status") in ("LIVE", "CONNECTED"),
             "asset_classes": ["INDIAN_EQUITIES", "INDIAN_INDICES", "OPTIONS", "FUTURES"],
             "message": upstox_diag.get("safe_error_message") or "Upstox V3 Market Data active",
+            "last_tick_at": upstox_diag.get("last_real_tick_at"),
+            "last_tick_age_ms": upstox_diag.get("last_tick_age_ms"),
             "diagnostic": upstox_diag,
         },
         {
             "provider_id": "fyers_ws",
             "provider_name": "FYERS API v3 Market Feed",
-            "status": fyers_diag["status"],
+            "status": fyers_diag.get("status", "DISCONNECTED"),
+            "connected": fyers_diag.get("websocket_status") in ("LIVE", "CONNECTED"),
             "asset_classes": ["INDIAN_EQUITIES", "INDIAN_INDICES", "OPTIONS", "FUTURES", "COMMODITIES"],
             "message": fyers_diag.get("safe_error_message") or "Fyers API v3 authenticated",
+            "last_tick_at": fyers_diag.get("last_real_tick_at"),
+            "last_tick_age_ms": fyers_diag.get("last_tick_age_ms"),
             "diagnostic": fyers_diag,
         },
     ]

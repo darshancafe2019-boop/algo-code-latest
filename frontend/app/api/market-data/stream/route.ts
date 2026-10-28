@@ -151,21 +151,12 @@ async function authenticateRequest(
     }
 
     if (authRes.status >= 500) {
-      console.warn(`[STREAM_AUTH] [req_id=${requestId}] Upstream auth endpoint returned HTTP ${authRes.status}. Allowing provisional stream access.`);
-      if (token && token.length >= 16) {
-        tokenAuthCache.set(token, {
-          authenticated: true,
-          expiresAt: Date.now() + 60_000,
-        });
-        return { authenticated: true };
-      }
-      if (authRequired) {
-        return {
-          authenticated: false,
-          error: "Authentication service temporarily degraded.",
-          status: 503,
-        };
-      }
+      console.warn(`[STREAM_AUTH] [req_id=${requestId}] Upstream auth endpoint returned HTTP ${authRes.status}. Failing closed.`);
+      return {
+        authenticated: false,
+        error: "Authentication service temporarily degraded.",
+        status: 503,
+      };
     }
 
     if (authRequired) {
@@ -179,25 +170,15 @@ async function authenticateRequest(
   } catch (err: any) {
     const isTimeout = err?.name === "AbortError" || err?.name === "TimeoutError";
     console.warn(
-      `[STREAM_AUTH] [req_id=${requestId}] Auth verification error (timeout=${isTimeout}): ${err?.message || "network failure"}. Allowing provisional stream access.`
+      `[STREAM_AUTH] [req_id=${requestId}] Auth verification error (timeout=${isTimeout}): ${err?.message || "network failure"}. Failing closed.`
     );
-    if (token && token.length >= 16) {
-      tokenAuthCache.set(token, {
-        authenticated: true,
-        expiresAt: Date.now() + 60_000,
-      });
-      return { authenticated: true };
-    }
-    if (authRequired) {
-      return {
-        authenticated: false,
-        error: isTimeout
-          ? "Authentication verification timed out."
-          : "Authentication service currently unreachable.",
-        status: 503,
-      };
-    }
-    return { authenticated: true };
+    return {
+      authenticated: false,
+      error: isTimeout
+        ? "Authentication verification timed out."
+        : "Authentication service currently unreachable.",
+      status: 503,
+    };
   }
 }
 

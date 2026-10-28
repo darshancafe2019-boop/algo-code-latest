@@ -306,7 +306,7 @@ async function runStreamAuthTests() {
 
     // Request with valid and invalid symbols
     const messyReq = new NextRequest(
-      "http://localhost:3000/api/market-data/stream?symbols=NSE:NIFTY50,BINANCE:BTCUSDT,<script>alert(1)</script>,VALID_SYM,1234567890123456789012345678901234567890EXTRA_LONG_SYMBOL_THAT_EXCEEDS_FORTY_CHARS",
+      "http://localhost:3000/api/market-data/stream?symbols=NSE:NIFTY50,BINANCE:BTCUSDT,<script>alert(1)</script>,VALID_SYM,1234567890123456789012345678901234567890EXTRA_LONG_SYMBOL_THAT_EXCEEDS_FORTY_CHARS&streamId=stream_test_dev",
       { method: "GET" }
     );
 
@@ -368,7 +368,7 @@ async function runStreamAuthTests() {
 
     // ── TEST 7: DELETE Stream Cleanup ──
     console.log("\n--- 7. Testing DELETE Stream Cleanup ---");
-    const deleteReq = new NextRequest("http://localhost:3000/api/market-data/stream?streamId=stream_test_del", {
+    const deleteReq = new NextRequest("http://localhost:3000/api/market-data/stream?streamId=stream_test_dev", {
       method: "DELETE",
     });
     const deleteRes = await DELETE(deleteReq);
@@ -384,7 +384,12 @@ async function runStreamAuthTests() {
   }
 }
 
-runStreamAuthTests().catch((err) => {
-  console.error("Test execution failed:", err);
-  process.exit(1);
-});
+runStreamAuthTests()
+  .then(() => {
+    process.exit(0);
+  })
+  .catch((err) => {
+    console.error("Test execution failed:", err);
+    process.exit(1);
+  });
+

@@ -112,6 +112,10 @@ def _ensure_schema():
                         timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                     )
                 """)
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_orders_bot_id ON orders (bot_id);")
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_orders_status ON orders (status);")
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_trades_bot_id ON trades (bot_id);")
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_positions_bot_id ON positions (bot_id);")
                 conn.commit()
             except Exception as ext_err:
                 logger.debug(f"Extended schema creation notice: {ext_err}")

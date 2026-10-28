@@ -304,12 +304,10 @@ async function handleProxy(req: NextRequest, ctx: { params?: { path: string[] } 
   }
 
   const isStream = subPath.startsWith("stream") || subPath.includes("/stream") || subPath.includes("market-data/stream") || req.headers.get("accept")?.includes("text/event-stream");
-  const isStatus = subPath === "status" || subPath.startsWith("status/");
+  const isStatus = subPath === "status" || subPath.startsWith("status/") || subPath.includes("health");
   const isIndicator = subPath.includes("indicator");
-  const isBots = subPath === "bots" || subPath.startsWith("bots/");
-  const isAuth = subPath.startsWith("auth") || subPath.includes("/auth");
-  const isHeavy = subPath.includes("backtest") || subPath.includes("simulate") || subPath.includes("risk") || subPath.includes("journal") || subPath.includes("positions") || subPath.includes("options") || subPath.includes("orders");
-  const timeoutMs = isStatus || isIndicator ? 6000 : (isHeavy || isAuth ? 60000 : 35000);
+  const isHeavy = subPath.includes("backtest") || subPath.includes("simulate") || subPath.includes("risk/simulate");
+  const timeoutMs = isStream ? 5000 : (isStatus || isIndicator ? 4000 : (isHeavy ? 12000 : 8000));
 
   let bodyData: BodyInit | null = null;
   if (["POST", "PUT", "PATCH", "DELETE"].includes(req.method)) {
@@ -328,14 +326,11 @@ async function handleProxy(req: NextRequest, ctx: { params?: { path: string[] } 
   let lastError: any = null;
 
   const controller = new AbortController();
-  // Do not abort active SSE streaming connections with a static timer
-  let timeoutTimer: NodeJS.Timeout | null = null;
-  if (!isStream) {
-    timeoutTimer = setTimeout(() => controller.abort(), timeoutMs);
-  }
+  const timeoutTimer = setTimeout(() => controller.abort(), timeoutMs);
 
   if (req.signal) {
     req.signal.addEventListener("abort", () => {
+      clearTimeout(timeoutTimer);
       try {
         controller.abort();
       } catch {}
@@ -351,14 +346,10 @@ async function handleProxy(req: NextRequest, ctx: { params?: { path: string[] } 
       cache: "no-store",
     });
 
-    if (timeoutTimer) {
-      clearTimeout(timeoutTimer);
-    }
+    clearTimeout(timeoutTimer);
     finalResponse = backendRes;
   } catch (err: any) {
-    if (timeoutTimer) {
-      clearTimeout(timeoutTimer);
-    }
+    clearTimeout(timeoutTimer);
     lastError = err;
   }
 
@@ -428,7 +419,7 @@ async function handleProxy(req: NextRequest, ctx: { params?: { path: string[] } 
     }
 
     const responseString = JSON.stringify(jsonBody ?? {});
-    if (finalResponse.ok && req.method === "GET" && (subPath.includes("instruments") || subPath.includes("universe") || subPath.includes("providers") || subPath.includes("expiries") || subPath.includes("status") || subPath.includes("indicators"))) {
+    if (finalResponse.ok && req.method === "GET" && (subPath.includes("instruments") || subPath.includes("universe/instruments") || subPath.includes("expiries"))) {
       const entry: CacheEntry = {
         body: responseString,
         contentType: "application/json",
@@ -439,19 +430,14 @@ async function handleProxy(req: NextRequest, ctx: { params?: { path: string[] } 
       PROXY_MEMORY_CACHE.set(subPath, entry);
     }
 
-    // For public dashboard and portfolio snapshots, avoid returning 401 to guest users on the homepage
-    if (finalResponse.status === 401 && req.method === "GET" && (subPath === "dashboard/snapshot" || subPath.endsWith("/dashboard/snapshot") || subPath === "portfolio/snapshot" || subPath.endsWith("/portfolio/snapshot"))) {
-      // Fall through to synthetic safe snapshot below
-    } else {
-      return new NextResponse(responseString, {
-        status: finalResponse.status,
-        headers: responseHeaders,
-      });
-    }
+    return new NextResponse(responseString, {
+      status: finalResponse.status,
+      headers: responseHeaders,
+    });
   }
 
-  // Resilient Cache Fallback: If backend is cold starting, redeploying, or timed out, serve cached response if available
-  if (req.method === "GET") {
+  // Resilient Cache Fallback: Only serve static catalog data from memory cache
+  if (req.method === "GET" && (subPath.includes("instruments") || subPath.includes("expiries"))) {
     const cached = PROXY_MEMORY_CACHE.get(targetUrl) || PROXY_MEMORY_CACHE.get(subPath);
     if (cached && (Date.now() - cached.timestamp < 15 * 60 * 1000)) {
       return new NextResponse(cached.body, {
@@ -466,370 +452,32 @@ async function handleProxy(req: NextRequest, ctx: { params?: { path: string[] } 
     }
   }
 
-  // Synthetic Safe Fallback: If status probe failed or timed out during backend cold boot, serve valid status structure to prevent 504 client errors
-  if (req.method === "GET" && (subPath === "status" || subPath.startsWith("status/"))) {
-    const fallbackStatus = {
-      status: "success",
-      bot: {
-        status: "STOPPED",
-        is_running: false,
-        is_paused: false,
-        uptime_seconds: 0,
-        uptime_formatted: "0m 0s",
-        name: "Bot 1",
-        symbol: "BTC/USDT",
-        timeframe: "15m",
-        strategy: "EMA_MACD_VP",
-        execution_mode: "PAPER",
-        allocated_capital: 10000.0,
-        current_signal: "HOLD",
-        signal_confidence: 0.0,
-        required_confidence: 75.0,
-      },
-      heartbeat: null,
-      health: {
-        balance: 50000.0,
-        equity: 50000.0,
-        open_trade_pnl: 0.0,
-        net_realized_pnl: 0.0,
-        total_net_pnl: 0.0,
-        open_positions_count: 0,
-        internet_connected: true,
-        cpu_percent: 0.0,
-        ram_mb: 0.0,
-        latency_ms: 0.0,
-      },
-      open_trade: null,
-      open_positions_count: 0,
-      last_signal: null,
-      todays_pnl: 0.0,
-      todays_pnl_pct: 0.0,
-      net_realized_pnl: 0.0,
-      total_net_pnl: 0.0,
-      risk_status: "14/14 Checks Passed (0 Failed)",
-      system_summary: {
-        total_bots: 1,
-        running_count: 0,
-        stopped_count: 1,
-        stalled_count: 0,
-        error_count: 0,
-        kill_switch_active: false,
-        system_state: "IDLE",
-        headline: "⚪ System Idle — All 1 Bot(s) Stopped",
-        open_positions_count: 0,
-      },
-      symbol: "BTC/USDT",
-      timeframe: "15m",
-      trading_mode: "PAPER",
-      live_price: null,
-      allow_shorts: true,
-      last_updated: new Date().toISOString(),
-    };
-    return NextResponse.json(fallbackStatus, {
-      status: 200,
-      headers: {
-        "X-Request-Id": requestId,
-        "X-Response-Time-Ms": latencyMs.toString(),
-        "X-Proxy-Cache": "SYNTHETIC-FALLBACK",
-        "Content-Type": "application/json",
-      },
-    });
-  }
-
-  // Synthetic Fallback for Indicator Profiles
-  if (req.method === "GET" && (subPath === "indicators/profiles" || subPath.endsWith("/indicators/profiles"))) {
-    return NextResponse.json({
-      status: "success",
-      profiles: [
-        {
-          profile_id: "profile-btc-15m-trend",
-          name: "BTC 15m Trend",
-          market_regime: "TRENDING",
-          scoring_mode: "WEIGHTED",
-          adaptive_mode: "BALANCED",
-          signal_threshold_long: 75.0,
-          signal_threshold_short: 75.0,
-          config: {
-            ema: { enabled: true, weight: 20, timeframe: "15m", fast: 20, slow: 50 },
-            rsi: { enabled: true, weight: 15, timeframe: "15m", period: 14, overbought: 70, oversold: 30 },
-            macd: { enabled: true, weight: 20, timeframe: "15m", fast: 12, slow: 26, signal: 9 },
-            supertrend: { enabled: true, weight: 15, timeframe: "15m", atr_period: 10, multiplier: 3.0 },
-            vwap: { enabled: true, weight: 15, timeframe: "15m" },
-            volume: { enabled: true, weight: 10, timeframe: "15m" }
-          }
-        }
-      ]
-    }, {
-      status: 200,
-      headers: {
-        "X-Request-Id": requestId,
-        "X-Response-Time-Ms": latencyMs.toString(),
-        "X-Proxy-Cache": "SYNTHETIC-FALLBACK",
-        "Content-Type": "application/json",
-      },
-    });
-  }
-
-  // Synthetic Fallback for Indicators / Live Signals
-  if (req.method === "GET" && (subPath.startsWith("indicators") || subPath.includes("/indicators"))) {
-    return NextResponse.json({
-      status: "success",
-      indicators: {},
-      summary: { composite_score: 50.0, consensus_signal: "NEUTRAL", confidence: 0.0 },
-      symbol: "BTC/USDT",
-      timeframe: "15m",
-      engine: { status: "ACTIVE", last_cycle: new Date().toISOString() }
-    }, {
-      status: 200,
-      headers: {
-        "X-Request-Id": requestId,
-        "X-Response-Time-Ms": latencyMs.toString(),
-        "X-Proxy-Cache": "SYNTHETIC-FALLBACK",
-        "Content-Type": "application/json",
-      },
-    });
-  }
-
-  // Synthetic Fallback for Bots Fleet List
-  if (req.method === "GET" && (subPath === "bots" || subPath.startsWith("bots/"))) {
-    return NextResponse.json({
-      status: "success",
-      success: true,
-      bots: [
-        {
-          id: "bot-1",
-          name: "BTC Momentum Trend V1",
-          symbol: "BTC/USDT",
-          timeframe: "15m",
-          strategy: "EMA_MACD_VP",
-          status: "STOPPED",
-          execution_mode: "PAPER",
-          allocated_capital: 10000.0,
-        }
-      ],
-      data: [],
-      total: 1,
-      total_bots: 1,
-      metrics: { total_bots: 1, active_bots: 0, stopped_bots: 1, total_pnl: 0.0 }
-    }, {
-      status: 200,
-      headers: {
-        "X-Request-Id": requestId,
-        "X-Response-Time-Ms": latencyMs.toString(),
-        "X-Proxy-Cache": "SYNTHETIC-FALLBACK",
-        "Content-Type": "application/json",
-      },
-    });
-  }
-
-  // Synthetic Fallback for Portfolio Snapshot
-  if (req.method === "GET" && (subPath === "portfolio/snapshot" || subPath.endsWith("/portfolio/snapshot"))) {
-    const mode = (url.searchParams.get("mode") || "PAPER").toUpperCase();
-    return NextResponse.json({
-      asOf: new Date().toISOString(),
-      mode,
-      baseCurrency: "USD",
-      startingBalance: 100000.0,
-      cashBalance: 100000.0,
-      equity: 100000.0,
-      availableCapital: 100000.0,
-      marginUsed: 0.0,
-      buyingPower: 200000.0,
-      grossRealizedPnl: 0.0,
-      netRealizedPnl: 0.0,
-      unrealizedPnl: 0.0,
-      netPnl: 0.0,
-      dailyPnl: 0.0,
-      weeklyPnl: 0.0,
-      monthlyPnl: 0.0,
-      lifetimePnl: 0.0,
-      fees: 0.0,
-      funding: 0.0,
-      openPositions: 0,
-      openContracts: 0,
-      openOrders: 0,
-      totalTradesCount: 0,
-      winningTradesCount: 0,
-      losingTradesCount: 0,
-      winRate: 0.0,
-      profitFactor: 0.0,
-      averageWin: 0.0,
-      averageLoss: 0.0,
-      riskRewardRatio: 0.0,
-      expectancy: 0.0,
-      maxDrawdownPct: 0.0,
-      currentDrawdownPct: 0.0,
-      accountingMethod: "FIFO",
-      dataFreshness: "CACHED",
-      reconciliationStatus: "RECONCILED",
-    }, {
-      status: 200,
-      headers: {
-        "X-Request-Id": requestId,
-        "X-Response-Time-Ms": latencyMs.toString(),
-        "X-Proxy-Cache": "SYNTHETIC-FALLBACK",
-        "Content-Type": "application/json",
-      },
-    });
-  }
-
-  // Synthetic Fallback for Dashboard Snapshot (Requirement 33)
-  if (req.method === "GET" && (subPath === "dashboard/snapshot" || subPath.endsWith("/dashboard/snapshot"))) {
-    const mode = (url.searchParams.get("mode") || "PAPER").toUpperCase();
-    return NextResponse.json({
-      generatedAt: new Date().toISOString(),
-      mode,
-      portfolio: {
-        asOf: new Date().toISOString(),
-        mode,
-        baseCurrency: "USD",
-        startingBalance: 100000.0,
-        cashBalance: 100000.0,
-        equity: 100000.0,
-        availableCapital: 100000.0,
-        buyingPower: 200000.0,
-        marginUsed: 0.0,
-        marginUtilizationPct: 0.0,
-        dailyPnl: 0.0,
-        dailyPnlPct: 0.0,
-        weeklyPnl: 0.0,
-        monthlyPnl: 0.0,
-        grossRealizedPnl: 0.0,
-        netRealizedPnl: 0.0,
-        unrealizedPnl: 0.0,
-        netPnl: 0.0,
-        fees: 0.0,
-        funding: 0.0,
-        winRate: 0.0,
-        totalTradesCount: 0,
-        winningTradesCount: 0,
-        losingTradesCount: 0,
-        openPositions: 0,
-        openContracts: 0,
-        reconciliationStatus: "RECONCILED",
-      },
-      positionsSummary: {
-        openPositionsCount: 0,
-        openContractsCount: 0,
-        marginUsed: 0.0,
-        unrealizedPnl: 0.0,
-      },
-      pnl: {
-        dailyPnl: 0.0,
-        grossRealizedPnl: 0.0,
-        netRealizedPnl: 0.0,
-        unrealizedPnl: 0.0,
-        netPnl: 0.0,
-        fees: 0.0,
-        funding: 0.0,
-      },
-      performance: {
-        winRate: 0.0,
-        totalTradesCount: 0,
-        winningTradesCount: 0,
-        losingTradesCount: 0,
-        profitFactor: 0.0,
-        expectancy: 0.0,
-      },
-      indices: [
-        { symbol: "NIFTY 50", ltp: 24850.0, previousClose: 24800.0, change: 50.0, pct: 0.20, isUp: true, source: "DHAN / NSE", status: "LAST_TRADED", lastTick: new Date().toISOString() },
-        { symbol: "BANKNIFTY", ltp: 51200.0, previousClose: 51100.0, change: 100.0, pct: 0.20, isUp: true, source: "DHAN / NSE", status: "LAST_TRADED", lastTick: new Date().toISOString() },
-        { symbol: "FINNIFTY", ltp: 23400.0, previousClose: 23350.0, change: 50.0, pct: 0.21, isUp: true, source: "DHAN / NSE", status: "LAST_TRADED", lastTick: new Date().toISOString() },
-        { symbol: "SENSEX", ltp: 81500.0, previousClose: 81350.0, change: 150.0, pct: 0.18, isUp: true, source: "BSE", status: "LAST_TRADED", lastTick: new Date().toISOString() },
-        { symbol: "MIDCPNIFTY", ltp: 12800.0, previousClose: 12750.0, change: 50.0, pct: 0.39, isUp: true, source: "DHAN / NSE", status: "LAST_TRADED", lastTick: new Date().toISOString() },
-      ],
-      movers: {
-        gainers: [],
-        losers: [],
-        active: [],
-      },
-      brokers: [],
-      health: {
-        overall: "HEALTHY",
-        score: 100.0,
-        mode,
-        tradingLocked: true,
-        services: [
-          { service: "Backend", status: "Operational", isOk: true },
-          { service: "Database", status: "Operational", isOk: true },
-          { service: "Gateway", status: "Streaming", isOk: true },
-          { service: "Market Data", status: "Live Feed", isOk: true },
-          { service: "Risk Engine", status: "Operational", isOk: true },
-          { service: "OMS", status: "Paper Operational", isOk: true },
-          { service: "WebSocket", status: "Ready", isOk: true },
-        ],
-      },
-      alerts: [
-        { text: "Paper execution engine operational • Zero risk breaches", time: new Date().toLocaleTimeString(), type: "blue" },
-      ],
-      logs: [
-        { text: "Authoritative P&L reconciliation passed (0 discrepancies)", time: new Date().toLocaleTimeString(), isGreen: true },
-      ],
-    }, {
-      status: 200,
-      headers: {
-        "X-Request-Id": requestId,
-        "X-Response-Time-Ms": latencyMs.toString(),
-        "X-Proxy-Cache": "SYNTHETIC-FALLBACK",
-        "Content-Type": "application/json",
-      },
-    });
-  }
-
-  // Synthetic Fallback for Universe Instruments
-  if (req.method === "GET" && (subPath === "universe/instruments" || subPath.includes("universe/instruments") || subPath === "instruments" || subPath.includes("instruments"))) {
-    return NextResponse.json({
-      success: true,
-      instruments: [
-        { canonical_symbol: "NIFTY 50", display_symbol: "NIFTY", exchange: "NSE", last_price: 24850.0, change_24h: 0.20, volume_24h: 15000000, asset_class: "Equities", status: "LIVE" },
-        { canonical_symbol: "BANKNIFTY", display_symbol: "BANKNIFTY", exchange: "NSE", last_price: 51200.0, change_24h: 0.20, volume_24h: 12000000, asset_class: "Equities", status: "LIVE" },
-        { canonical_symbol: "FINNIFTY", display_symbol: "FINNIFTY", exchange: "NSE", last_price: 23400.0, change_24h: 0.21, volume_24h: 8000000, asset_class: "Equities", status: "LIVE" },
-        { canonical_symbol: "SENSEX", display_symbol: "SENSEX", exchange: "BSE", last_price: 81500.0, change_24h: 0.18, volume_24h: 6000000, asset_class: "Equities", status: "LIVE" },
-        { canonical_symbol: "MIDCPNIFTY", display_symbol: "MIDCPNIFTY", exchange: "NSE", last_price: 12800.0, change_24h: 0.39, volume_24h: 4000000, asset_class: "Equities", status: "LIVE" },
-      ],
-      total_count: 5,
-      total: 5,
-    }, {
-      status: 200,
-      headers: {
-        "X-Request-Id": requestId,
-        "X-Response-Time-Ms": latencyMs.toString(),
-        "X-Proxy-Cache": "SYNTHETIC-FALLBACK",
-        "Content-Type": "application/json",
-      },
-    });
-  }
-
-  // Synthetic Fallback for Universe Summary
-  if (req.method === "GET" && (subPath === "universe/summary" || subPath.includes("universe/summary"))) {
-    return NextResponse.json({
-      success: true,
-      summary: {
-        total_instruments: 5,
-        asset_classes_covered: 1,
-        active_markets: 2,
-        providers_connected: 2,
-        average_feed_latency_ms: 12,
-        timestamp: new Date().toISOString(),
-      },
-    }, {
-      status: 200,
-      headers: {
-        "X-Request-Id": requestId,
-        "X-Response-Time-Ms": latencyMs.toString(),
-        "X-Proxy-Cache": "SYNTHETIC-FALLBACK",
-        "Content-Type": "application/json",
-      },
-    });
-  }
-
   // Handle connection failure or timeout with structured JSON preventing client crash
-  const isTimeout = lastError?.name === "AbortError";
+  const isTimeout = lastError?.name === "AbortError" || lastError?.name === "TimeoutError";
   const statusCode = isTimeout ? 504 : 503;
   const errorCode = isTimeout ? "GATEWAY_TIMEOUT" : "BACKEND_UNAVAILABLE";
   const errorMessage = isTimeout
     ? `Backend request to /api/${subPath} timed out after ${timeoutMs}ms`
     : `Quant.OS Engine backend is unreachable at ${BACKEND_URL}. System is initializing or reconnecting.`;
+
+  if (isStream) {
+    return new NextResponse(
+      `event: error\ndata: ${JSON.stringify({
+        code: isTimeout ? "STREAM_TIMEOUT" : "STREAM_UNAVAILABLE",
+        message: errorMessage,
+        timestamp: new Date().toISOString(),
+      })}\n\n`,
+      {
+        status: 200,
+        headers: {
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache, no-transform",
+          Connection: "keep-alive",
+          "X-Request-Id": requestId,
+        },
+      }
+    );
+  }
 
   return NextResponse.json(
     {

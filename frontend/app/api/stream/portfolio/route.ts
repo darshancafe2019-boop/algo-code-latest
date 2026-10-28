@@ -20,7 +20,14 @@ export async function GET(req: NextRequest) {
   if (backendUrl) {
     const upstreamUrl = `${backendUrl}/api/stream/portfolio?mode=${encodeURIComponent(mode)}`;
     const controller = new AbortController();
+    const connectTimer = setTimeout(() => {
+      try {
+        controller.abort();
+      } catch {}
+    }, 4000);
+
     req.signal.addEventListener("abort", () => {
+      clearTimeout(connectTimer);
       try {
         controller.abort();
       } catch {}
@@ -36,6 +43,7 @@ export async function GET(req: NextRequest) {
         signal: controller.signal,
         cache: "no-store",
       });
+      clearTimeout(connectTimer);
 
       if (upstreamRes.ok && upstreamRes.body) {
         return new Response(upstreamRes.body, {

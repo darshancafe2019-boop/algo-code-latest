@@ -700,7 +700,7 @@ def get_authoritative_connection():
         pool_failed = False
         last_pool_exc = None
         if pool is not None:
-            checkout_timeout = float(os.getenv("PG_POOL_CHECKOUT_TIMEOUT", "8.0"))
+            checkout_timeout = float(os.getenv("PG_POOL_CHECKOUT_TIMEOUT", "2.5"))
             try:
                 with pool.connection(timeout=checkout_timeout) as conn:
                     adapter = PostgresConnectionAdapter(conn)
@@ -724,7 +724,7 @@ def get_authoritative_connection():
         clean_url = _get_pg_clean_url()
         if clean_url and (pool is None or pool_failed or getattr(config, "IS_PRODUCTION", False) or time.time() >= _pg_circuit_broken_until):
             import psycopg
-            conn = psycopg.connect(clean_url, connect_timeout=10, keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=3)
+            conn = psycopg.connect(clean_url, connect_timeout=3, keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=3)
             try:
                 adapter = PostgresConnectionAdapter(conn)
                 yield adapter
@@ -887,10 +887,22 @@ def safe_query(sql: str, params: tuple = ()) -> list:
         pass
 
     if getattr(config, "IS_POSTGRES", False):
+        clean_upper_sql = sql.strip().upper()
+        if clean_upper_sql.startswith("PRAGMA"):
+            if "JOURNAL_MODE" in clean_upper_sql:
+                return [{"journal_mode": "wal"}]
+            if "BUSY_TIMEOUT" in clean_upper_sql:
+                return [{"busy_timeout": 30000}]
+            if "SYNCHRONOUS" in clean_upper_sql:
+                return [{"synchronous": 1}]
+            if "FOREIGN_KEYS" in clean_upper_sql:
+                return [{"foreign_keys": 1}]
+            return []
+
         pool = get_db_pool()
         if pool is not None:
             pg_sql = translate_sqlite_sql_to_postgres(sql)
-            checkout_timeout = float(os.getenv("PG_POOL_CHECKOUT_TIMEOUT", "8.0"))
+            checkout_timeout = float(os.getenv("PG_POOL_CHECKOUT_TIMEOUT", "2.5"))
             for attempt in range(2):
                 try:
                     from psycopg.rows import dict_row
@@ -940,7 +952,7 @@ def safe_query(sql: str, params: tuple = ()) -> list:
                     import psycopg
                     from psycopg.rows import dict_row
                     logger.warning("Falling back to direct psycopg.connect for query after pool error: %s", last_exc)
-                    with psycopg.connect(clean_url, connect_timeout=10, keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=3) as direct_conn:
+                    with psycopg.connect(clean_url, connect_timeout=3, keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=3) as direct_conn:
                         with direct_conn.cursor(row_factory=dict_row) as cur:
                             getattr(cur, "execute")(pg_sql, params)
                             res = [sanitize_for_json(dict(r)) for r in cur.fetchall()]
@@ -956,7 +968,7 @@ def safe_query(sql: str, params: tuple = ()) -> list:
                 from psycopg.rows import dict_row
                 pg_sql = translate_sqlite_sql_to_postgres(sql)
                 clean_url = _get_pg_clean_url()
-                conn = psycopg.connect(clean_url, connect_timeout=10, keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=3)
+                conn = psycopg.connect(clean_url, connect_timeout=3, keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=3)
                 try:
                     with conn.cursor(row_factory=dict_row) as cur:
                         getattr(cur, "execute")(pg_sql, params)
@@ -1100,6 +1112,10 @@ def init_db(force: bool = False) -> None:
                                 'CREATE INDEX IF NOT EXISTS "idx_pg_system_health_ts" ON "system_health"("last_updated" DESC);',
                                 'CREATE INDEX IF NOT EXISTS "idx_pg_bot_config_versions" ON "bot_config_versions"("bot_id", "version" DESC);',
                                 'CREATE INDEX IF NOT EXISTS "idx_pg_bot_instances_slug" ON "bot_instances"("slug");',
+                                'CREATE INDEX IF NOT EXISTS "idx_pg_orders_bot_id" ON "orders"("bot_id");',
+                                'CREATE INDEX IF NOT EXISTS "idx_pg_orders_status" ON "orders"("status");',
+                                'CREATE INDEX IF NOT EXISTS "idx_pg_trades_bot_id" ON "trades"("bot_id");',
+                                'CREATE INDEX IF NOT EXISTS "idx_pg_cap_ledger_cust_ts" ON "capital_ledger"("customer_id", "timestamp" DESC);',
                             ]
                             for idx_sql in pg_indexes:
                                 try:
@@ -1259,6 +1275,19 @@ def init_db(force: bool = False) -> None:
                 cursor.execute("CREATE INDEX IF NOT EXISTS idx_cap_ledger_cust ON capital_ledger(customer_id, department_id)")
                 cursor.execute("CREATE INDEX IF NOT EXISTS idx_cap_ledger_acc ON capital_ledger(broker_account_id, environment)")
                 cursor.execute("CREATE INDEX IF NOT EXISTS idx_cap_ledger_bot ON capital_ledger(bot_id)")
+                for opt_idx in [
+                    "CREATE INDEX IF NOT EXISTS idx_orders_bot_id ON orders(bot_id)",
+                    "CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status)",
+                    "CREATE INDEX IF NOT EXISTS idx_orders_created_at ON orders(created_at DESC)",
+                    "CREATE INDEX IF NOT EXISTS idx_trades_bot_id ON trades(bot_id)",
+                    "CREATE INDEX IF NOT EXISTS idx_trades_timestamp ON trades(timestamp DESC)",
+                    "CREATE INDEX IF NOT EXISTS idx_positions_bot_id ON positions(bot_id)",
+                    "CREATE INDEX IF NOT EXISTS idx_capital_ledger_customer_timestamp ON capital_ledger(customer_id, timestamp DESC)",
+                ]:
+                    try:
+                        cursor.execute(opt_idx)
+                    except Exception:
+                        pass
 
                 cursor.execute(
                     """

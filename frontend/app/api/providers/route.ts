@@ -42,6 +42,28 @@ export async function GET(req: NextRequest) {
     for (const p of gwHealth.providers) {
       providersMap[p.provider_id] = p;
     }
+  } else {
+    // Fallback to Backend Integrated Provider Health
+    const BACKEND_URL = getBackendBaseUrl();
+    if (BACKEND_URL) {
+      try {
+        const bRes = await fetch(`${BACKEND_URL}/api/market/providers/health`, {
+          cache: "no-store",
+          headers: { Accept: "application/json" },
+          signal: AbortSignal.timeout(2000),
+        });
+        if (bRes.ok) {
+          const bData = await bRes.json();
+          const list = Array.isArray(bData.providers) ? bData.providers : [];
+          for (const p of list) {
+            providersMap[p.provider_id] = p;
+          }
+          if (bData.providers_map) {
+            Object.assign(providersMap, bData.providers_map);
+          }
+        }
+      } catch (_err) {}
+    }
   }
 
   const dhanGw = providersMap["dhan_ws"] || providersMap["dhan"];
@@ -64,21 +86,28 @@ export async function GET(req: NextRequest) {
   const hasExnessCreds = Boolean(process.env.EXNESS_ACCOUNT_ID);
   const hasIbkrCreds = Boolean(process.env.IBKR_CLIENT_ID || process.env.IBKR_PORT);
 
-  // Determine connection states from real telemetry
-  const dhanState = dhanGw?.stream_status === "CONNECTED" || dhanGw?.status === "LIVE" || dhanGw?.status === "MARKET_CLOSED"
-    ? "CONNECTED"
-    : (hasDhanCreds ? "CONNECTED" : "NOT_CONFIGURED");
+  // Determine connection states from real telemetry (zero fabrication)
+  const isConn = (p: any) => Boolean(p && (p.connected === true || p.status === "LIVE" || p.status === "CONNECTED" || p.websocket_status === "LIVE" || p.stream_status === "CONNECTED"));
 
-  const upstoxState = upstoxGw?.stream_status === "CONNECTED" || upstoxGw?.status === "LIVE" || upstoxGw?.status === "MARKET_CLOSED"
+  const dhanState = isConn(dhanGw)
     ? "CONNECTED"
-    : (hasUpstoxCreds ? "CONNECTED" : "NOT_CONFIGURED");
+    : (hasDhanCreds ? "DEGRADED" : "NOT_CONFIGURED");
 
-  const deltaState = deltaGw?.status === "LIVE" || deltaGw?.stream_status === "CONNECTED"
+  const upstoxState = isConn(upstoxGw)
     ? "CONNECTED"
-    : (hasDeltaCreds ? "CONNECTED" : "NOT_CONFIGURED");
+    : (hasUpstoxCreds ? "DEGRADED" : "NOT_CONFIGURED");
 
-  const binanceState = binanceGw?.status === "LIVE" ? "CONNECTED" : "NOT_CONFIGURED";
-  const fyersState = fyersGw?.status === "LIVE" || fyersGw?.stream_status === "CONNECTED" || hasFyersCreds ? "CONNECTED" : "NOT_CONFIGURED";
+  const deltaState = isConn(deltaGw)
+    ? "CONNECTED"
+    : (hasDeltaCreds ? "DEGRADED" : "NOT_CONFIGURED");
+
+  const binanceState = isConn(binanceGw)
+    ? "CONNECTED"
+    : (hasBinanceCreds ? "DEGRADED" : "NOT_CONFIGURED");
+
+  const fyersState = isConn(fyersGw)
+    ? "CONNECTED"
+    : (hasFyersCreds ? "DEGRADED" : "NOT_CONFIGURED");
 
   const providers = [
     // ── INDIAN BROKERS ──────────────────────────────────────────────────────────

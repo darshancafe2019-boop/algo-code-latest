@@ -62,23 +62,36 @@ export async function GET() {
         if (Array.isArray(bData)) {
           return NextResponse.json(bData);
         } else if (bData.providers) {
-          const catalogList: ProviderCatalogItem[] = Object.entries(bData.providers).map(([k, p]: [string, any]) => ({
-            id: k,
-            name: p.name || k.toUpperCase(),
-            category: (k === "binance" || k === "delta") ? "CRYPTO" : "INDIAN_BROKERS",
-            description: `${p.name || k} Market Data Feed`,
-            assetClasses: ["EQUITY", "CRYPTO_SPOT"],
-            connected: Boolean(p.connected),
-            connectionState: p.connected ? "CONNECTED" : (p.configured ? "DEGRADED" : "NOT_CONFIGURED"),
-            mode: p.connected ? "REAL_TIME" : "SIMULATED",
-            isPrimary: true,
-            health: {
-              pingMs: p.latency_ms || 12,
-              lastTickAt: Date.now(),
-              subscriptions: 5,
-              error: null,
-            },
-          }));
+          const rawList = Array.isArray(bData.providers) ? bData.providers : Object.entries(bData.providers).map(([k, p]: [string, any]) => ({ id: k, ...p }));
+          const catalogList: ProviderCatalogItem[] = rawList.map((p: any) => {
+            const pid = (p.id || p.provider_id || "").replace(/_ws$/, "");
+            const isConn = Boolean(p.connected || p.status === "LIVE" || p.status === "CONNECTED");
+            const isDisconn = p.status === "DISCONNECTED";
+            const isDeg = p.status === "DEGRADED" || (Boolean(p.configured || p.diagnostic?.configured) && !isConn);
+            const connState: ProviderCatalogItem["connectionState"] = isConn
+              ? "CONNECTED"
+              : (isDisconn ? "DISCONNECTED" : (isDeg ? "DEGRADED" : "NOT_CONFIGURED"));
+            const lastTickMs = p.last_tick_at
+              ? new Date(p.last_tick_at).getTime()
+              : (p.last_real_tick_at ? new Date(p.last_real_tick_at).getTime() : 0);
+            return {
+              id: pid,
+              name: p.name || p.provider_name || pid.toUpperCase(),
+              category: (pid === "binance" || pid === "delta") ? "CRYPTO" : "INDIAN_BROKERS",
+              description: `${p.name || pid} Market Data Feed`,
+              assetClasses: p.asset_classes || ["EQUITY", "CRYPTO_SPOT"],
+              connected: isConn,
+              connectionState: connState,
+              mode: isConn ? "REAL_TIME" : (isDeg ? "DELAYED" : "DISABLED"),
+              isPrimary: true,
+              health: {
+                pingMs: p.last_tick_age_ms || p.latency_ms || 0,
+                lastTickAt: Number.isFinite(lastTickMs) ? lastTickMs : 0,
+                subscriptions: p.subscriptions || 0,
+                error: p.safe_error_message || p.message || p.error || null,
+              },
+            };
+          });
           return NextResponse.json(catalogList);
         }
       }
@@ -92,8 +105,8 @@ export async function GET() {
   const hasTwelveData = Boolean(marketDataConfig.twelvedata.apiKey && marketDataConfig.twelvedata.apiKey !== "demo");
   const hasBinance = Boolean(process.env.BINANCE_API_KEY);
 
-  const defaultState = (configured: boolean): "CONNECTED" | "NOT_CONFIGURED" => {
-    return configured ? "CONNECTED" : "NOT_CONFIGURED";
+  const defaultState = (configured: boolean): "DEGRADED" | "NOT_CONFIGURED" => {
+    return configured ? "DEGRADED" : "NOT_CONFIGURED";
   };
 
   const providers: ProviderCatalogItem[] = [

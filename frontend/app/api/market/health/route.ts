@@ -22,11 +22,16 @@ export async function GET() {
 
       if (res.ok) {
         const data = await res.json();
+        const provList = Array.isArray(data.providers)
+          ? data.providers
+          : (data.providers ? Object.values(data.providers) : []);
+        const hasDisconnected = provList.some((p: any) => p.connected === false || p.status === "DISCONNECTED" || p.status === "DEGRADED");
+        const computedStatus = hasDisconnected ? "degraded" : (data.status === "healthy" || data.status === "OK" ? "healthy" : "degraded");
         return NextResponse.json({
-          status: "healthy",
+          ...data,
+          status: computedStatus,
           gateway: "CONNECTED",
           timestamp: Date.now(),
-          ...data,
         });
       }
     } catch {
@@ -47,10 +52,10 @@ export async function GET() {
       if (bRes.ok) {
         const bData = await bRes.json();
         return NextResponse.json({
-          status: "healthy",
-          gateway: "CONNECTED",
+          status: "degraded",
+          gateway: "DISCONNECTED",
           timestamp: Date.now(),
-          providers: bData.providers || bData,
+          providers: bData.providers_map || bData.providers || bData,
         });
       }
     } catch {}
@@ -62,67 +67,67 @@ export async function GET() {
   const hasDelta = Boolean(marketDataConfig.delta.apiKey);
 
   return NextResponse.json({
-    status: "healthy",
-    gateway: "CONNECTED",
+    status: "unavailable",
+    gateway: "DISCONNECTED",
     timestamp: Date.now(),
     providers: {
       dhan: {
         configured: hasDhan,
         authenticated: hasDhan,
-        rest: hasDhan ? "OK" : "STANDBY",
-        websocket: hasDhan ? "CONNECTED" : "STANDBY",
+        rest: "DOWN",
+        websocket: "DISCONNECTED",
         subscriptions: 0,
-        lastTickAt: Date.now(),
-        stale: false,
-        error: null,
+        lastTickAt: null,
+        stale: true,
+        error: hasDhan ? "Market data gateway offline" : "Credentials required",
       },
       upstox: {
         configured: hasUpstox,
         authenticated: hasUpstox,
-        rest: hasUpstox ? "OK" : "STANDBY",
-        websocket: hasUpstox ? "CONNECTED" : "STANDBY",
+        rest: "DOWN",
+        websocket: "DISCONNECTED",
         subscriptions: 0,
-        lastTickAt: Date.now(),
-        stale: false,
-        error: null,
+        lastTickAt: null,
+        stale: true,
+        error: hasUpstox ? "Market data gateway offline" : "Credentials required",
       },
       delta: {
         configured: hasDelta,
         authenticated: hasDelta,
-        rest: hasDelta ? "OK" : "STANDBY",
-        websocket: "CONNECTED",
+        rest: "DOWN",
+        websocket: "DISCONNECTED",
         endpoint: "wss://public-socket.india.delta.exchange",
         subscriptions: 0,
-        lastTickAt: Date.now(),
-        stale: false,
-        error: null,
+        lastTickAt: null,
+        stale: true,
+        error: hasDelta ? "Market data gateway offline" : "Credentials required",
       },
       twelvedata: {
         configured: hasTwelveData,
         authenticated: hasTwelveData,
-        rest: hasTwelveData ? "OK" : "STANDBY",
-        websocket: "STANDBY",
+        rest: "DOWN",
+        websocket: "DISCONNECTED",
         subscriptions: 0,
         lastTickAt: null,
-        stale: false,
-        error: null,
+        stale: true,
+        error: hasTwelveData ? "Market data gateway offline" : "Set TWELVE_DATA_API_KEY",
       },
       binance: {
-        configured: true,
+        configured: Boolean(process.env.BINANCE_API_KEY),
         authenticated: false,
-        rest: "OK",
-        websocket: "CONNECTED",
+        rest: "DOWN",
+        websocket: "DISCONNECTED",
         subscriptions: 0,
-        lastTickAt: Date.now(),
-        stale: false,
-        error: null,
+        lastTickAt: null,
+        stale: true,
+        error: "Market data gateway offline",
       },
     },
     metrics: {
       ticksPerSec: 0,
-      activeSockets: 1,
-      totalSubscriptions: 5,
-      avgLatencyMs: 12,
+      activeSockets: 0,
+      totalSubscriptions: 0,
+      avgLatencyMs: null,
     },
   });
 }

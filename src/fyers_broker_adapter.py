@@ -277,12 +277,13 @@ class FyersBrokerAdapter(BrokerAdapter):
         except Exception as e:
             latency_ms = round((time.perf_counter() - t0) * 1000, 1)
             return {
-                "success": True,
-                "connected": bool(self.app_id),
-                "latencyMs": latency_ms if latency_ms > 0 else 24,
+                "success": False,
+                "connected": False,
+                "latencyMs": latency_ms if latency_ms > 0 else 0,
                 "appIdMasked": (self.app_id[:4] + "..." + self.app_id[-3:]) if len(self.app_id) >= 8 else self.app_id,
                 "endpoint": self.base_url,
-                "message": f"Fyers API v3 verified ({latency_ms if latency_ms > 0 else 24}ms).",
+                "error": str(e),
+                "message": f"Fyers API v3 connection failed: {e}",
                 "timestamp": datetime.now(timezone.utc).isoformat(),
             }
 
@@ -364,21 +365,22 @@ class FyersBrokerAdapter(BrokerAdapter):
     def get_safe_diagnostic(self) -> Dict[str, Any]:
         """Returns safe provider diagnostic without exposing secrets."""
         is_conf = bool(self.app_id and (self.secret_id or self.access_token))
+        has_token = bool(self.access_token)
         return {
             "configured": is_conf,
-            "authentication_status": "VALID" if is_conf else "MISSING_CREDENTIALS",
-            "token_status": "ACTIVE" if bool(self.access_token) else ("CONFIGURED" if is_conf else "MISSING"),
+            "authentication_status": "VALID" if (is_conf and has_token) else ("CONFIGURED_NO_TOKEN" if is_conf else "MISSING_CREDENTIALS"),
+            "token_status": "ACTIVE" if has_token else ("CONFIGURED" if is_conf else "MISSING"),
             "token_expiry": None,
-            "data_entitlement": "ACTIVE" if is_conf else "INACTIVE",
-            "rest_status": "UP" if is_conf else "DOWN",
-            "websocket_status": "LIVE" if is_conf else "DISCONNECTED",
-            "subscription_status": "ACTIVE" if is_conf else "INACTIVE",
-            "decoder_status": "JSON_OK",
-            "last_real_tick_at": datetime.now(timezone.utc).isoformat() if is_conf else None,
-            "last_tick_age_ms": 150 if is_conf else None,
-            "error_code": None,
-            "safe_error_message": None,
-            "status": "LIVE" if is_conf else "NOT_CONFIGURED",
+            "data_entitlement": "ACTIVE" if (is_conf and has_token) else "INACTIVE",
+            "rest_status": "UP" if (is_conf and has_token) else "DOWN",
+            "websocket_status": "DISCONNECTED",
+            "subscription_status": "INACTIVE",
+            "decoder_status": "READY" if is_conf else "INACTIVE",
+            "last_real_tick_at": None,
+            "last_tick_age_ms": None,
+            "error_code": None if (is_conf and has_token) else ("MISSING_TOKEN" if is_conf else "NOT_CONFIGURED"),
+            "safe_error_message": None if (is_conf and has_token) else ("Access token required for real-time market data" if is_conf else "Fyers credentials not configured"),
+            "status": "CONFIGURED" if (is_conf and not has_token) else ("READY" if is_conf else "NOT_CONFIGURED"),
         }
 
     def get_option_chain(

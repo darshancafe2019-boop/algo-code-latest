@@ -245,7 +245,7 @@ export function getGatewayWsUrl(): string {
 }
 
 export function isGatewayWsConfigured(): boolean {
-  return true;
+  return Boolean(getGatewayWsUrl());
 }
 
 /**

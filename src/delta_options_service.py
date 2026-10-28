@@ -400,11 +400,26 @@ class DeltaOptionsService:
         quotes_to_save: List[Dict[str, Any]] = []
         now_iso = datetime.now(timezone.utc).isoformat()
 
+        # Build contract lookup cache to recover real settlement times and strikes
+        contract_lookup: Dict[Any, Dict[str, Any]] = {}
+        try:
+            db_contracts = db.get_delta_contracts(underlying=underlying, active_only=True)
+            for c in db_contracts:
+                if c.get("product_id"):
+                    contract_lookup[c["product_id"]] = c
+                if c.get("symbol"):
+                    contract_lookup[c["symbol"]] = c
+        except Exception:
+            pass
+
         for t in tickers:
             pid = t.get("product_id")
             sym = t.get("symbol")
             if not pid or not sym:
                 continue
+
+            c_info = contract_lookup.get(pid) or contract_lookup.get(sym) or {}
+            settle_time = t.get("settlement_time") or c_info.get("settlement_time") or ""
 
             q_obj = t.get("quotes") or {}
             g_obj = t.get("greeks") or {}
@@ -415,8 +430,8 @@ class DeltaOptionsService:
                 "symbol": sym,
                 "underlying_symbol": t.get("underlying_asset_symbol", underlying),
                 "contract_type": t.get("contract_type", "call_options"),
-                "strike_price": float(t.get("strike_price", 0.0)),
-                "settlement_time": t.get("settlement_time", ""),
+                "strike_price": float(t.get("strike_price") or c_info.get("strike_price") or 0.0),
+                "settlement_time": settle_time,
                 "mark_price": float(t.get("mark_price", 0.0)),
                 "spot_price": float(t.get("spot_price", 0.0)),
                 "best_bid": float(q_obj.get("best_bid", 0.0)),
@@ -594,6 +609,16 @@ class DeltaOptionsService:
                 if sp and float(sp) > 0:
                     spot_price = float(sp)
                     break
+
+        if spot_price <= 0:
+            try:
+                und_ticker = self.client.get_ticker(f"{und}USD")
+                if und_ticker:
+                    sp_val = und_ticker.get("spot_price") or und_ticker.get("mark_price") or und_ticker.get("close")
+                    if sp_val and float(sp_val) > 0:
+                        spot_price = float(sp_val)
+            except Exception as e:
+                logger.debug(f"Failed to fetch underlying ticker for {und}USD: {e}")
 
         if spot_price <= 0:
             try:

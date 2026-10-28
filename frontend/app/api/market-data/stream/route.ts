@@ -355,8 +355,8 @@ export async function GET(req: NextRequest) {
                     received_timestamp: q.receivedTimestamp,
                     feed_latency_ms: q.feedLatencyMs,
                     data_mode: q.dataMode,
-                    is_stale: false,
-                    age_seconds: 0,
+                    is_stale: Boolean(q.isStale || (q.eventTimestamp && (Date.now() - new Date(q.eventTimestamp).getTime()) > 15000)),
+                    age_seconds: q.eventTimestamp ? Math.max(0, Math.round((Date.now() - new Date(q.eventTimestamp).getTime()) / 1000)) : 60,
                   },
                 })}\n\n`
               );

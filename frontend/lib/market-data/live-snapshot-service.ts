@@ -155,21 +155,66 @@ export async function refreshRealMarketData(): Promise<void> {
             vol: parseFloat(item.volume) || liveCache[canonical].vol,
             lastUpdated: now,
           };
+          // Strictly keep Binance quotes identified as Binance
           if (canonical === "BTC/USDT") {
-            liveCache["BTC"] = { ...liveCache[canonical], exchange: "DELTA" };
-            liveCache["BTC-PERP"] = { ...liveCache[canonical], exchange: "DELTA_PERP", provider: "DELTA" };
+            liveCache["BTC/USDT"] = { ...liveCache[canonical], exchange: "BINANCE", provider: "BINANCE" };
           } else if (canonical === "ETH/USDT") {
-            liveCache["ETH"] = { ...liveCache[canonical], exchange: "DELTA" };
-            liveCache["ETH-PERP"] = { ...liveCache[canonical], exchange: "DELTA_PERP", provider: "DELTA" };
+            liveCache["ETH/USDT"] = { ...liveCache[canonical], exchange: "BINANCE", provider: "BINANCE" };
           } else if (canonical === "SOL/USDT") {
-            liveCache["SOL"] = { ...liveCache[canonical], exchange: "DELTA" };
-            liveCache["SOL-PERP"] = { ...liveCache[canonical], exchange: "DELTA_PERP", provider: "DELTA" };
+            liveCache["SOL/USDT"] = { ...liveCache[canonical], exchange: "BINANCE", provider: "BINANCE" };
           }
         }
       }
     }
   } catch {
     // Ignore Binance timeout
+  }
+
+  // 1B. Fetch Authentic Delta Exchange India Quotes (Native Delta API, No Substitution)
+  try {
+    const deltaRes = await fetch("https://api.india.delta.exchange/v2/tickers/BTCUSD", {
+      headers: { "User-Agent": "QuantOS/1.0", Accept: "application/json" },
+      signal: AbortSignal.timeout(2500),
+      cache: "no-store",
+    });
+    if (deltaRes.ok) {
+      const deltaJson = await deltaRes.json();
+      const res = deltaJson.result;
+      if (res) {
+        const ltp = Number(res.close || res.mark_price || 0);
+        const spot = Number(res.spot_price || ltp);
+        liveCache["BTC"] = {
+          ltp: spot,
+          prevClose: Number(res.open || spot),
+          chg: Number(res.ltp_change_24h || 0),
+          chgPct: Number(res.mark_change_24h || 0),
+          bid: Number(res.quotes?.best_bid || spot),
+          ask: Number(res.quotes?.best_ask || spot),
+          vol: Number(res.volume || 0),
+          oi: Number(res.oi || 0),
+          exchange: "DELTA",
+          provider: "DELTA",
+          name: "Bitcoin (Delta India)",
+          lastUpdated: now,
+        };
+        liveCache["BTC-PERP"] = {
+          ltp,
+          prevClose: Number(res.open || ltp),
+          chg: Number(res.ltp_change_24h || 0),
+          chgPct: Number(res.mark_change_24h || 0),
+          bid: Number(res.quotes?.best_bid || ltp),
+          ask: Number(res.quotes?.best_ask || ltp),
+          vol: Number(res.volume || 0),
+          oi: Number(res.oi || 0),
+          exchange: "DELTA_PERP",
+          provider: "DELTA",
+          name: "BTC Perpetual (Delta India)",
+          lastUpdated: now,
+        };
+      }
+    }
+  } catch {
+    // Non-blocking Delta REST probe
   }
 
   // 2. Fetch Yahoo Real-Time Quotes (Parallel Fetch)
@@ -444,10 +489,6 @@ export async function getLiveSnapshotQuotes(
     };
   }
 
-  // If underlying is requested (e.g. NIFTY), also attach dynamic live ATM option chain quotes!
-  const spotPrice = liveCache["NIFTY"]?.ltp || 22421.95;
-  const optionChainQuotes = generateDynamicOptionChainQuotes("NIFTY", spotPrice);
-  Object.assign(quotes, optionChainQuotes);
-
+  // Only return validated quotes for requested instruments (Zero Fake Data Policy)
   return quotes;
 }

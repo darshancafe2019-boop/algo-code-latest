@@ -453,6 +453,11 @@ class UpstoxWSAdapter(BaseProviderAdapter):
                     self._last_valid_greeks_at = time.time()
 
                 ex = "BSE" if (ik.startswith("BSE_") or "BSE" in ik) else "NSE"
+                ltt_val = feed_data.get("ltt")
+                if ltt_val and int(ltt_val) > 0:
+                    trade_ts_iso = datetime.fromtimestamp(int(ltt_val) / 1000.0, tz=timezone.utc).isoformat()
+                else:
+                    trade_ts_iso = now_iso
 
                 q = NormalizedQuote(
                     symbol=sym,
@@ -473,7 +478,7 @@ class UpstoxWSAdapter(BaseProviderAdapter):
                     oi=oi_val,
                     depth=depth_data,
                     greeks=greeks_data,
-                    event_timestamp=now_iso,
+                    event_timestamp=trade_ts_iso,
                     received_timestamp=now_iso,
                     feed_latency_ms=round(self._last_latency_ms, 1),
                     data_mode="REAL_TIME",

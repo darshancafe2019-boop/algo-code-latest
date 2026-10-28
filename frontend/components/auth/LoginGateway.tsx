@@ -84,6 +84,17 @@ export function LoginGateway() {
       setErrorMessageRaw("Authentication service is temporarily unavailable. Please try again shortly.");
       return;
     }
+    if (
+      msg.includes("An error occurred") ||
+      msg.includes("UPSTREAM_HTTP_") ||
+      msg.includes("Bad Gateway") ||
+      msg.includes("Service Unavailable") ||
+      msg.includes("502") ||
+      msg.includes("503")
+    ) {
+      setErrorMessageRaw("Quant.OS backend service is waking up. Please wait 10 seconds and try again.");
+      return;
+    }
     if (msg.includes("<html") || msg.includes("<!DOCTYPE") || msg.includes("<body")) {
       setErrorMessageRaw("Authentication service returned an unexpected response. Please try again shortly.");
       return;

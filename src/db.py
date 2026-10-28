@@ -9864,6 +9864,44 @@ def get_universe_summary_stats() -> Dict[str, Any]:
     row["asset_classes_covered"] = 8
     row["active_markets"] = 5
     row["providers_connected"] = 4
+
+    # 6 Canonical Lifecycle Pipeline Counts (Master Market Data Pipeline)
+    catalogue_count = int(row.get("total_instruments", 0))
+    eligible_count = int(row.get("tradable", catalogue_count))
+    sub_count = 0
+    valid_ticks = 0
+    fresh_ticks = 0
+
+    try:
+        from src.ticker_service import get_ticker_service
+        ts = get_ticker_service()
+        if hasattr(ts, "get_service_status"):
+            st = ts.get_service_status()
+            sub_count = int(st.get("active_subscriptions") or 0)
+            valid_ticks = int(st.get("valid_ticks_count") or 0)
+            fresh_ticks = int(st.get("fresh_ticks_count") or 0)
+        elif hasattr(ts, "_quotes"):
+            valid_ticks = len(ts._quotes)
+            now_t = time.time()
+            fresh_ticks = len([q for q in ts._quotes.values() if now_t - getattr(q, "received_at", 0) <= 15.0])
+            sub_count = len(getattr(ts, "_subscribed_symbols", [])) or valid_ticks
+    except Exception:
+        pass
+
+    row["catalogue_instruments"] = catalogue_count
+    row["eligible_instruments"] = eligible_count
+    row["subscribed_instruments"] = sub_count
+    row["instruments_with_valid_ticks"] = valid_ticks
+    row["instruments_with_fresh_ticks"] = fresh_ticks
+    row["instruments_with_stale_or_missing_ticks"] = max(0, catalogue_count - fresh_ticks)
+    row["pipeline_lifecycle"] = {
+        "catalogue_instruments": catalogue_count,
+        "eligible_instruments": eligible_count,
+        "subscribed_instruments": sub_count,
+        "instruments_with_valid_ticks": valid_ticks,
+        "instruments_with_fresh_ticks": fresh_ticks,
+        "instruments_with_stale_or_missing_ticks": max(0, catalogue_count - fresh_ticks),
+    }
     return row
 
 

@@ -490,10 +490,10 @@ class DeltaSubscriptionManager:
         if self.funding_symbols:
             channels.append({"name": "funding_rate", "symbols": list(self.funding_symbols)})
 
-        # 9. Candlesticks
+        # 9. Candlesticks (official Delta India channel name is candlestick_{resolution})
         for res, syms in self.candle_subscriptions.items():
             if syms:
-                channels.append({"name": "candlesticks", "symbols": list(syms), "resolution": res})
+                channels.append({"name": f"candlestick_{res}", "symbols": list(syms)})
 
         # 10. System Status (Global)
         channels.append({"name": "system_status"})
@@ -885,7 +885,7 @@ class DeltaOptionsWSAdapter(BaseProviderAdapter):
         if self._is_ws_open():
             self._schedule_coro(self._safe_send({
                 "type": "subscribe",
-                "payload": {"channels": [{"name": "candlesticks", "symbols": [delta_sym], "resolution": resolution}]}
+                "payload": {"channels": [{"name": f"candlestick_{resolution}", "symbols": [delta_sym]}]}
             }))
 
     def subscribe_funding(self, symbol: str):
@@ -1004,7 +1004,7 @@ class DeltaOptionsWSAdapter(BaseProviderAdapter):
             return
 
         # 9. Candlesticks
-        if msg_type == "candlesticks":
+        if msg_type == "candlesticks" or (msg_type and msg_type.startswith("candlestick_")):
             self._handle_candlestick_message(data)
             return
 
@@ -1887,10 +1887,12 @@ class DeltaOptionsWSAdapter(BaseProviderAdapter):
             try:
                 import urllib.request
                 import json
-                with urllib.request.urlopen(f"https://api.binance.com/api/v3/ticker/price?symbol={und}USDT", timeout=2.0) as resp:
-                    b_data = json.loads(resp.read().decode())
-                    if "price" in b_data and float(b_data["price"]) > 0:
-                        spot_price = float(b_data["price"])
+                req = urllib.request.Request(f"{self.rest_base_url}/v2/tickers/{und}USD", headers={"User-Agent": "QuantOS/1.0", "Accept": "application/json"})
+                with urllib.request.urlopen(req, timeout=2.5) as resp:
+                    d_data = json.loads(resp.read().decode()).get("result") or {}
+                    sp = d_data.get("spot_price") or d_data.get("mark_price") or d_data.get("close")
+                    if sp and float(sp) > 0:
+                        spot_price = float(sp)
             except Exception:
                 pass
 

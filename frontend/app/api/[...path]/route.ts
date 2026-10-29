@@ -308,7 +308,7 @@ async function handleProxy(req: NextRequest, ctx: { params?: { path: string[] } 
   const isIndicator = subPath.includes("indicator");
   const isAuth = subPath.startsWith("auth") || subPath.includes("/auth") || subPath.includes("auth/");
   const isHeavy = subPath.includes("backtest") || subPath.includes("simulate") || subPath.includes("risk/simulate");
-  const timeoutMs = isStream ? 5000 : (isStatus || isIndicator ? 4000 : (isAuth ? 15000 : (isHeavy ? 12000 : 8000)));
+  const timeoutMs = isStream ? 5000 : (isStatus || isIndicator ? 4000 : (isAuth ? 25000 : (isHeavy ? 12000 : 8000)));
 
   let bodyData: BodyInit | null = null;
   if (["POST", "PUT", "PATCH", "DELETE"].includes(req.method)) {
@@ -529,11 +529,13 @@ async function handleProxy(req: NextRequest, ctx: { params?: { path: string[] } 
       ok: false,
       success: false,
       status: "error",
+      message: errorMessage,
+      error_code: errorCode,
       data: null,
       error: {
         code: errorCode,
         message: errorMessage,
-        retryable: true,
+        retryable: isTimeout,
         details: lastError?.message || String(lastError),
       },
       requestId,

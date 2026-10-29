@@ -299,8 +299,18 @@ export function LoginGateway() {
       const res = await verifyEmailOTP(challengeId, otpCode);
       if (!res.success) {
         setErrorMessage(res.error || "Invalid or expired verification code.");
-        setOtpDigits(["", "", "", "", "", ""]);
-        digitInputRefs.current[0]?.focus();
+        // Do not wipe digits on transient network or gateway timeouts, allowing seamless re-attempt
+        const isTransient =
+          res.statusCode === 504 ||
+          res.statusCode === 503 ||
+          res.statusCode === 502 ||
+          res.errorCode === "GATEWAY_TIMEOUT" ||
+          res.errorCode === "NETWORK_ERROR";
+
+        if (!isTransient) {
+          setOtpDigits(["", "", "", "", "", ""]);
+          digitInputRefs.current[0]?.focus();
+        }
       } else {
         setSuccessMessage("Email verified successfully! Entering terminal...");
         setTimeout(() => {

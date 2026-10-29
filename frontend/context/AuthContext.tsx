@@ -31,6 +31,8 @@ export interface LoginResult {
   userId?: string;
   message?: string;
   error?: string;
+  errorCode?: string;
+  statusCode?: number;
   devOtp?: string;
   devMode?: boolean;
 }
@@ -454,16 +456,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Verify Email OTP
   const verifyEmailOTP = async (
     challengeId: string,
-    otp: string
+    otp: string,
+    isRecovery: boolean = false
   ): Promise<LoginResult> => {
     try {
       const res = await fetch("/api/auth/email-otp/verify", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(isRecovery ? { "X-Auth-Recovery": "true" } : {}),
+        },
         credentials: "include",
         body: JSON.stringify({
           challenge_id: challengeId,
           otp: otp.trim(),
+          recovery: isRecovery,
           device_name: typeof navigator !== "undefined" ? `${navigator.platform} Browser` : "Web Terminal",
         }),
       });
@@ -497,14 +504,47 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         };
       }
 
+      // If upstream previously succeeded during a client/proxy timeout (504), automatically recover session
+      if (!res.ok && data.error_code === "CHALLENGE_ALREADY_USED" && data.can_recover && !isRecovery) {
+        return verifyEmailOTP(challengeId, otp, true);
+      }
+
+      const status = res.status;
+      const errorCode = data.error_code || data.error?.code || (status === 504 ? "GATEWAY_TIMEOUT" : undefined);
+      let errorMessage = data.message || data.error?.message || data.error;
+
+      if (!errorMessage || status === 504 || errorCode === "GATEWAY_TIMEOUT") {
+        if (status === 504 || errorCode === "GATEWAY_TIMEOUT") {
+          errorMessage = "Verification request timed out. Please tap Verify again to continue.";
+        } else if (status === 503 || errorCode === "SERVICE_UNAVAILABLE" || errorCode === "BACKEND_UNAVAILABLE") {
+          errorMessage = "Authentication service is temporarily unavailable. Please try again shortly.";
+        } else if (status === 429 || errorCode === "MAX_ATTEMPTS_EXCEEDED") {
+          errorMessage = "Maximum verification attempts exceeded. Please request a new code.";
+        } else if (errorCode === "SUPERSEDED_BY_NEWER_CODE") {
+          errorMessage = "A newer verification code was requested. Please use the latest code sent to your email.";
+        } else if (errorCode === "CHALLENGE_ALREADY_USED") {
+          errorMessage = "This verification code has already been used. Please request a new code.";
+        } else if (errorCode === "CHALLENGE_EXPIRED") {
+          errorMessage = "Verification code has expired. Please request a new code.";
+        } else if (status === 401 || errorCode === "INVALID_OTP") {
+          errorMessage = "Incorrect verification code. Please check and try again.";
+        } else {
+          errorMessage = "Invalid or expired verification code.";
+        }
+      }
+
       return {
         success: false,
-        error: data.message || "Invalid or expired verification code.",
+        error: errorMessage,
+        errorCode,
+        statusCode: status,
       };
     } catch (err: any) {
       return {
         success: false,
         error: err?.message || "Failed to reach authentication server.",
+        errorCode: "NETWORK_ERROR",
+        statusCode: 0,
       };
     }
   };

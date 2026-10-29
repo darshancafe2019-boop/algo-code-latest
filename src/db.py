@@ -856,7 +856,7 @@ def safe_execute(sql: str, params: tuple = ()) -> bool:
         if pool is not None:
             pg_sql = translate_sqlite_sql_to_postgres(sql)
             is_ddl = sql.strip().upper().startswith(("CREATE ", "ALTER ", "DROP ", "VACUUM"))
-            checkout_timeout = float(os.getenv("PG_POOL_CHECKOUT_TIMEOUT", "8.0"))
+            checkout_timeout = float(os.getenv("PG_POOL_CHECKOUT_TIMEOUT", "1.5"))
             for attempt in range(2):
                 try:
                     with pool.connection(timeout=checkout_timeout) as conn:
@@ -12860,36 +12860,47 @@ def log_security_audit_event(
     details: Optional[Dict[str, Any]] = None,
     request_id: str = ""
 ) -> str:
-    """Logs an immutable security audit event."""
+    """Logs an immutable security audit event asynchronously without blocking caller."""
     event_id = f"sec-{uuid.uuid4().hex[:12]}"
     now_iso = datetime.now(timezone.utc).isoformat()
     details_str = json.dumps(details or {})
 
-    safe_execute(
-        """
+    sql = """
         INSERT INTO security_audit_events (
             event_id, timestamp_utc, actor_user_id, actor_role, action,
             resource_type, resource_id, result, assurance_level, ip_address,
             user_agent, details_json, request_id, created_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        (
-            event_id,
-            now_iso,
-            actor_user_id,
-            actor_role,
-            action,
-            resource_type,
-            resource_id,
-            result,
-            assurance_level,
-            ip_address,
-            user_agent,
-            details_str,
-            request_id,
-            now_iso,
-        )
+    """
+    params = (
+        event_id,
+        now_iso,
+        actor_user_id,
+        actor_role,
+        action,
+        resource_type,
+        resource_id,
+        result,
+        assurance_level,
+        ip_address,
+        user_agent,
+        details_str,
+        request_id,
+        now_iso,
     )
+
+    try:
+        t = threading.Thread(
+            target=safe_execute,
+            args=(sql, params),
+            name=f"audit-{event_id}",
+            daemon=True
+        )
+        t.start()
+    except Exception as exc:
+        logger.warning("Failed to dispatch async security audit event: %s", exc)
+        safe_execute(sql, params)
+
     return event_id
 
 

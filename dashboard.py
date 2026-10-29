@@ -14312,6 +14312,10 @@ def api_auth_diagnostics():
         return jsonify(diag), 500
 
 
+_RECENT_VERIFIED_CHALLENGES_LOCK = threading.Lock()
+_RECENT_VERIFIED_CHALLENGES: Dict[str, Dict[str, Any]] = {}
+
+
 @app.route("/api/auth/email-otp/verify", methods=["POST"])
 @app.route("/api/auth/verify-otp", methods=["POST"])
 def api_auth_email_otp_verify():
@@ -14321,7 +14325,9 @@ def api_auth_email_otp_verify():
     Accepts challenge_id or normalized email.
     Enforces ACTIVE state, 5-minute expiration, single-use consumption, maximum 5 attempts,
     creates the authenticated session, and sets the HttpOnly session cookie.
+    Includes idempotent recovery for client/proxy timeouts (504 resilience).
     """
+    t_start = time.perf_counter()
     request_id = f"req_{secrets.token_hex(6)}"
     client_ip = request.remote_addr or "127.0.0.1"
 
@@ -14346,8 +14352,10 @@ def api_auth_email_otp_verify():
     if not challenge and email_input:
         challenge = db.get_active_auth_otp_challenge_by_email(email_input, "LOGIN")
 
+    t_lookup_ms = round((time.perf_counter() - t_start) * 1000, 2)
+
     if not challenge or challenge.get("purpose") != "LOGIN":
-        logger.warning("[OTP] [OTP_VERIFICATION_FAILED] Challenge not found or purpose mismatch for request_id=%s", request_id)
+        logger.warning("[OTP] [OTP_VERIFICATION_FAILED] Challenge not found or purpose mismatch for request_id=%s [lookup_ms=%.2f]", request_id, t_lookup_ms)
         return jsonify({
             "status": "error",
             "success": False,
@@ -14405,11 +14413,117 @@ def api_auth_email_otp_verify():
         }), 429
 
     if chal_status == "USED" or challenge.get("used_at"):
-        logger.warning("[OTP] [OTP_VERIFICATION_FAILED] Challenge already used: %s", actual_challenge_id)
+        # Check for idempotent recovery: client or proxy timed out (e.g. 504 Gateway Timeout),
+        # but verification previously completed in backend.
+        is_recovery_request = bool(
+            data.get("recovery") or
+            data.get("is_retry") or
+            request.headers.get("X-Auth-Recovery") == "true" or
+            request.headers.get("X-Idempotent-Recovery") == "true"
+        )
+        now_ts = time.time()
+        is_hash_match = hmac.compare_digest(code_hash, challenge.get("otp_hash", ""))
+
+        used_at_str = challenge.get("used_at")
+        is_recent_use = False
+        if used_at_str:
+            try:
+                used_dt = datetime.fromisoformat(used_at_str)
+                if used_dt.tzinfo is None:
+                    used_dt = used_dt.replace(tzinfo=timezone.utc)
+                is_recent_use = (datetime.now(timezone.utc) - used_dt).total_seconds() <= 120
+            except Exception:
+                pass
+
+        cached_entry = None
+        with _RECENT_VERIFIED_CHALLENGES_LOCK:
+            cached = _RECENT_VERIFIED_CHALLENGES.get(actual_challenge_id)
+            if cached and (now_ts - cached.get("timestamp", 0) <= 120):
+                cached_entry = cached
+
+        can_recover = is_hash_match and (cached_entry is not None or is_recent_use)
+
+        if can_recover and is_recovery_request:
+            if cached_entry and hmac.compare_digest(code_hash, cached_entry.get("otp_hash", "")):
+                logger.info("[OTP_IDEMPOTENT_REPLAY] Replaying cached session for challenge %s [req_id=%s]", actual_challenge_id, request_id)
+                user_data = cached_entry["user"]
+                session_data = cached_entry["session"]
+                raw_token = cached_entry["raw_token"]
+                is_https = request.is_secure or (request.headers.get("X-Forwarded-Proto") == "https")
+                resp = make_response(jsonify({
+                    "status": "success",
+                    "success": True,
+                    "message": "Authentication successful.",
+                    "user": user_data,
+                    "session": session_data,
+                    "session_token": raw_token,
+                    "request_id": request_id,
+                    "recovered": True
+                }))
+                cookie_kwargs = {
+                    "httponly": True,
+                    "samesite": "Lax",
+                    "secure": is_https,
+                    "max_age": get_daily_cookie_max_age(),
+                    "path": "/"
+                }
+                resp.set_cookie("algo_session_token", raw_token, **cookie_kwargs)
+                resp.set_cookie("quantos_session_token", raw_token, **cookie_kwargs)
+                return resp
+            else:
+                user = db.get_user_by_id(challenge["user_id"])
+                if user and user.get("is_active"):
+                    logger.info("[OTP_IDEMPOTENT_DB_RECOVERY] Re-issuing active session for recently consumed challenge %s [req_id=%s]", actual_challenge_id, request_id)
+                    raw_token, session_dict = SessionManager.create_session(
+                        user_id=user["id"],
+                        device_name=device_name,
+                        ip_address=client_ip,
+                        user_agent=request.headers.get("User-Agent", "")
+                    )
+                    user_payload = {
+                        "id": user["id"],
+                        "username": user["username"],
+                        "email": user["email"],
+                        "role": user.get("role", "ADMIN"),
+                        "is_2fa_enabled": bool(user.get("is_2fa_enabled")),
+                        "must_change_password": bool(user.get("must_change_password", 0)),
+                    }
+                    with _RECENT_VERIFIED_CHALLENGES_LOCK:
+                        _RECENT_VERIFIED_CHALLENGES[actual_challenge_id] = {
+                            "otp_hash": code_hash,
+                            "user": user_payload,
+                            "session": session_dict,
+                            "raw_token": raw_token,
+                            "timestamp": time.time(),
+                        }
+                    is_https = request.is_secure or (request.headers.get("X-Forwarded-Proto") == "https")
+                    resp = make_response(jsonify({
+                        "status": "success",
+                        "success": True,
+                        "message": "Authentication successful.",
+                        "user": user_payload,
+                        "session": session_dict,
+                        "session_token": raw_token,
+                        "request_id": request_id,
+                        "recovered": True
+                    }))
+                    cookie_kwargs = {
+                        "httponly": True,
+                        "samesite": "Lax",
+                        "secure": is_https,
+                        "max_age": get_daily_cookie_max_age(),
+                        "path": "/"
+                    }
+                    resp.set_cookie("algo_session_token", raw_token, **cookie_kwargs)
+                    resp.set_cookie("quantos_session_token", raw_token, **cookie_kwargs)
+                    return resp
+
+        logger.warning("[OTP] [OTP_VERIFICATION_FAILED] Challenge already used: %s (can_recover=%s)", actual_challenge_id, can_recover)
         return jsonify({
             "status": "error",
             "success": False,
             "error_code": "CHALLENGE_ALREADY_USED",
+            "can_recover": can_recover,
             "message": "This verification code has already been used. Please request a new code.",
             "request_id": request_id
         }), 400
@@ -14503,6 +14617,7 @@ def api_auth_email_otp_verify():
         }), 401
 
     # Consume atomically so concurrent requests cannot reuse the same code.
+    t_before_consume = time.perf_counter()
     try:
         consumed = db.consume_auth_otp_challenge(actual_challenge_id)
     except Exception:
@@ -14515,15 +14630,42 @@ def api_auth_email_otp_verify():
             "message": "Authentication challenge is invalid or has expired. Please sign in again.",
             "request_id": request_id
         }), 400
-    logger.info("[OTP] Verification successful for user=%s [Challenge ID: %s]", user["username"], actual_challenge_id)
+    t_consume_ms = round((time.perf_counter() - t_before_consume) * 1000, 2)
+    logger.info("[OTP] Verification successful for user=%s [Challenge ID: %s, consume_ms=%.2f]", user["username"], actual_challenge_id, t_consume_ms)
 
     # Issue Authenticated Session
+    t_before_session = time.perf_counter()
     raw_token, session_dict = SessionManager.create_session(
         user_id=user["id"],
         device_name=device_name,
         ip_address=client_ip,
         user_agent=request.headers.get("User-Agent", "")
     )
+    t_session_ms = round((time.perf_counter() - t_before_session) * 1000, 2)
+
+    user_payload = {
+        "id": user["id"],
+        "username": user["username"],
+        "email": user["email"],
+        "role": user.get("role", "ADMIN"),
+        "is_2fa_enabled": bool(user.get("is_2fa_enabled")),
+        "must_change_password": bool(user.get("must_change_password", 0)),
+    }
+
+    # Store in recent cache for idempotent recovery in case of client/proxy timeouts
+    now_ts = time.time()
+    with _RECENT_VERIFIED_CHALLENGES_LOCK:
+        # Prune old entries
+        expired_keys = [k for k, v in _RECENT_VERIFIED_CHALLENGES.items() if now_ts - v.get("timestamp", 0) > 300]
+        for k in expired_keys:
+            _RECENT_VERIFIED_CHALLENGES.pop(k, None)
+        _RECENT_VERIFIED_CHALLENGES[actual_challenge_id] = {
+            "otp_hash": code_hash,
+            "user": user_payload,
+            "session": session_dict,
+            "raw_token": raw_token,
+            "timestamp": now_ts,
+        }
 
     db.log_security_audit_event(
         action="LOGIN_EMAIL_OTP_SUCCESS",
@@ -14541,19 +14683,18 @@ def api_auth_email_otp_verify():
     except Exception:
         pass
 
+    t_total_ms = round((time.perf_counter() - t_start) * 1000, 2)
+    logger.info(
+        "[OTP_VERIFY_TIMING] req_id=%s total_ms=%.2f lookup_ms=%.2f consume_ms=%.2f session_ms=%.2f user_id=%s",
+        request_id, t_total_ms, t_lookup_ms, t_consume_ms, t_session_ms, user.get("id", "unknown")
+    )
+
     is_https = request.is_secure or (request.headers.get("X-Forwarded-Proto") == "https")
     resp = make_response(jsonify({
         "status": "success",
         "success": True,
         "message": "Authentication successful.",
-        "user": {
-            "id": user["id"],
-            "username": user["username"],
-            "email": user["email"],
-            "role": user.get("role", "ADMIN"),
-            "is_2fa_enabled": bool(user.get("is_2fa_enabled")),
-            "must_change_password": bool(user.get("must_change_password", 0)),
-        },
+        "user": user_payload,
         "session": session_dict,
         "session_token": raw_token,
         "request_id": request_id

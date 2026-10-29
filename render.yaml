@@ -39,7 +39,7 @@ services:
       - key: AUTH_BOOTSTRAP_EMAIL
         sync: false
       - key: AUTH_EMAIL_FROM
-        value: onboarding@resend.dev
+        sync: false
       - key: DATABASE_URL
         sync: false
       - key: RESEND_API_KEY

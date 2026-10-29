@@ -13,6 +13,7 @@ import json
 import logging
 import os
 import smtplib
+import time
 import uuid
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
@@ -28,11 +29,23 @@ logger = logging.getLogger("email_service")
 
 
 def _has_valid_production_sender() -> bool:
+    provider = (config.EMAIL_PROVIDER or "").strip().lower()
+    sender = (
+        os.getenv("OTP_FROM_EMAIL", "").strip()
+        or os.getenv("AUTH_EMAIL_FROM", "").strip()
+        or os.getenv("RESEND_FROM_EMAIL", "").strip()
+        or getattr(config, "OTP_FROM_EMAIL", "")
+        or getattr(config, "AUTH_EMAIL_FROM", "")
+        or getattr(config, "RESEND_FROM_EMAIL", "")
+        or ""
+    )
+    if not sender and provider == "resend":
+        # Resend provides standard sandbox sender onboarding@resend.dev for verified owner delivery
+        return True
     sender_is_explicit = any(
         os.getenv(name, "").strip()
         for name in ("OTP_FROM_EMAIL", "AUTH_EMAIL_FROM", "RESEND_FROM_EMAIL")
-    )
-    sender = config.OTP_FROM_EMAIL or config.AUTH_EMAIL_FROM or config.RESEND_FROM_EMAIL or ""
+    ) or (provider == "resend" and not sender)
     sender_address = parseaddr(sender)[1]
     return (
         sender_is_explicit
@@ -242,12 +255,42 @@ class ResendEmailProvider(BaseEmailProvider):
                 "text": text_content,
             }
             
-            executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-            try:
-                future = executor.submit(resend.Emails.send, params)
-                resp = future.result(timeout=3.5)
-            finally:
-                executor.shutdown(wait=False, cancel_futures=True)
+            t0 = time.monotonic()
+            resp = None
+            last_err = None
+            max_attempts = 2
+
+            for attempt in range(1, max_attempts + 1):
+                attempt_timeout = 7.0 if attempt == 1 else 4.0
+                executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+                try:
+                    future = executor.submit(resend.Emails.send, params)
+                    resp = future.result(timeout=attempt_timeout)
+                    break
+                except (concurrent.futures.TimeoutError, TimeoutError) as to_err:
+                    last_err = to_err
+                    logger.warning("[OTP] [RESEND_TIMEOUT_ATTEMPT] Resend attempt %d timed out after %.1fs", attempt, attempt_timeout)
+                    if attempt == max_attempts:
+                        break
+                except Exception as ex:
+                    last_err = ex
+                    err_lower = str(ex).lower()
+                    if any(c in err_lower for c in ("api key", "unauthorized", "401", "403", "restricted", "unverified", "422")):
+                        raise
+                    logger.warning("[OTP] [RESEND_RETRYABLE_ERROR] Resend attempt %d failed: %s", attempt, ex)
+                    if attempt == max_attempts:
+                        raise
+                finally:
+                    executor.shutdown(wait=False, cancel_futures=True)
+
+            if resp is None:
+                if isinstance(last_err, (concurrent.futures.TimeoutError, TimeoutError)):
+                    elapsed_ms = (time.monotonic() - t0) * 1000
+                    logger.error("[OTP] [RESEND_TIMEOUT] Resend email delivery timed out after retries (elapsed=%.1fms)", elapsed_ms)
+                    return False, "Email delivery timed out. Please try again.", None
+                raise last_err or RuntimeError("Resend dispatch failed with unknown error")
+
+            elapsed_ms = (time.monotonic() - t0) * 1000
 
             # Robust response inspection: ensure msg_id is present and no error dict was returned
             msg_id = None
@@ -264,11 +307,12 @@ class ResendEmailProvider(BaseEmailProvider):
                 logger.error("[OTP] [RESEND_NO_MESSAGE_ID] Resend response did not contain a valid message ID: %s", resp)
                 return False, "Resend did not return a valid message ID.", None
 
+            logger.info("[RESEND_DISPATCH_TIMING] latency_ms=%.1f msg_id=%s recipient=%s", elapsed_ms, msg_id, mask_email_address(clean_to))
             logger.info("[OTP] Resend message ID: %s", msg_id)
             logger.info("[OTP] Email accepted by Resend for recipient: %s", mask_email_address(clean_to))
             return True, None, str(msg_id)
         except (concurrent.futures.TimeoutError, TimeoutError):
-            logger.error("[OTP] [RESEND_TIMEOUT] Resend email delivery timed out after 3.5s")
+            logger.error("[OTP] [RESEND_TIMEOUT] Resend email delivery timed out")
             return False, "Email delivery timed out. Please try again.", None
         except Exception as e:
             err_str = str(e).lower()

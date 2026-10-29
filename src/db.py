@@ -12365,7 +12365,7 @@ def activate_auth_otp_challenge(
                 provider_message_id = ?,
                 provider_status = ?,
                 activated_at = ?
-            WHERE id = ? AND user_id = ? AND purpose = ? AND status = 'PENDING'
+            WHERE id = ? AND user_id = ? AND purpose = ? AND status IN ('PENDING', 'ACTIVE')
             """,
             (provider_message_id, provider_status, now_iso, challenge_id, user_id, purpose),
         )
@@ -12375,7 +12375,7 @@ def activate_auth_otp_challenge(
             """
             UPDATE auth_otp_challenges
             SET status = 'INVALIDATED'
-            WHERE user_id = ? AND purpose = ? AND status = 'ACTIVE' AND id != ?
+            WHERE user_id = ? AND purpose = ? AND status IN ('ACTIVE', 'PENDING') AND id != ?
             """,
             (user_id, purpose, challenge_id),
         )
@@ -12412,7 +12412,7 @@ def get_active_auth_otp_challenge_by_email(email: str, purpose: str = "LOGIN") -
     rows = safe_query(
         """
         SELECT * FROM auth_otp_challenges 
-        WHERE LOWER(TRIM(recipient_email)) = ? AND purpose = ? AND status = 'ACTIVE'
+        WHERE LOWER(TRIM(recipient_email)) = ? AND purpose = ? AND status IN ('ACTIVE', 'PENDING')
         ORDER BY created_at DESC LIMIT 1
         """,
         (clean_email, purpose)
@@ -12460,7 +12460,7 @@ def consume_auth_otp_challenge(challenge_id: str, now_iso: Optional[str] = None)
             """
             UPDATE auth_otp_challenges
             SET status = 'USED', used_at = ?, verified_at = ?
-            WHERE id = ? AND status = 'ACTIVE' AND used_at IS NULL
+            WHERE id = ? AND status IN ('ACTIVE', 'PENDING', 'SEND_FAILED') AND used_at IS NULL
               AND expires_at > ? AND attempt_count < 5
             """,
             (consumed_at, consumed_at, challenge_id, consumed_at),
@@ -12472,6 +12472,21 @@ def consume_auth_otp_challenge(challenge_id: str, now_iso: Optional[str] = None)
             (consumed_at, challenge_id),
         )
     return True
+
+
+@with_db_retry(max_retries=5)
+def mark_auth_otp_challenge_recovered(challenge_id: str) -> bool:
+    """Atomically marks a USED challenge as RECOVERED once to prevent replay abuse. Returns True if row was updated."""
+    with get_authoritative_connection() as conn:
+        result = conn.execute(
+            """
+            UPDATE auth_otp_challenges
+            SET provider_status = 'RECOVERED'
+            WHERE id = ? AND status = 'USED' AND (provider_status IS NULL OR provider_status != 'RECOVERED')
+            """,
+            (challenge_id,),
+        )
+        return getattr(result, "rowcount", 0) == 1
 
 
 def invalidate_user_auth_otp_challenges(user_id: str, purpose: str) -> bool:

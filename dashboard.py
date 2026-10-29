@@ -14372,12 +14372,12 @@ def api_auth_email_otp_verify():
     code_hash = hashlib.sha256(code.encode("utf-8")).hexdigest()
 
     if chal_status == "INVALIDATED":
-        # Check if this user has an ACTIVE challenge
+        # Check if this user has an ACTIVE or PENDING challenge
         user_id = challenge.get("user_id")
         active_chal = None
         if user_id:
             active_rows = db.safe_query(
-                "SELECT * FROM auth_otp_challenges WHERE user_id = ? AND purpose = 'LOGIN' AND status = 'ACTIVE' ORDER BY created_at DESC LIMIT 1",
+                "SELECT * FROM auth_otp_challenges WHERE user_id = ? AND purpose = 'LOGIN' AND status IN ('ACTIVE', 'PENDING') ORDER BY created_at DESC LIMIT 1",
                 (user_id,)
             )
             if active_rows:
@@ -14431,24 +14431,42 @@ def api_auth_email_otp_verify():
                 used_dt = datetime.fromisoformat(used_at_str)
                 if used_dt.tzinfo is None:
                     used_dt = used_dt.replace(tzinfo=timezone.utc)
-                is_recent_use = (datetime.now(timezone.utc) - used_dt).total_seconds() <= 120
+                # Strict 60-second recovery window
+                is_recent_use = (datetime.now(timezone.utc) - used_dt).total_seconds() <= 60
             except Exception:
                 pass
 
         cached_entry = None
         with _RECENT_VERIFIED_CHALLENGES_LOCK:
             cached = _RECENT_VERIFIED_CHALLENGES.get(actual_challenge_id)
-            if cached and (now_ts - cached.get("timestamp", 0) <= 120):
+            if cached and (now_ts - cached.get("timestamp", 0) <= 60):
                 cached_entry = cached
 
-        can_recover = is_hash_match and (cached_entry is not None or is_recent_use)
+        is_already_recovered = (challenge.get("provider_status") == "RECOVERED")
+        can_recover = is_hash_match and not is_already_recovered and (cached_entry is not None or is_recent_use)
 
         if can_recover and is_recovery_request:
+            # Atomic single-use recovery: mark provider_status = 'RECOVERED'
+            recovery_ok = db.mark_auth_otp_challenge_recovered(actual_challenge_id)
+            if not recovery_ok:
+                logger.warning("[OTP_RECOVERY_REJECTED] Challenge %s already recovered or cannot transition to RECOVERED", actual_challenge_id)
+                return jsonify({
+                    "status": "error",
+                    "success": False,
+                    "error_code": "CHALLENGE_ALREADY_USED",
+                    "can_recover": False,
+                    "message": "This verification code has already been consumed. Please request a new code.",
+                    "request_id": request_id
+                }), 400
+
             if cached_entry and hmac.compare_digest(code_hash, cached_entry.get("otp_hash", "")):
                 logger.info("[OTP_IDEMPOTENT_REPLAY] Replaying cached session for challenge %s [req_id=%s]", actual_challenge_id, request_id)
                 user_data = cached_entry["user"]
                 session_data = cached_entry["session"]
                 raw_token = cached_entry["raw_token"]
+                with _RECENT_VERIFIED_CHALLENGES_LOCK:
+                    _RECENT_VERIFIED_CHALLENGES.pop(actual_challenge_id, None)
+
                 is_https = request.is_secure or (request.headers.get("X-Forwarded-Proto") == "https")
                 resp = make_response(jsonify({
                     "status": "success",
@@ -14488,14 +14506,6 @@ def api_auth_email_otp_verify():
                         "is_2fa_enabled": bool(user.get("is_2fa_enabled")),
                         "must_change_password": bool(user.get("must_change_password", 0)),
                     }
-                    with _RECENT_VERIFIED_CHALLENGES_LOCK:
-                        _RECENT_VERIFIED_CHALLENGES[actual_challenge_id] = {
-                            "otp_hash": code_hash,
-                            "user": user_payload,
-                            "session": session_dict,
-                            "raw_token": raw_token,
-                            "timestamp": time.time(),
-                        }
                     is_https = request.is_secure or (request.headers.get("X-Forwarded-Proto") == "https")
                     resp = make_response(jsonify({
                         "status": "success",
@@ -14528,8 +14538,8 @@ def api_auth_email_otp_verify():
             "request_id": request_id
         }), 400
 
-    if chal_status != "ACTIVE":
-        logger.warning("[OTP] [OTP_VERIFICATION_FAILED] Challenge status is %s (not ACTIVE): %s", chal_status, actual_challenge_id)
+    if chal_status not in ("ACTIVE", "PENDING", "SEND_FAILED"):
+        logger.warning("[OTP] [OTP_VERIFICATION_FAILED] Challenge status is %s: %s", chal_status, actual_challenge_id)
         return jsonify({
             "status": "error",
             "success": False,
@@ -14813,7 +14823,7 @@ def api_auth_email_otp_resend():
         user_email = (user.get("email") or "").strip().lower()
 
     # Generate fresh cryptographically secure 6-digit OTP
-    expiry_mins = 10 if purpose == "PASSWORD_RESET" else 5
+    expiry_mins = 10
     otp_code = f"{secrets.randbelow(1_000_000):06d}"
     otp_hash = hashlib.sha256(otp_code.encode("utf-8")).hexdigest()
     new_challenge_id = f"chall_{secrets.token_urlsafe(24)}"

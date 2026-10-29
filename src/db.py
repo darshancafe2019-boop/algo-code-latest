@@ -308,28 +308,107 @@ def _record_pg_success():
     _pg_consecutive_failures = 0
 
 
-def _robust_check_connection(conn) -> None:
+_direct_pg_semaphore = threading.Semaphore(4)
+_direct_fallback_count = 0
+
+
+class BoundedDirectPgConnection:
+    """Wrapper that ensures direct fallback connections release the semaphore on close."""
+    def __init__(self, conn, sem):
+        self._conn = conn
+        self._sem = sem
+        self._released = False
+
+    def __getattr__(self, name):
+        return getattr(self._conn, name)
+
+    def close(self):
+        try:
+            if not getattr(self._conn, "closed", True):
+                self._conn.close()
+        finally:
+            if not self._released:
+                self._released = True
+                self._sem.release()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+
+
+def _acquire_direct_pg_connection(timeout: float = 3.0):
+    """
+    Acquires a bounded direct PostgreSQL connection to prevent connection storms.
+    Limits concurrent fallback connections to 4 process-wide.
+    """
+    global _direct_fallback_count
+    clean_url = _get_pg_clean_url()
+    if not clean_url:
+        raise RuntimeError("Authoritative PostgreSQL connection URL unavailable")
+
+    acquired = _direct_pg_semaphore.acquire(timeout=timeout)
+    if not acquired:
+        logger.error("Direct connection limit reached (max 4 concurrent fallbacks saturated).")
+        raise RuntimeError("PostgreSQL direct connection capacity saturated")
+
+    try:
+        import psycopg
+        conn = psycopg.connect(
+            clean_url,
+            connect_timeout=min(int(timeout), 4),
+            keepalives=1,
+            keepalives_idle=30,
+            keepalives_interval=10,
+            keepalives_count=3,
+        )
+        _direct_fallback_count += 1
+        return BoundedDirectPgConnection(conn, _direct_pg_semaphore)
+    except Exception as exc:
+        _direct_pg_semaphore.release()
+        raise exc
+
+
+def _fast_check_connection(conn) -> None:
     """Probes a connection's health before handing it out from the pool.
-    If the socket was severed or corrupted by Neon SSL drops, it explicitly closes
-    the broken connection so psycopg_pool discards it and spawns a fresh replacement.
-    Ensures connection remains in clean IDLE transaction state.
+    Fast in-memory check without incurring a costly 200ms network round-trip on every checkout.
+    Only sends a wire test if the connection has been idle for > 45 seconds or transaction state is dirty.
     """
     try:
-        if getattr(conn, "closed", False):
-            raise RuntimeError("Connection is closed")
-        with conn.cursor() as cur:
-            cur.execute("SELECT 1;")
-        if not getattr(conn, "autocommit", False):
+        if getattr(conn, "closed", False) or getattr(conn, "broken", False):
+            raise RuntimeError("Connection is closed or broken")
+
+        status = getattr(conn.info, "transaction_status", None)
+        if status is not None and status != 0:  # 0 is IDLE
             try:
                 conn.rollback()
             except Exception:
-                pass
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+                raise RuntimeError(f"Connection transaction status dirty ({status}), closed")
+
+        now = time.monotonic()
+        last_used = getattr(conn, "_last_checked_at", 0.0)
+        if now - last_used > 45.0:
+            with conn.cursor() as cur:
+                cur.execute("SELECT 1;")
+            setattr(conn, "_last_checked_at", now)
+        else:
+            setattr(conn, "_last_checked_at", now)
     except Exception as check_err:
         try:
             conn.close()
         except Exception:
             pass
         raise check_err
+
+
+def _robust_check_connection(conn) -> None:
+    """Legacy alias for backward compatibility."""
+    _fast_check_connection(conn)
 
 
 def _get_pg_clean_url() -> Optional[str]:
@@ -357,8 +436,8 @@ def get_db_pool():
             if _pg_pool is None and (getattr(config, "IS_PRODUCTION", False) or time.time() >= _pg_circuit_broken_until):
                 try:
                     from psycopg_pool import ConnectionPool
-                    min_conns = int(os.getenv("PG_POOL_MIN", "4"))
-                    max_conns = int(os.getenv("PG_POOL_MAX", "20"))
+                    min_conns = int(os.getenv("PG_POOL_MIN", "5"))
+                    max_conns = int(os.getenv("PG_POOL_MAX", "25"))
                     _pg_pool = ConnectionPool(
                         conninfo=clean_conninfo,
                         min_size=min_conns,
@@ -367,7 +446,7 @@ def get_db_pool():
                         max_idle=300.0,
                         max_lifetime=600.0,
                         reconnect_timeout=15.0,
-                        check=_robust_check_connection,
+                        check=_fast_check_connection,
                         open=True,
                         kwargs={
                             "autocommit": True,
@@ -378,7 +457,7 @@ def get_db_pool():
                             "keepalives_count": 3,
                         }
                     )
-                    logger.info("Initialized cloud-hardened PostgreSQL ConnectionPool (min=%d, max=%d, check=robust)", min_conns, max_conns)
+                    logger.info("Initialized cloud-hardened PostgreSQL ConnectionPool (min=%d, max=%d, check=fast)", min_conns, max_conns)
                 except Exception as e:
                     logger.exception("Failed to initialize PostgreSQL ConnectionPool: %s", e)
                     _trip_pg_circuit_breaker(60.0, str(e))
@@ -407,17 +486,20 @@ def get_db_pool_stats() -> Dict[str, Any]:
                 pass
         stats = pool.get_stats() if hasattr(pool, "get_stats") else {}
         active_waiting_count = len(getattr(pool, "_waiting", [])) if hasattr(pool, "_waiting") else stats.get("requests_waiting", 0)
+        direct_active = 4 - _direct_pg_semaphore._value if hasattr(_direct_pg_semaphore, "_value") else 0
         return {
             "configured": True,
             "engine": "postgresql",
             "pool_min": stats.get("pool_min", 1),
-            "pool_max": stats.get("pool_max", 20),
+            "pool_max": stats.get("pool_max", 25),
             "pool_size": stats.get("pool_size", 0),
             "pool_available": stats.get("pool_available", 0),
             "requests_waiting": active_waiting_count,
             "requests_queued": stats.get("requests_queued", active_waiting_count),
             "connection_errors": stats.get("errors", 0),
             "usage_ms": stats.get("usage_ms", 0),
+            "direct_fallback_count": _direct_fallback_count,
+            "direct_fallback_active": max(0, direct_active),
         }
     except Exception as e:
         return {"configured": True, "error": type(e).__name__}
@@ -700,7 +782,7 @@ def get_authoritative_connection():
         pool_failed = False
         last_pool_exc = None
         if pool is not None:
-            checkout_timeout = float(os.getenv("PG_POOL_CHECKOUT_TIMEOUT", "2.5"))
+            checkout_timeout = float(os.getenv("PG_POOL_CHECKOUT_TIMEOUT", "1.5"))
             try:
                 with pool.connection(timeout=checkout_timeout) as conn:
                     adapter = PostgresConnectionAdapter(conn)
@@ -723,24 +805,23 @@ def get_authoritative_connection():
 
         clean_url = _get_pg_clean_url()
         if clean_url and (pool is None or pool_failed or getattr(config, "IS_PRODUCTION", False) or time.time() >= _pg_circuit_broken_until):
-            import psycopg
-            conn = psycopg.connect(clean_url, connect_timeout=3, keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=3)
+            direct_conn = _acquire_direct_pg_connection(timeout=3.0)
             try:
-                adapter = PostgresConnectionAdapter(conn)
+                adapter = PostgresConnectionAdapter(direct_conn)
                 yield adapter
-                if not getattr(conn, "autocommit", False):
-                    conn.commit()
+                if not getattr(direct_conn, "autocommit", False):
+                    direct_conn.commit()
                 return
             except Exception:
                 try:
-                    if not getattr(conn, "autocommit", False):
-                        conn.rollback()
+                    if not getattr(direct_conn, "autocommit", False):
+                        direct_conn.rollback()
                 except Exception:
                     pass
                 raise
             finally:
                 try:
-                    conn.close()
+                    direct_conn.close()
                 except Exception:
                     pass
 
@@ -825,9 +906,8 @@ def safe_execute(sql: str, params: tuple = ()) -> bool:
             clean_url = _get_pg_clean_url()
             if clean_url:
                 try:
-                    import psycopg
-                    logger.warning("Falling back to direct psycopg.connect for execute after pool error: %s", last_exc)
-                    with psycopg.connect(clean_url, connect_timeout=10, keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=3) as direct_conn:
+                    logger.warning("Falling back to bounded direct psycopg connection for execute after pool error: %s", last_exc)
+                    with _acquire_direct_pg_connection(timeout=4.0) as direct_conn:
                         with direct_conn.transaction():
                             with direct_conn.cursor() as cur:
                                 getattr(cur, "execute")(pg_sql, params)
@@ -839,20 +919,15 @@ def safe_execute(sql: str, params: tuple = ()) -> bool:
             if getattr(config, "IS_PRODUCTION", False):
                 raise RuntimeError(f"Database execute failed on authoritative PostgreSQL engine: {last_exc}")
             return False
-        elif getattr(config, "DATABASE_URL", None) and (getattr(config, "IS_PRODUCTION", False) or time.time() >= _pg_circuit_broken_until):
+        elif _get_pg_clean_url() and (getattr(config, "IS_PRODUCTION", False) or time.time() >= _pg_circuit_broken_until):
             try:
-                import psycopg
                 pg_sql = translate_sqlite_sql_to_postgres(sql)
-                clean_url = str(config.DATABASE_URL).strip().strip("'\"")
-                conn = psycopg.connect(clean_url, connect_timeout=10, keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=3)
-                try:
+                with _acquire_direct_pg_connection(timeout=4.0) as conn:
                     with conn.transaction():
                         with conn.cursor() as cur:
                             getattr(cur, "execute")(pg_sql, params)
-                    _record_pg_success()
-                    return True
-                finally:
-                    conn.close()
+                _record_pg_success()
+                return True
             except Exception as e:
                 _trip_pg_circuit_breaker(60.0, str(e))
                 logger.exception("Direct PostgreSQL execute failed: %s", e)
@@ -902,7 +977,7 @@ def safe_query(sql: str, params: tuple = ()) -> list:
         pool = get_db_pool()
         if pool is not None:
             pg_sql = translate_sqlite_sql_to_postgres(sql)
-            checkout_timeout = float(os.getenv("PG_POOL_CHECKOUT_TIMEOUT", "2.5"))
+            checkout_timeout = float(os.getenv("PG_POOL_CHECKOUT_TIMEOUT", "1.5"))
             for attempt in range(2):
                 try:
                     from psycopg.rows import dict_row
@@ -949,10 +1024,9 @@ def safe_query(sql: str, params: tuple = ()) -> list:
             clean_url = _get_pg_clean_url()
             if clean_url:
                 try:
-                    import psycopg
                     from psycopg.rows import dict_row
-                    logger.warning("Falling back to direct psycopg.connect for query after pool error: %s", last_exc)
-                    with psycopg.connect(clean_url, connect_timeout=3, keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=3) as direct_conn:
+                    logger.warning("Falling back to bounded direct psycopg connection for query after pool error: %s", last_exc)
+                    with _acquire_direct_pg_connection(timeout=3.0) as direct_conn:
                         with direct_conn.cursor(row_factory=dict_row) as cur:
                             getattr(cur, "execute")(pg_sql, params)
                             res = [sanitize_for_json(dict(r)) for r in cur.fetchall()]
@@ -964,20 +1038,18 @@ def safe_query(sql: str, params: tuple = ()) -> list:
             raise RuntimeError(f"Database query failed on authoritative PostgreSQL engine: {last_exc}")
         elif _get_pg_clean_url() and (getattr(config, "IS_PRODUCTION", False) or time.time() >= _pg_circuit_broken_until):
             try:
-                import psycopg
                 from psycopg.rows import dict_row
                 pg_sql = translate_sqlite_sql_to_postgres(sql)
-                clean_url = _get_pg_clean_url()
-                conn = psycopg.connect(clean_url, connect_timeout=3, keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=3)
-                try:
+                with _acquire_direct_pg_connection(timeout=3.0) as conn:
                     with conn.cursor(row_factory=dict_row) as cur:
                         getattr(cur, "execute")(pg_sql, params)
                         res = [sanitize_for_json(dict(r)) for r in cur.fetchall()]
-                    conn.commit()
-                    return res
-                finally:
-                    conn.close()
+                _record_pg_success()
+                return res
             except Exception as e:
+                _trip_pg_circuit_breaker(60.0, str(e))
+                logger.exception("Direct PostgreSQL query failed: %s", e)
+                raise RuntimeError(f"Direct PostgreSQL query failed: {e}")
                 _trip_pg_circuit_breaker(60.0, str(e))
                 logger.exception("Direct PostgreSQL query failed: %s", e)
                 raise RuntimeError(f"Direct PostgreSQL query failed: {e}")
@@ -1122,6 +1194,35 @@ def init_db(force: bool = False) -> None:
                                     getattr(cur, "execute")(idx_sql)
                                 except Exception:
                                     pass
+
+                            # Ensure sequences are attached to tables with integer/bigint 'id' without a default
+                            try:
+                                cur.execute("""
+                                    SELECT c.table_name
+                                    FROM information_schema.columns c
+                                    JOIN information_schema.tables t ON c.table_name = t.table_name
+                                    WHERE c.table_schema = 'public'
+                                      AND t.table_type = 'BASE TABLE'
+                                      AND c.column_name = 'id'
+                                      AND c.column_default IS NULL
+                                      AND c.data_type IN ('bigint', 'integer', 'smallint');
+                                """)
+                                missing_seqs = [r[0] for r in cur.fetchall()]
+                                for t_name in missing_seqs:
+                                    seq_name = f"{t_name}_id_seq"
+                                    cur.execute(f"CREATE SEQUENCE IF NOT EXISTS {seq_name};")
+                                    cur.execute(f"SELECT COALESCE(MAX(id), 0) + 1 FROM {t_name};")
+                                    next_val = cur.fetchone()[0]
+                                    cur.execute(f"ALTER SEQUENCE {seq_name} RESTART WITH {max(1, next_val)};")
+                                    cur.execute(f"ALTER TABLE {t_name} ALTER COLUMN id SET DEFAULT nextval('{seq_name}');")
+                                    try:
+                                        cur.execute(f"ALTER SEQUENCE {seq_name} OWNED BY {t_name}.id;")
+                                    except Exception:
+                                        pass
+                                if missing_seqs:
+                                    logger.info("Automatically generated and attached sequences for %d PostgreSQL tables: %s", len(missing_seqs), missing_seqs)
+                            except Exception as seq_err:
+                                logger.debug("PostgreSQL sequence check notice: %s", seq_err)
                         conn.commit()
                     logger.info("[OK] PostgreSQL database connection & critical tables verified.")
             except Exception as e:

@@ -354,6 +354,7 @@ TOTPManager.hash_recovery_code = RecoveryCodesManager.hash_recovery_code
 
 # In-memory fast validation cache: token_hash -> (cached_at_timestamp, session_dict)
 _SESSION_CACHE: Dict[str, Tuple[float, Dict[str, Any]]] = {}
+_NEGATIVE_SESSION_CACHE: Dict[str, float] = {}
 _LAST_ACTIVITY_UPDATE: Dict[str, float] = {}
 _SESSION_CACHE_TTL_SEC = 60.0
 _ACTIVITY_UPDATE_INTERVAL_SEC = 300.0
@@ -371,8 +372,10 @@ class SessionManager:
         """Clears in-memory session cache for a specific token or entirely."""
         if token_hash:
             _SESSION_CACHE.pop(token_hash, None)
+            _NEGATIVE_SESSION_CACHE.pop(token_hash, None)
         else:
             _SESSION_CACHE.clear()
+            _NEGATIVE_SESSION_CACHE.clear()
 
     @staticmethod
     def create_session(user_id: str, device_name: str = "Browser", ip_address: str = "127.0.0.1", user_agent: str = "") -> Tuple[str, Dict[str, Any]]:
@@ -406,6 +409,7 @@ class SessionManager:
         now_ts = time.time()
         _LAST_ACTIVITY_UPDATE[session_id] = now_ts
         _SESSION_CACHE[token_hash] = (now_ts, dict(session_dict))
+        _NEGATIVE_SESSION_CACHE.pop(token_hash, None)
         return raw_token, session_dict
 
     @staticmethod
@@ -428,6 +432,9 @@ class SessionManager:
         today_utc = now.strftime("%Y-%m-%d")
 
         # 1. Fast in-memory hit
+        if _NEGATIVE_SESSION_CACHE.get(token_hash, 0.0) > now_ts:
+            return None
+
         cached_entry = _SESSION_CACHE.get(token_hash)
         if cached_entry:
             cached_at, cached_session = cached_entry
@@ -480,6 +487,7 @@ class SessionManager:
         # 2. Database fetch
         session = db.get_user_session_by_token_hash(token_hash)
         if not session:
+            _NEGATIVE_SESSION_CACHE[token_hash] = now_ts + 10.0
             _SESSION_CACHE.pop(token_hash, None)
             return None
 

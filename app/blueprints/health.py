@@ -37,20 +37,22 @@ def get_system_health():
 @health_bp.route("/health/live", methods=["GET"])
 @health_bp.route("/api/health/live", methods=["GET"])
 def get_liveness():
-    """Liveness probe: reports whether this process can respond to requests."""
+    """Liveness probe: pure process liveness to prevent container restart loops."""
     from src import db
     now_iso = datetime.now(timezone.utc).isoformat()
+    uptime_sec = round(time.time() - _START_TIME, 1)
     db_health = db.check_database_health()
     db_ok = db.is_database_healthy()
 
     payload = {
         "success": True,
-        "status": "ok",
+        "status": "ALIVE" if request.path == "/health/live" else "ok",
         "service": "alpha-algo-backend",
         "backend": True,
         "pid": os.getpid(),
         "database": "HEALTHY" if db_ok else "UNHEALTHY",
         "db": db_health,
+        "uptimeSeconds": uptime_sec,
         "timestamp": now_iso
     }
     return jsonify(payload), 200
@@ -136,17 +138,23 @@ def get_readiness():
     # 5. Overarching Status Calculation
     # Optional gateway and market-data failures are observable but do not prevent
     # readiness. The database and risk engine remain hard dependencies.
+    has_binance = bool(os.getenv("BINANCE_API_KEY") or os.getenv("BINANCE_TESTNET_API_KEY"))
     if db_status == "HEALTHY" and risk_status != "ERROR":
         overall_status = "HEALTHY"
         status_code = 200
+        if not has_binance or gw_status == "DEGRADED":
+            status_str = "degraded"
+        else:
+            status_str = "READY" if request.path == "/health/ready" else "ok"
     else:
         overall_status = "UNHEALTHY"
         status_code = 503
+        status_str = "UNHEALTHY"
 
     mode = getattr(config, "TRADING_MODE", "PAPER")
 
     return jsonify({
-        "status": "READY" if overall_status == "HEALTHY" else "UNHEALTHY",
+        "status": status_str,
         "overall_status": overall_status,
         "backend": True,
         "mode": mode,

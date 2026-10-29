@@ -56,11 +56,21 @@ def _audit_writer_worker():
             try:
                 clean_items = []
                 for it in items:
-                    clean_it = tuple(None if (isinstance(v, str) and v == "") else v for v in it)
-                    clean_items.append(clean_it)
+                    cleaned = []
+                    for idx, v in enumerate(it):
+                        if isinstance(v, str) and v == "":
+                            cleaned.append(None)
+                        elif idx == 19 and v is not None:  # trade_id (BIGINT in PostgreSQL)
+                            try:
+                                cleaned.append(int(v))
+                            except (ValueError, TypeError):
+                                cleaned.append(None)
+                        else:
+                            cleaned.append(v)
+                    clean_items.append(tuple(cleaned))
 
                 if getattr(config, "IS_POSTGRES", False):
-                    from src.db import get_db_pool, translate_sqlite_sql_to_postgres
+                    from src.db import get_db_pool, translate_sqlite_sql_to_postgres, _acquire_direct_pg_connection
                     pg_sql = translate_sqlite_sql_to_postgres(insert_sql)
                     pool = get_db_pool()
                     pool_written = False
@@ -72,17 +82,17 @@ def _audit_writer_worker():
                                         cur.executemany(pg_sql, clean_items)
                             pool_written = True
                         except Exception as pool_write_err:
-                            logger.warning("Audit pool write failed (%s), falling back to direct connection", pool_write_err)
+                            logger.warning("Audit pool write failed (%s), falling back to bounded direct connection", pool_write_err)
 
                     if not pool_written and getattr(config, "DATABASE_URL", None):
-                        import psycopg
-                        conn = psycopg.connect(config.DATABASE_URL, connect_timeout=5)
-                        try:
-                            with conn.transaction():
-                                with conn.cursor() as cur:
-                                    cur.executemany(pg_sql, clean_items)
-                        finally:
-                            conn.close()
+                        direct_conn = _acquire_direct_pg_connection(timeout=3.0)
+                        if direct_conn:
+                            try:
+                                with direct_conn.transaction():
+                                    with direct_conn.cursor() as cur:
+                                        cur.executemany(pg_sql, clean_items)
+                            finally:
+                                direct_conn.close()
                 else:
                     with get_db_transaction() as conn:
                         cursor = conn.cursor()

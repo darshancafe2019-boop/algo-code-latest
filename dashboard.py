@@ -7449,26 +7449,32 @@ def api_bot_copilot_query():
 def health_live():
     """
     Lightweight, non-blocking liveness probe.
-    Returns HTTP 200 while Flask and Database are operational.
-    If database is corrupted, reports degraded/unhealthy status with HTTP 503.
+    - Pure process liveness for orchestrators (Render/Kubernetes) on /health/live:
+      Returns HTTP 200 ALIVE immediately, avoiding cascading container restart loops.
+    - Non-blocking service status for /api/health/live.
     """
     now_iso = datetime.now(timezone.utc).isoformat()
+    uptime_sec = round(time.time() - getattr(app, "_start_time", time.time()), 2)
+
+    if request.path == "/health/live":
+        return jsonify({
+            "status": "ALIVE",
+            "service": "alpha-algo-backend",
+            "uptime_seconds": uptime_sec,
+            "timestamp": now_iso
+        }), 200
+
     db_health = db.check_database_health()
     db_ok = db.is_database_healthy()
 
     payload = {
-        "status": "ok" if db_ok else "UNHEALTHY",
+        "status": "ok" if db_ok else "DEGRADED",
         "service": "alpha-algo-backend",
+        "uptime_seconds": uptime_sec,
+        "database": "HEALTHY" if db_ok else "UNHEALTHY",
         "db": db_health,
         "timestamp": now_iso
     }
-    if not db_ok or db_health.get("corrupted", False):
-        return jsonify(payload), 503
-
-    if request.path == "/health/live":
-        payload["status"] = "ALIVE"
-        return jsonify(payload), 200
-
     return jsonify(payload), 200
 
 
@@ -7515,10 +7521,12 @@ def health_ready():
         upstox_ok = False
 
     is_legacy_ready = request.path == "/health/ready"
-    if db_ok:
-        status_str = "READY" if is_legacy_ready else "HEALTHY"
-    else:
+    if not db_ok:
         status_str = "UNHEALTHY"
+    elif not (binance_ok and upstox_ok and market_data_ok):
+        status_str = "degraded"
+    else:
+        status_str = "READY" if is_legacy_ready else "ok"
 
     pool_stats = db.get_db_pool_stats()
     database_pool = {

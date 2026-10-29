@@ -53,7 +53,7 @@ interface AuthContextType {
     totp_code?: string;
     remember_me?: boolean;
   }) => Promise<LoginResult>;
-  verifyEmailOTP: (challengeId: string, otp: string) => Promise<LoginResult>;
+  verifyEmailOTP: (challengeId: string, otp: string, email?: string) => Promise<LoginResult>;
   resendEmailOTP: (challengeId: string) => Promise<{ success: boolean; message: string; challengeId?: string; destination?: string; cooldown_seconds?: number; error?: string; devOtp?: string; devMode?: boolean }>;
   sendLoginOTP: (emailOrUsername: string) => Promise<{ success: boolean; message: string; challengeId?: string; destination?: string; cooldown_seconds?: number; error?: string; devOtp?: string; devMode?: boolean }>;
   verify2FA: (challengeId: string, code: string) => Promise<LoginResult>;
@@ -457,6 +457,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const verifyEmailOTP = async (
     challengeId: string,
     otp: string,
+    email?: string,
     isRecovery: boolean = false
   ): Promise<LoginResult> => {
     try {
@@ -469,6 +470,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         credentials: "include",
         body: JSON.stringify({
           challenge_id: challengeId,
+          email: email?.trim() || undefined,
           otp: otp.trim(),
           recovery: isRecovery,
           device_name: typeof navigator !== "undefined" ? `${navigator.platform} Browser` : "Web Terminal",
@@ -506,7 +508,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // If upstream previously succeeded during a client/proxy timeout (504), automatically recover session
       if (!res.ok && data.error_code === "CHALLENGE_ALREADY_USED" && data.can_recover && !isRecovery) {
-        return verifyEmailOTP(challengeId, otp, true);
+        return verifyEmailOTP(challengeId, otp, email, true);
       }
 
       const status = res.status;

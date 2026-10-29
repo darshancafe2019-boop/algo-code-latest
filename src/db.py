@@ -12453,7 +12453,7 @@ def mark_auth_otp_challenge_used(challenge_id: str) -> bool:
 
 @with_db_retry(max_retries=5)
 def consume_auth_otp_challenge(challenge_id: str, now_iso: Optional[str] = None) -> bool:
-    """Atomically consumes an active, unexpired OTP once and updates the legacy mirror."""
+    """Atomically consumes an unexpired OTP once and updates the legacy mirror."""
     consumed_at = now_iso or datetime.now(timezone.utc).isoformat()
     with get_authoritative_connection() as conn:
         result = conn.execute(
@@ -12471,6 +12471,24 @@ def consume_auth_otp_challenge(challenge_id: str, now_iso: Optional[str] = None)
             "UPDATE email_otp_challenges SET used_at = ? WHERE id = ?",
             (consumed_at, challenge_id),
         )
+        # Safely invalidate all other unconsumed challenges for this user/purpose
+        chal = conn.execute("SELECT user_id, purpose FROM auth_otp_challenges WHERE id = ?", (challenge_id,)).fetchone()
+        if chal:
+            try:
+                u_id = chal["user_id"]
+                purp = chal["purpose"]
+            except (TypeError, IndexError, KeyError):
+                u_id = chal[0] if len(chal) > 0 else None
+                purp = chal[1] if len(chal) > 1 else None
+            if u_id and purp:
+                conn.execute(
+                    """
+                    UPDATE auth_otp_challenges
+                    SET status = 'INVALIDATED', used_at = ?
+                    WHERE user_id = ? AND purpose = ? AND id != ? AND used_at IS NULL
+                    """,
+                    (consumed_at, u_id, purp, challenge_id),
+                )
     return True
 
 

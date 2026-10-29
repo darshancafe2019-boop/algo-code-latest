@@ -134,6 +134,24 @@ export function LoginGateway() {
     return () => clearInterval(interval);
   }, [resendCooldown]);
 
+  // Restore persisted OTP session on page refresh
+  useEffect(() => {
+    try {
+      if (typeof window !== "undefined") {
+        const savedChallengeId = sessionStorage.getItem("quantos_otp_challenge_id");
+        const savedEmail = sessionStorage.getItem("quantos_otp_destination_email");
+        if (savedChallengeId) {
+          setChallengeId(savedChallengeId);
+          if (savedEmail) {
+            setDestinationEmail(savedEmail);
+            setEmailInput(savedEmail);
+          }
+          setAuthStep("email_otp");
+        }
+      }
+    } catch {}
+  }, []);
+
   // Evaluate Password Strength
   const evaluatePassword = (pwd: string): { score: number; label: string; color: string; criteria: PasswordCriteria } => {
     const criteria: PasswordCriteria = {
@@ -205,8 +223,19 @@ export function LoginGateway() {
       const res = await sendLoginOTP(target);
       if (res.success) {
         setAuthStep("email_otp");
-        if (res.challengeId) setChallengeId(res.challengeId);
-        if (res.destination) setDestinationEmail(res.destination);
+        if (res.challengeId) {
+          setChallengeId(res.challengeId);
+          try {
+            sessionStorage.setItem("quantos_otp_challenge_id", res.challengeId);
+          } catch {}
+        }
+        const dest = res.destination || target;
+        if (dest) {
+          setDestinationEmail(dest);
+          try {
+            sessionStorage.setItem("quantos_otp_destination_email", dest);
+          } catch {}
+        }
         if (res.devOtp) setDevOtp(res.devOtp);
         setResendCooldown(res.cooldown_seconds || 60);
         setOtpDigits(["", "", "", "", "", ""]);
@@ -249,8 +278,18 @@ export function LoginGateway() {
 
       if (res.requiresEmailOTP) {
         setAuthStep("email_otp");
-        if (res.challengeId) setChallengeId(res.challengeId);
-        if (res.destination) setDestinationEmail(res.destination);
+        if (res.challengeId) {
+          setChallengeId(res.challengeId);
+          try {
+            sessionStorage.setItem("quantos_otp_challenge_id", res.challengeId);
+          } catch {}
+        }
+        if (res.destination) {
+          setDestinationEmail(res.destination);
+          try {
+            sessionStorage.setItem("quantos_otp_destination_email", res.destination);
+          } catch {}
+        }
         if (res.devOtp) setDevOtp(res.devOtp);
         setResendCooldown(60);
         setOtpDigits(["", "", "", "", "", ""]);
@@ -288,7 +327,20 @@ export function LoginGateway() {
       return;
     }
 
-    if (!challengeId) {
+    let activeChallengeId = challengeId;
+    let activeEmail = destinationEmail || emailInput;
+    if (typeof window !== "undefined") {
+      try {
+        if (!activeChallengeId) {
+          activeChallengeId = sessionStorage.getItem("quantos_otp_challenge_id");
+        }
+        if (!activeEmail) {
+          activeEmail = sessionStorage.getItem("quantos_otp_destination_email") || "";
+        }
+      } catch {}
+    }
+
+    if (!activeChallengeId && !activeEmail) {
       setErrorMessage("Session challenge expired. Please restart login.");
       setAuthStep("credentials");
       return;
@@ -296,7 +348,7 @@ export function LoginGateway() {
 
     setIsSubmitting(true);
     try {
-      const res = await verifyEmailOTP(challengeId, otpCode);
+      const res = await verifyEmailOTP(activeChallengeId || "", otpCode, activeEmail || undefined);
       if (!res.success) {
         setErrorMessage(res.error || "Invalid or expired verification code.");
         // Do not wipe digits on transient network or gateway timeouts, allowing seamless re-attempt
@@ -312,6 +364,10 @@ export function LoginGateway() {
           digitInputRefs.current[0]?.focus();
         }
       } else {
+        try {
+          sessionStorage.removeItem("quantos_otp_challenge_id");
+          sessionStorage.removeItem("quantos_otp_destination_email");
+        } catch {}
         setSuccessMessage("Email verified successfully! Entering terminal...");
         setTimeout(() => {
           if (typeof window !== "undefined") {
@@ -322,7 +378,7 @@ export function LoginGateway() {
     } finally {
       setIsSubmitting(false);
     }
-  }, [challengeId, otpDigits, verifyEmailOTP]);
+  }, [challengeId, destinationEmail, emailInput, isSubmitting, otpDigits, verifyEmailOTP]);
 
   // Handle Resend OTP
   const handleResendOTP = async () => {
@@ -339,8 +395,18 @@ export function LoginGateway() {
         res = await sendLoginOTP(destinationEmail || emailInput);
       }
       if (res && res.success) {
-        if (res.challengeId) setChallengeId(res.challengeId);
-        if (res.destination) setDestinationEmail(res.destination);
+        if (res.challengeId) {
+          setChallengeId(res.challengeId);
+          try {
+            sessionStorage.setItem("quantos_otp_challenge_id", res.challengeId);
+          } catch {}
+        }
+        if (res.destination) {
+          setDestinationEmail(res.destination);
+          try {
+            sessionStorage.setItem("quantos_otp_destination_email", res.destination);
+          } catch {}
+        }
         if (res.devOtp) {
           // Clear first so React always triggers re-render + flash even if same code
           setDevOtp(null);
@@ -907,6 +973,12 @@ export function LoginGateway() {
                   type="button"
                   onClick={() => {
                     setAuthStep("credentials");
+                    setChallengeId(null);
+                    setDestinationEmail("");
+                    try {
+                      sessionStorage.removeItem("quantos_otp_challenge_id");
+                      sessionStorage.removeItem("quantos_otp_destination_email");
+                    } catch {}
                     setErrorMessage(null);
                     setSuccessMessage(null);
                   }}
@@ -1012,6 +1084,12 @@ export function LoginGateway() {
                   type="button"
                   onClick={() => {
                     setAuthStep("credentials");
+                    setChallengeId(null);
+                    setDestinationEmail("");
+                    try {
+                      sessionStorage.removeItem("quantos_otp_challenge_id");
+                      sessionStorage.removeItem("quantos_otp_destination_email");
+                    } catch {}
                     setErrorMessage(null);
                   }}
                   className="text-slate-400 hover:text-slate-200 transition-colors"

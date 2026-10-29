@@ -14351,6 +14351,20 @@ def api_auth_email_otp_verify():
         challenge = db.get_auth_otp_challenge(challenge_id)
     if not challenge and email_input:
         challenge = db.get_active_auth_otp_challenge_by_email(email_input, "LOGIN")
+        if not challenge:
+            clean_email = email_input.strip().lower()
+            now_iso = datetime.now(timezone.utc).isoformat()
+            email_rows = db.safe_query(
+                """
+                SELECT * FROM auth_otp_challenges
+                WHERE LOWER(TRIM(recipient_email)) = ? AND purpose = 'LOGIN'
+                  AND used_at IS NULL AND expires_at > ?
+                ORDER BY created_at DESC LIMIT 1
+                """,
+                (clean_email, now_iso)
+            )
+            if email_rows:
+                challenge = email_rows[0]
 
     t_lookup_ms = round((time.perf_counter() - t_start) * 1000, 2)
 
@@ -14401,7 +14415,7 @@ def api_auth_email_otp_verify():
                 "request_id": request_id
             }), 400
 
-    if attempts >= 5 or (chal_status == "INVALIDATED" and attempts >= 5):
+    if attempts >= 5:
         db.safe_execute("UPDATE auth_otp_challenges SET status = 'INVALIDATED' WHERE id = ?", (actual_challenge_id,))
         logger.warning("[OTP] [MAX_ATTEMPTS_EXCEEDED] Challenge %s reached max 5 attempts", actual_challenge_id)
         return jsonify({
@@ -14412,6 +14426,9 @@ def api_auth_email_otp_verify():
             "request_id": request_id
         }), 429
 
+    is_hash_match = hmac.compare_digest(code_hash, challenge.get("otp_hash", ""))
+
+    # 1. Check if the challenge was already consumed (Used) -> Idempotent Recovery
     if chal_status == "USED" or challenge.get("used_at"):
         # Check for idempotent recovery: client or proxy timed out (e.g. 504 Gateway Timeout),
         # but verification previously completed in backend.
@@ -14422,7 +14439,6 @@ def api_auth_email_otp_verify():
             request.headers.get("X-Idempotent-Recovery") == "true"
         )
         now_ts = time.time()
-        is_hash_match = hmac.compare_digest(code_hash, challenge.get("otp_hash", ""))
 
         used_at_str = challenge.get("used_at")
         is_recent_use = False
@@ -14538,16 +14554,7 @@ def api_auth_email_otp_verify():
             "request_id": request_id
         }), 400
 
-    if chal_status not in ("ACTIVE", "PENDING", "SEND_FAILED"):
-        logger.warning("[OTP] [OTP_VERIFICATION_FAILED] Challenge status is %s: %s", chal_status, actual_challenge_id)
-        return jsonify({
-            "status": "error",
-            "success": False,
-            "error_code": "CHALLENGE_INVALID",
-            "message": "Authentication challenge invalid or expired. Please sign in again.",
-            "request_id": request_id
-        }), 400
-
+    # 4. Check expiry
     try:
         exp = datetime.fromisoformat(challenge["expires_at"])
         if exp.tzinfo is None:
@@ -14572,6 +14579,7 @@ def api_auth_email_otp_verify():
             "request_id": request_id
         }), 400
 
+    # 5. Check user validity
     user = db.get_user_by_id(challenge["user_id"])
     if not user or not user.get("is_active"):
         return jsonify({
@@ -14582,6 +14590,7 @@ def api_auth_email_otp_verify():
             "request_id": request_id
         }), 404
 
+    # 6. Verify hash
     if not hmac.compare_digest(code_hash, challenge["otp_hash"]):
         # Check if user entered an older superseded code
         user_id = challenge.get("user_id")
@@ -14597,6 +14606,7 @@ def api_auth_email_otp_verify():
                 "message": "This verification code was superseded by a newer code. Please use the latest code sent to your email.",
                 "request_id": request_id
             }), 400
+
         new_attempts = db.increment_auth_otp_attempts(actual_challenge_id)
         remaining = max(0, 5 - new_attempts)
         db.log_security_audit_event(

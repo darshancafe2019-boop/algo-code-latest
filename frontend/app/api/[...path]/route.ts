@@ -235,7 +235,7 @@ async function handleProxy(req: NextRequest, ctx: { params?: { path: string[] } 
       const t0 = performance.now();
       const bRes = await fetch(`${BACKEND_URL}/api/health/ready`, {
         cache: "no-store",
-        signal: AbortSignal.timeout(3000),
+        signal: AbortSignal.timeout(6000),
         headers: { "Accept": "application/json", "X-Request-Id": requestId }
       });
       const bLatency = Math.round(performance.now() - t0);
@@ -258,7 +258,7 @@ async function handleProxy(req: NextRequest, ctx: { params?: { path: string[] } 
       try {
         const bRes = await fetch(`${BACKEND_URL}/health/ready`, {
           cache: "no-store",
-          signal: AbortSignal.timeout(3000)
+          signal: AbortSignal.timeout(6000)
         });
         if (bRes.ok) {
           const bData = await bRes.json().catch(() => ({}));

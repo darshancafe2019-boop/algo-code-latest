@@ -12058,7 +12058,7 @@ def get_bot_instance(bot_id: str) -> Optional[Dict[str, Any]]:
 
 def get_user_by_username(username: str) -> Optional[Dict[str, Any]]:
     """Fetches user record by username."""
-    rows = safe_query("SELECT * FROM users WHERE username = ? AND is_active = 1", (username,))
+    rows = safe_query("SELECT * FROM users WHERE username = ? AND is_active = 1 ORDER BY created_at ASC", (username,))
     return rows[0] if rows else None
 
 
@@ -12160,7 +12160,7 @@ def set_user_2fa_settings(user_id: str, is_2fa_enabled: int, totp_secret_encrypt
 
 def get_user_by_email(email: str) -> Optional[Dict[str, Any]]:
     """Fetches user record by email address (case-insensitive)."""
-    rows = safe_query("SELECT * FROM users WHERE LOWER(email) = LOWER(?) AND is_active = 1", (email.strip(),))
+    rows = safe_query("SELECT * FROM users WHERE LOWER(email) = LOWER(?) AND is_active = 1 ORDER BY created_at ASC", (email.strip(),))
     return rows[0] if rows else None
 
 

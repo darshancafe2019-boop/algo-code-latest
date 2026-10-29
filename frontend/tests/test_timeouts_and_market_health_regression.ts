@@ -258,10 +258,55 @@ async function runRegressionTestSuite() {
 
     const streamPortfolioReq = new NextRequest("http://localhost:3100/api/stream/portfolio?mode=PAPER");
     const streamPortfolioRes = await handlePortfolioStreamGet(streamPortfolioReq);
-    assert(streamPortfolioRes.status === 200, "Stream returns 200 SSE format");
-    const streamText = await streamPortfolioRes.text();
-    assert(streamText.includes("STREAM_ERROR") || streamText.includes("STREAM_UNAVAILABLE"), "Stream returns SSE STREAM_ERROR/UNAVAILABLE event on timeout");
-    assert(!streamText.includes("net::ERR_TIMED_OUT"), "No unhandled timeout occurs");
+    assert(streamPortfolioRes.status === 503, "Stream handshake timeout returns HTTP 503 before streaming");
+    assert(
+      streamPortfolioRes.headers.get("content-type")?.includes("application/json"),
+      "Pre-stream timeout returns structured JSON instead of synthetic SSE"
+    );
+    const streamBody = await streamPortfolioRes.json();
+    assert(streamBody.error?.code === "STREAM_ERROR", "Stream handshake timeout has a structured error code");
+    assert(!JSON.stringify(streamBody).includes("net::ERR_TIMED_OUT"), "No unhandled timeout is exposed");
+
+    for (const status of [401, 403, 502]) {
+      global.fetch = (async () =>
+        new Response(JSON.stringify({ error: `Upstream ${status}` }), {
+          status,
+          headers: { "Content-Type": "application/json" },
+        })) as any;
+      const errorReq = new NextRequest("http://localhost:3100/api/stream/portfolio?mode=PAPER");
+      const errorRes = await handlePortfolioStreamGet(errorReq);
+      assert(errorRes.status === status, `Pre-stream upstream HTTP ${status} is preserved`);
+    }
+
+    console.log("--- 6A. Testing Long-Lived Stream and Client Cancellation ---");
+    const streamRequestController = new AbortController();
+    let upstreamStreamSignal: AbortSignal | undefined;
+    global.fetch = (async (_url: string, init?: RequestInit) => {
+      upstreamStreamSignal = init?.signal || undefined;
+      return new Response(
+        new ReadableStream({
+          start(controller) {
+            controller.enqueue("data: {\"type\":\"PORTFOLIO_SNAPSHOT\"}\n\n");
+          },
+        }),
+        { status: 200, headers: { "Content-Type": "text/event-stream" } }
+      );
+    }) as any;
+    const longLivedReq = new NextRequest(
+      "http://localhost:3100/api/stream/portfolio?mode=PAPER",
+      { signal: streamRequestController.signal }
+    );
+    const longLivedRes = await handlePortfolioStreamGet(longLivedReq);
+    await new Promise((resolve) => setTimeout(resolve, 5100));
+    assert(longLivedRes.status === 200, "Successful portfolio stream handshake returns HTTP 200");
+    assert(
+      longLivedRes.headers.get("content-type")?.includes("text/event-stream"),
+      "Successful stream preserves the event-stream content type"
+    );
+    assert(upstreamStreamSignal?.aborted === false, "Healthy stream is not aborted after five seconds");
+    streamRequestController.abort();
+    assert(upstreamStreamSignal?.aborted === true, "Client cancellation aborts the upstream stream");
+    await longLivedRes.body?.cancel();
 
     console.log("\n=======================================================");
     console.log("ALL TIMEOUT & MARKET HEALTH REGRESSION TESTS PASSED! ✅");

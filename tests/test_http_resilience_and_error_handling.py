@@ -11,6 +11,7 @@ Tests:
 
 import pytest
 import json
+from unittest.mock import patch
 from dashboard import app
 from src.db import get_connection
 
@@ -28,6 +29,16 @@ def test_standard_health_ready_status(client):
     assert res.status_code == 200
     data = res.get_json()
     assert data["status"] in ["HEALTHY", "READY", "ok"]
+
+
+def test_health_ready_fails_when_database_probe_returns_no_rows(client):
+    with patch("src.db.safe_query", return_value=[]):
+        res = client.get("/health/ready")
+
+    assert res.status_code == 503
+    data = res.get_json()
+    assert data["status"] == "UNHEALTHY"
+    assert data["services"]["database"]["status"] == "ERROR"
 
 
 def test_api_status_shape(client):

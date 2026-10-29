@@ -1783,7 +1783,14 @@ def create_app() -> tuple:
 
 
 async def main():
-    port = int(os.environ.get("PORT") or os.environ.get("MARKET_GATEWAY_PORT") or "5051")
+    gw_port = os.environ.get("MARKET_GATEWAY_PORT")
+    env_port = os.environ.get("PORT")
+    if gw_port:
+        port = int(gw_port)
+    elif env_port and env_port != "5050":
+        port = int(env_port)
+    else:
+        port = 5051
     host = os.environ.get("MARKET_GATEWAY_HOST", "0.0.0.0")
     app, _ = create_app()
     runner = web.AppRunner(app, handle_signals=False)

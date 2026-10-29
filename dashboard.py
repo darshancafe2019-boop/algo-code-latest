@@ -3716,8 +3716,8 @@ def api_market_most_traded():
     return jsonify(res)
 
 
-@app.route("/api/market/quotes", methods=["GET"])
-def api_market_quotes():
+@app.route("/api/market/legacy-quotes", methods=["GET"])
+def api_market_quotes_legacy():
     """Returns live or snapshot quotes for requested symbols."""
     symbols_param = request.args.get("symbols", "") or request.args.get("symbol", "")
     if not symbols_param:
@@ -4493,8 +4493,8 @@ def api_futures_basis():
     })
 
 
-@app.route("/api/market/quote", methods=["GET"])
-def api_market_quote():
+@app.route("/api/market/legacy-quote", methods=["GET"])
+def api_market_quote_legacy():
     """Returns a normalized, quality-validated MarketQuote for any symbol without fabrication."""
     symbol = request.args.get("symbol", "BTC/USDT").upper()
 
@@ -7477,21 +7477,21 @@ def health_live():
 def health_ready():
     """
     Readiness probe returning granular component statuses.
-    External provider failures (Binance/Upstox) report 'degraded' but do NOT make Flask offline.
+    The database is the only hard dependency for readiness. Optional provider keys and
+    market-data cache can be degraded without making the backend itself unavailable.
     """
     now_iso = datetime.now(timezone.utc).isoformat()
 
-    # 1. Backend Core (Always True if handling this request)
     backend_ok = True
 
-    # 2. Database connectivity
     db_ok = True
     try:
-        safe_query("SELECT 1")
+        db_ok = bool(safe_query("SELECT 1"))
     except Exception:
         db_ok = False
 
-    # 3. Market Data Cache
+    # Optional subsystem checks. They should be reported for observability but not
+    # block readiness when the database itself is healthy.
     market_data_ok = True
     try:
         cand = safe_query_one("SELECT close, timestamp FROM candles_cache ORDER BY id DESC LIMIT 1")
@@ -7500,7 +7500,6 @@ def health_ready():
     except Exception:
         market_data_ok = False
 
-    # 4. Binance Provider
     binance_ok = True
     try:
         has_key = bool(os.getenv("BINANCE_API_KEY") or os.getenv("BINANCE_TESTNET_API_KEY"))
@@ -7508,7 +7507,6 @@ def health_ready():
     except Exception:
         binance_ok = False
 
-    # 5. Upstox Provider
     upstox_ok = True
     try:
         upstox_token = os.getenv("UPSTOX_ACCESS_TOKEN") or ""
@@ -7516,14 +7514,12 @@ def health_ready():
     except Exception:
         upstox_ok = False
 
-    if not db_ok:
-        status_str = "degraded"
-    elif not (market_data_ok and binance_ok and upstox_ok):
-        status_str = "degraded"
-    else:
-        status_str = "ok"
-
     is_legacy_ready = request.path == "/health/ready"
+    if db_ok:
+        status_str = "READY" if is_legacy_ready else "HEALTHY"
+    else:
+        status_str = "UNHEALTHY"
+
     pool_stats = db.get_db_pool_stats()
     database_pool = {
         key: pool_stats[key]
@@ -7544,15 +7540,15 @@ def health_ready():
     }
 
     payload = {
-        "status": "READY" if (is_legacy_ready and db_ok) else status_str,
+        "status": status_str,
         "backend": backend_ok,
-        "database": db_ok if not is_legacy_ready else ("OK" if db_ok else "ERROR"),
+        "database": "OK" if db_ok else "ERROR",
         "database_engine": "postgresql" if config.IS_POSTGRES else "sqlite",
         "database_pool": database_pool,
         "market_data": market_data_ok,
         "binance": binance_ok,
         "upstox": upstox_ok,
-        "timestamp": now_iso
+        "timestamp": now_iso,
     }
 
     return jsonify(payload), 200 if db_ok else 503
@@ -14150,7 +14146,7 @@ def api_auth_login():
         otp_code = f"{secrets.randbelow(1_000_000):06d}"
         otp_hash = hashlib.sha256(otp_code.encode("utf-8")).hexdigest()
         challenge_id = f"chall_{secrets.token_urlsafe(24)}"
-        expires_at = (datetime.now(timezone.utc) + timedelta(minutes=5)).isoformat()
+        expires_at = (datetime.now(timezone.utc) + timedelta(minutes=10)).isoformat()
 
         # Store in auth_otp_challenges in PENDING state
         try:
@@ -14178,79 +14174,72 @@ def api_auth_login():
             os.getenv("ALLOW_DEV_OTP", "false").lower() in ("true", "1")
             or (not is_prod and os.getenv("AUTH_BOOTSTRAP_ENABLED", "true").lower() in ("true", "1"))
         )
-        include_dev_otp = allow_dev_fallback or (not is_prod and (
-            (is_test_mode and not has_real_provider) or is_dev
-        ))
+        if is_prod:
+            include_dev_otp = False
+        else:
+            include_dev_otp = allow_dev_fallback or (
+                (is_test_mode and not has_real_provider) or is_dev
+            )
 
-        # Atomically mark ACTIVE immediately and invalidate prior active OTPs so user can enter OTP immediately
+        # Synchronous dispatch with bounded timeout (3.5s)
+        sent_ok = False
+        err_msg = None
+        email_msg_id = None
+        try:
+            sent_ok, err_msg, email_msg_id = global_email_service.send_login_otp(
+                to_email=user_email,
+                otp_code=otp_code,
+                username=user["username"],
+                user_id=user["id"]
+            )
+        except Exception as exc:
+            err_msg = str(exc)
+            logger.error("[LOGIN_OTP] Dispatch exception: %s", exc)
+
+        if not sent_ok:
+            if is_prod or not include_dev_otp:
+                db.mark_auth_otp_challenge_send_failed(challenge_id, err_msg or "Provider rejected email")
+                logger.error("[LOGIN_OTP] Email delivery failed: %s", err_msg)
+            return jsonify({
+                "status": "EMAIL_DELIVERY_FAILED",
+                "success": False,
+                "error_code": "EMAIL_DELIVERY_FAILED",
+                "message": "We couldn't deliver the verification code to your email. Could not send verification email. Please check your network and try again.",
+                "request_id": request_id
+            }), 502
+
+        # Atomically activate challenge upon successful send (or in dev fallback mode)
         try:
             db.activate_auth_otp_challenge(
                 challenge_id=challenge_id,
                 user_id=user["id"],
                 purpose="LOGIN",
-                provider_message_id="async_queued",
-                provider_status="PENDING"
+                provider_message_id=email_msg_id or ("dev_mode" if include_dev_otp else ""),
+                provider_status="SUBMITTED" if sent_ok else "DEV_EMULATED"
             )
         except Exception:
             return _auth_storage_unavailable(request_id, "activate_login_challenge")
-
-        # Asynchronously dispatch email to prevent blocking the HTTP worker thread
-        def _async_send_login_email(target_email: str, code: str, username_val: str, user_id_val: str, chall_id: str):
-            try:
-                sent_ok, err_msg, email_msg_id = global_email_service.send_login_otp(
-                    to_email=target_email,
-                    otp_code=code,
-                    username=username_val,
-                    user_id=user_id_val
-                )
-                if sent_ok:
-                    try:
-                        db.safe_execute(
-                            "UPDATE auth_otp_challenges SET provider_message_id = ?, provider_status = 'SUBMITTED' WHERE id = ?",
-                            (email_msg_id or "", chall_id)
-                        )
-                    except Exception:
-                        pass
-                    logger.info("[LOGIN_OTP] Async email delivered to %s [Message ID: %s]", _mask_email_address(target_email), email_msg_id)
-                else:
-                    try:
-                        db.safe_execute(
-                            "UPDATE auth_otp_challenges SET provider_status = 'FAILED' WHERE id = ?",
-                            (chall_id,)
-                        )
-                    except Exception:
-                        pass
-                    logger.warning("[LOGIN_OTP] Async email delivery failed to %s: %s", _mask_email_address(target_email), err_msg)
-            except Exception as async_exc:
-                logger.error("[LOGIN_OTP] Async email delivery exception: %s", async_exc)
-
-        login_email_thread = threading.Thread(
-            target=_async_send_login_email,
-            args=(user_email, otp_code, user["username"], user["id"], challenge_id),
-            daemon=True,
-            name=f"login-email-{challenge_id[:12]}"
-        )
-        login_email_thread.start()
 
         db.log_security_audit_event(
             action="LOGIN_EMAIL_OTP_DISPATCHED",
             actor_user_id=user["id"],
             result="CHALLENGED",
             ip_address=client_ip,
-            details={"challenge_id": challenge_id, "destination": _mask_email_address(user_email)}
+            details={"challenge_id": challenge_id, "destination": masked_dest}
         )
 
         response_payload: Dict[str, Any] = {
             "status": "EMAIL_OTP_REQUIRED",
             "challenge_id": challenge_id,
             "destination": masked_dest,
-            "message": "Verification code sent to your registered email.",
+            "message": f"Verification code sent to {masked_dest}.",
+            "cooldown_seconds": 60,
+            "expires_in": 600,
             "request_id": request_id
         }
         if include_dev_otp:
             response_payload["dev_otp"] = otp_code
             response_payload["dev_mode"] = True
-
         return jsonify(response_payload), 200
 
     except Exception as exc:
@@ -14346,7 +14335,7 @@ def api_auth_email_otp_verify():
     challenge = None
     if challenge_id:
         challenge = db.get_auth_otp_challenge(challenge_id)
-    elif email_input:
+    if not challenge and email_input:
         challenge = db.get_active_auth_otp_challenge_by_email(email_input, "LOGIN")
 
     if not challenge or challenge.get("purpose") != "LOGIN":
@@ -14362,6 +14351,40 @@ def api_auth_email_otp_verify():
     actual_challenge_id = challenge["id"]
     chal_status = challenge.get("status", "ACTIVE")
     attempts = challenge.get("attempt_count", 0)
+
+    # Constant-time comparison of SHA-256 hash
+    code_hash = hashlib.sha256(code.encode("utf-8")).hexdigest()
+
+    if chal_status == "INVALIDATED":
+        # Check if this user has an ACTIVE challenge
+        user_id = challenge.get("user_id")
+        active_chal = None
+        if user_id:
+            active_rows = db.safe_query(
+                "SELECT * FROM auth_otp_challenges WHERE user_id = ? AND purpose = 'LOGIN' AND status = 'ACTIVE' ORDER BY created_at DESC LIMIT 1",
+                (user_id,)
+            )
+            if active_rows:
+                active_chal = active_rows[0]
+
+        if active_chal and hmac.compare_digest(code_hash, active_chal.get("otp_hash", "")):
+            # User submitted an older challenge_id, but the OTP code is for the current ACTIVE challenge!
+            # Seamlessly switch to verifying the active challenge
+            challenge = active_chal
+            actual_challenge_id = active_chal["id"]
+            chal_status = active_chal.get("status", "ACTIVE")
+            attempts = active_chal.get("attempt_count", 0)
+            logger.info("[OTP] Client submitted superseded challenge %s, but OTP matches latest active challenge %s. Accepting.", challenge_id, actual_challenge_id)
+        else:
+            logger.warning("[OTP] [OTP_VERIFICATION_FAILED] Challenge superseded: %s", actual_challenge_id)
+            return jsonify({
+                "status": "error",
+                "success": False,
+                "error_code": "SUPERSEDED_BY_NEWER_CODE",
+                "message": "A newer verification code was requested. Please use the latest code sent to your email.",
+                "request_id": request_id
+            }), 400
+
     if attempts >= 5 or (chal_status == "INVALIDATED" and attempts >= 5):
         db.safe_execute("UPDATE auth_otp_challenges SET status = 'INVALIDATED' WHERE id = ?", (actual_challenge_id,))
         logger.warning("[OTP] [MAX_ATTEMPTS_EXCEEDED] Challenge %s reached max 5 attempts", actual_challenge_id)
@@ -14427,9 +14450,21 @@ def api_auth_email_otp_verify():
             "request_id": request_id
         }), 404
 
-    # Constant-time comparison of SHA-256 hash
-    code_hash = hashlib.sha256(code.encode("utf-8")).hexdigest()
     if not hmac.compare_digest(code_hash, challenge["otp_hash"]):
+        # Check if user entered an older superseded code
+        user_id = challenge.get("user_id")
+        older_chal = db.safe_query(
+            "SELECT id FROM auth_otp_challenges WHERE user_id = ? AND purpose = 'LOGIN' AND status = 'INVALIDATED' AND otp_hash = ? AND created_at > ? LIMIT 1",
+            (user_id, code_hash, (datetime.now(timezone.utc) - timedelta(minutes=15)).isoformat())
+        )
+        if older_chal:
+            return jsonify({
+                "status": "error",
+                "success": False,
+                "error_code": "SUPERSEDED_BY_NEWER_CODE",
+                "message": "This verification code was superseded by a newer code. Please use the latest code sent to your email.",
+                "request_id": request_id
+            }), 400
         new_attempts = db.increment_auth_otp_attempts(actual_challenge_id)
         remaining = max(0, 5 - new_attempts)
         db.log_security_audit_event(
@@ -14665,69 +14700,54 @@ def api_auth_email_otp_resend():
         os.getenv("ALLOW_DEV_OTP", "false").lower() in ("true", "1")
         or (not is_prod and os.getenv("AUTH_BOOTSTRAP_ENABLED", "true").lower() in ("true", "1"))
     )
-    include_dev_otp = allow_dev_fallback or (not is_prod and (
-        (is_test_mode and not has_real_provider) or is_dev
-    ))
+    if is_prod:
+        include_dev_otp = False
+    else:
+        include_dev_otp = allow_dev_fallback or (
+            (is_test_mode and not has_real_provider) or is_dev
+        )
 
-    # Atomically activate new challenge immediately and invalidate prior challenges so the client can verify without delay
+    # Synchronous dispatch with bounded timeout (3.5s)
+    sent_ok = False
+    err_msg = None
+    email_msg_id = None
+    try:
+        if purpose == "PASSWORD_RESET":
+            sent_ok, err_msg, email_msg_id = global_email_service.send_password_reset_otp(
+                user_email, otp_code, user["username"], user_id=user["id"]
+            )
+        else:
+            sent_ok, err_msg, email_msg_id = global_email_service.send_login_otp(
+                user_email, otp_code, user["username"], user_id=user["id"]
+            )
+    except Exception as exc:
+        err_msg = str(exc)
+        logger.error("[OTP] Resend dispatch exception: %s", exc)
+
+    if not sent_ok:
+        if is_prod or not include_dev_otp:
+            db.mark_auth_otp_challenge_send_failed(new_challenge_id, err_msg or "Provider rejected email")
+            logger.error("[OTP] Resend email delivery failed: %s", err_msg)
+            return jsonify({
+                "status": "EMAIL_DELIVERY_FAILED",
+                "success": False,
+                "error_code": "EMAIL_DELIVERY_FAILED",
+                "message": "We couldn't deliver the verification code to your email. Could not send verification email. Please check your network and try again.",
+                "request_id": request_id
+            }), 502
+
+    # Atomically activate new challenge and invalidate prior challenges
     try:
         db.activate_auth_otp_challenge(
             challenge_id=new_challenge_id,
             user_id=user["id"],
             purpose=purpose,
-            provider_message_id="async_queued",
-            provider_status="PENDING"
+            provider_message_id=email_msg_id or ("dev_mode" if include_dev_otp else ""),
+            provider_status="SUBMITTED" if sent_ok else "DEV_EMULATED"
         )
     except Exception:
         return _auth_storage_unavailable(request_id, "activate_otp_challenge")
-    logger.info("[OTP] Challenge %s activated immediately. Dispatching email asynchronously.", new_challenge_id)
-
-    # Asynchronous background email delivery to guarantee sub-second HTTP responses
-    def _async_send_otp_email(
-        target_email: str,
-        code: str,
-        username: str,
-        user_id_val: str,
-        chall_id: str,
-        otp_purpose: str
-    ):
-        try:
-            if otp_purpose == "PASSWORD_RESET":
-                sent_ok, err_msg, email_msg_id = global_email_service.send_password_reset_otp(
-                    target_email, code, username, user_id=user_id_val
-                )
-            else:
-                sent_ok, err_msg, email_msg_id = global_email_service.send_login_otp(
-                    target_email, code, username, user_id=user_id_val
-                )
-            if sent_ok:
-                try:
-                    db.safe_execute(
-                        "UPDATE auth_otp_challenges SET provider_message_id = ?, provider_status = 'SUBMITTED' WHERE id = ?",
-                        (email_msg_id or "", chall_id)
-                    )
-                except Exception:
-                    pass
-                logger.info("[OTP] Async email delivered successfully to %s [Message ID: %s]", _mask_email_address(target_email), email_msg_id)
-            else:
-                try:
-                    db.safe_execute(
-                        "UPDATE auth_otp_challenges SET provider_status = 'FAILED' WHERE id = ?",
-                        (chall_id,)
-                    )
-                except Exception:
-                    pass
-                logger.warning("[OTP] Async email delivery failed to %s: %s", _mask_email_address(target_email), err_msg)
-        except Exception as async_exc:
-            logger.error("[OTP] Async email delivery exception: %s", async_exc)
-
-    email_thread = threading.Thread(
-        target=_async_send_otp_email,
-        args=(user_email, otp_code, user["username"], user["id"], new_challenge_id, purpose),
-        daemon=True,
-        name=f"otp-email-{new_challenge_id[:12]}"
-    )
-    email_thread.start()
+    logger.info("[OTP] Challenge %s activated successfully for user=%s.", new_challenge_id, user["username"])
 
     resend_payload = {
         "status": "success",
@@ -14736,6 +14756,7 @@ def api_auth_email_otp_resend():
         "destination": masked_dest,
         "message": f"Verification code sent to {masked_dest}.",
         "cooldown_seconds": 60,
+        "expires_in": 600,
         "request_id": request_id
     }
     if include_dev_otp:
@@ -18498,8 +18519,36 @@ def api_reconciliation_status():
 def api_stream_portfolio():
     """Real-time SSE event stream for live authoritative portfolio snapshot updates."""
     from src.global_data_engine import GlobalDataEngine
-    gde = GlobalDataEngine.get_instance()
+
+    token = (
+        request.cookies.get("algo_session_token")
+        or request.cookies.get("quantos_session_token")
+        or request.headers.get("Authorization", "").replace("Bearer ", "", 1).strip()
+    )
+    if not token:
+        return jsonify({
+            "status": "error",
+            "error_code": "UNAUTHORIZED",
+            "message": "Authentication required to stream portfolio data."
+        }), 401
+
+    user, session = get_current_user_and_session(allow_dev_fallback=False)
+    if not user or not session:
+        return jsonify({
+            "status": "error",
+            "error_code": "UNAUTHORIZED",
+            "message": "Valid authenticated session required."
+        }), 401
+
     mode = request.args.get("mode", getattr(config, "TRADING_MODE", "PAPER")).upper()
+    if mode not in {"PAPER", "LIVE"}:
+        return jsonify({
+            "status": "error",
+            "error_code": "INVALID_MODE",
+            "message": "Portfolio stream mode must be PAPER or LIVE."
+        }), 400
+
+    gde = GlobalDataEngine.get_instance()
 
     def event_stream():
         while True:
@@ -18510,14 +18559,16 @@ def api_stream_portfolio():
             except Exception as e:
                 err_data = json.dumps({"type": "STREAM_ERROR", "error": str(e)})
                 yield f"data: {err_data}\n\n"
+                break
             time.sleep(3.0)
 
     return Response(
         event_stream(),
         mimetype="text/event-stream",
         headers={
-            "Cache-Control": "no-cache",
+            "Cache-Control": "no-cache, no-transform",
             "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
         }
     )
 
@@ -19327,6 +19378,28 @@ def api_markets_quote():
         quote_res = NseService.get_instance().get_quote(inst.display_symbol)
         data = quote_res.get("data", {}) if isinstance(quote_res, dict) else {}
         ltp = float(data["LastTradedPrice"]) if data.get("LastTradedPrice") is not None else None
+        provider_name = "nse_india"
+
+        if ltp is None:
+            try:
+                from src.upstox_service import upstox_service
+                if upstox_service.is_authenticated or upstox_service.is_configured:
+                    up_q = upstox_service.get_full_market_quote(inst.display_symbol)
+                    if up_q and up_q.get("last_price"):
+                        ltp = float(up_q["last_price"])
+                        data = {
+                            "LastTradedPrice": ltp,
+                            "High": up_q.get("high"),
+                            "Low": up_q.get("low"),
+                            "Open": up_q.get("open"),
+                            "Close": up_q.get("close") or ltp,
+                            "PercentChange": up_q.get("change_pct"),
+                            "TotalTradedVolume": up_q.get("volume"),
+                        }
+                        provider_name = "upstox"
+            except Exception:
+                pass
+
         return jsonify({
             "status": "success" if ltp is not None else "no_data",
             "symbol": inst.display_symbol,
@@ -19342,7 +19415,7 @@ def api_markets_quote():
             "changePct": float(data["PercentChange"]) if data.get("PercentChange") is not None else None,
             "volume": float(data["TotalTradedVolume"]) if data.get("TotalTradedVolume") is not None else None,
             "dataAgeMs": 150 if ltp is not None else None,
-            "provider": "nse_india",
+            "provider": provider_name,
             "timestamp": datetime.now(timezone.utc).isoformat()
         })
 

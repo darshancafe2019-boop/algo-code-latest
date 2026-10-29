@@ -133,6 +133,25 @@ def test_dual_cookie_support_in_auth_me(client):
     assert data3["user"]["id"] == admin_id
 
 
+def test_portfolio_stream_rejects_missing_or_expired_session(client):
+    unauthenticated = client.get("/api/stream/portfolio?mode=PAPER")
+    assert unauthenticated.status_code == 401
+
+    admin = db.get_user_by_username("admin")
+    assert admin is not None
+    raw_token, _ = SessionManager.create_session(user_id=admin["id"])
+    client.set_cookie("algo_session_token", raw_token)
+
+    with patch.object(SessionManager, "validate_session", return_value=None):
+        expired = client.get("/api/stream/portfolio?mode=PAPER")
+    assert expired.status_code == 401
+
+    authenticated = client.get("/api/stream/portfolio?mode=PAPER", buffered=False)
+    assert authenticated.status_code == 200
+    assert authenticated.mimetype == "text/event-stream"
+    authenticated.close()
+
+
 def test_otp_verification_sets_both_cookies_and_restores_session(client):
     """OTP verification must set both algo_session_token and quantos_session_token with proper flags."""
     admin = db.get_user_by_username("admin")
@@ -249,4 +268,3 @@ def test_api_status_public_whitelist(client):
     assert res.status_code == 200
     data = res.get_json()
     assert "bot_id" in data or "status" in data
-

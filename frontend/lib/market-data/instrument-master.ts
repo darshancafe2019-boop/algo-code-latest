@@ -24,6 +24,26 @@ export interface ResolvedInstrument {
   status: "RESOLVED" | "INSTRUMENT_NOT_FOUND";
 }
 
+export const DHAN_SCRIP_MAP: Record<string, { securityId: string; segment: ExchangeSegment; lotSize: number; isIndex: boolean }> = {
+  NIFTY: { securityId: "13", segment: "NSE_EQ", lotSize: 25, isIndex: true },
+  "NIFTY 50": { securityId: "13", segment: "NSE_EQ", lotSize: 25, isIndex: true },
+  BANKNIFTY: { securityId: "25", segment: "NSE_EQ", lotSize: 15, isIndex: true },
+  "NIFTY BANK": { securityId: "25", segment: "NSE_EQ", lotSize: 15, isIndex: true },
+  FINNIFTY: { securityId: "27", segment: "NSE_EQ", lotSize: 40, isIndex: true },
+  MIDCPNIFTY: { securityId: "44", segment: "NSE_EQ", lotSize: 50, isIndex: true },
+  SENSEX: { securityId: "51", segment: "BSE_EQ", lotSize: 10, isIndex: true },
+  RELIANCE: { securityId: "2885", segment: "NSE_EQ", lotSize: 1, isIndex: false },
+  TCS: { securityId: "11536", segment: "NSE_EQ", lotSize: 1, isIndex: false },
+  HDFCBANK: { securityId: "1333", segment: "NSE_EQ", lotSize: 1, isIndex: false },
+  INFY: { securityId: "1594", segment: "NSE_EQ", lotSize: 1, isIndex: false },
+  ICICIBANK: { securityId: "4963", segment: "NSE_EQ", lotSize: 1, isIndex: false },
+  SBIN: { securityId: "3045", segment: "NSE_EQ", lotSize: 1, isIndex: false },
+  BHARTIARTL: { securityId: "10604", segment: "NSE_EQ", lotSize: 1, isIndex: false },
+  ITC: { securityId: "1660", segment: "NSE_EQ", lotSize: 1, isIndex: false },
+  KOTAKBANK: { securityId: "1922", segment: "NSE_EQ", lotSize: 1, isIndex: false },
+  LT: { securityId: "11483", segment: "NSE_EQ", lotSize: 1, isIndex: false },
+};
+
 class InstrumentMaster {
   private static instance: InstrumentMaster | null = null;
   private bySymbol: Map<string, InstrumentMasterRecord> = new Map();
@@ -1201,7 +1221,15 @@ class InstrumentMaster {
       const found = this.bySecurityId.get(key);
       if (found) return found;
     }
-    return this.bySecurityId.get(securityId);
+    const found = this.bySecurityId.get(securityId);
+    if (found) return found;
+
+    for (const [sym, info] of Object.entries(DHAN_SCRIP_MAP)) {
+      if (info.securityId === securityId) {
+        return this.resolve(sym, exchange);
+      }
+    }
+    return undefined;
   }
 
   public getAll(): InstrumentMasterRecord[] {
@@ -1540,18 +1568,18 @@ export class DhanInstrumentResolver {
       return cached;
     }
 
-    // Attempt resolution via InstrumentMaster
-    const registered = instrumentMaster.resolve(symbolOrQuery, exchange);
-    if (registered) {
+    const cleanSym = symbolOrQuery.trim().toUpperCase().replace(/^NSE:/, "").replace(/^BSE:/, "").trim();
+    if (DHAN_SCRIP_MAP[cleanSym]) {
+      const match = DHAN_SCRIP_MAP[cleanSym];
       const resolved: ResolvedInstrument = {
-        symbol: registered.symbol,
-        tradingSymbol: registered.tradingSymbol,
-        securityId: registered.securityId,
-        exchangeSegment: registered.exchange,
-        instrumentType: registered.instrumentType as any,
-        lotSize: registered.lotSize,
-        tickSize: registered.tickSize,
-        underlying: registered.symbol,
+        symbol: cleanSym,
+        tradingSymbol: cleanSym,
+        securityId: match.securityId,
+        exchangeSegment: exchange || match.segment,
+        instrumentType: match.isIndex ? "INDEX" : "EQUITY",
+        lotSize: match.lotSize,
+        tickSize: 0.05,
+        underlying: cleanSym,
         provider: "dhan",
         status: "RESOLVED",
       };

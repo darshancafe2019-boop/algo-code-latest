@@ -25,7 +25,14 @@ load_dotenv()
 
 def parse_args():
     p = argparse.ArgumentParser(description="Quant.OS Market Data Gateway")
-    default_port = int(os.environ.get("PORT") or os.environ.get("MARKET_GATEWAY_PORT") or "5051")
+    gw_port = os.environ.get("MARKET_GATEWAY_PORT")
+    env_port = os.environ.get("PORT")
+    if gw_port:
+        default_port = int(gw_port)
+    elif env_port and env_port != "5050":
+        default_port = int(env_port)
+    else:
+        default_port = 5051
     p.add_argument("--port", type=int, default=default_port)
     p.add_argument("--log-level", default="INFO", choices=["DEBUG", "INFO", "WARNING", "ERROR"])
     return p.parse_args()

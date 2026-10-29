@@ -278,6 +278,7 @@ export function LoginGateway() {
 
   // Submit Email OTP
   const submitEmailOTP = useCallback(async (codeToSubmit?: string) => {
+    if (isSubmitting) return;
     setErrorMessage(null);
     setSuccessMessage(null);
 

@@ -57,41 +57,53 @@ export async function GET(req: NextRequest) {
         });
       }
 
-      return new Response(
-        `data: ${JSON.stringify({ type: "STREAM_UNAVAILABLE", status: upstreamRes.status })}\n\n`,
+      const bodyText = await upstreamRes.text().catch(() => "");
+      if (bodyText && upstreamRes.headers.get("content-type")?.includes("application/json")) {
+        try {
+          const jsonBody = JSON.parse(bodyText);
+          return NextResponse.json(jsonBody, { status: upstreamRes.status });
+        } catch {}
+      }
+
+      return NextResponse.json(
         {
-          status: 200,
-          headers: {
-            "Content-Type": "text/event-stream",
-            "Cache-Control": "no-cache, no-transform",
-            Connection: "keep-alive",
+          ok: false,
+          success: false,
+          status: "error",
+          error: {
+            code: upstreamRes.status === 401 ? "UNAUTHORIZED" : "STREAM_UNAVAILABLE",
+            message: `Portfolio stream unavailable (HTTP ${upstreamRes.status}).`,
           },
-        }
+        },
+        { status: upstreamRes.status || 503, headers: { "X-Request-Id": req.headers.get("x-request-id") || "portfolio-stream" } }
       );
     } catch (err: any) {
-      return new Response(
-        `data: ${JSON.stringify({ type: "STREAM_ERROR", message: err.message || "Failed to connect to portfolio stream" })}\n\n`,
+      clearTimeout(connectTimer);
+      return NextResponse.json(
         {
-          status: 200,
-          headers: {
-            "Content-Type": "text/event-stream",
-            "Cache-Control": "no-cache, no-transform",
-            Connection: "keep-alive",
+          ok: false,
+          success: false,
+          status: "error",
+          error: {
+            code: "STREAM_ERROR",
+            message: err?.message || "Failed to connect to portfolio stream.",
           },
-        }
+        },
+        { status: 503, headers: { "X-Request-Id": req.headers.get("x-request-id") || "portfolio-stream" } }
       );
     }
   }
 
-  return new Response(
-    `data: ${JSON.stringify({ type: "STREAM_UNAVAILABLE", status: 503 })}\n\n`,
+  return NextResponse.json(
     {
-      status: 200,
-      headers: {
-        "Content-Type": "text/event-stream",
-        "Cache-Control": "no-cache, no-transform",
-        Connection: "keep-alive",
+      ok: false,
+      success: false,
+      status: "error",
+      error: {
+        code: "STREAM_UNAVAILABLE",
+        message: "Portfolio stream backend is not configured.",
       },
-    }
+    },
+    { status: 503 }
   );
 }

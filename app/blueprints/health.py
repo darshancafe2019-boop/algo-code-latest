@@ -134,17 +134,19 @@ def get_readiness():
     paper_status = "HEALTHY"
 
     # 5. Overarching Status Calculation
-    if db_status == "HEALTHY":
-        overall_status = "HEALTHY" if gw_status == "HEALTHY" and risk_status != "ERROR" else "DEGRADED"
+    # Optional gateway and market-data failures are observable but do not prevent
+    # readiness. The database and risk engine remain hard dependencies.
+    if db_status == "HEALTHY" and risk_status != "ERROR":
+        overall_status = "HEALTHY"
         status_code = 200
     else:
-        overall_status = "DEGRADED"
+        overall_status = "UNHEALTHY"
         status_code = 503
 
     mode = getattr(config, "TRADING_MODE", "PAPER")
 
     return jsonify({
-        "status": "ok" if overall_status == "HEALTHY" else "degraded",
+        "status": "READY" if overall_status == "HEALTHY" else "UNHEALTHY",
         "overall_status": overall_status,
         "backend": True,
         "mode": mode,

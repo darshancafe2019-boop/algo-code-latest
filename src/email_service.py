@@ -245,7 +245,7 @@ class ResendEmailProvider(BaseEmailProvider):
             executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
             try:
                 future = executor.submit(resend.Emails.send, params)
-                resp = future.result(timeout=5.0)
+                resp = future.result(timeout=3.5)
             finally:
                 executor.shutdown(wait=False, cancel_futures=True)
 
@@ -472,13 +472,14 @@ class EmailService:
         if not clean_recipient:
             clean_recipient = get_target_admin_email()
 
-        subject = "Your Quant.OS verification code"
+        now_utc = datetime.now(timezone.utc).strftime("%H:%M UTC")
+        subject = f"Your Quant.OS verification code [{now_utc}]"
 
         text_content = f"""Quant.OS
 
 Your verification code is: {otp_code}
 
-This code expires in 5 minutes.
+This code expires in 10 minutes. If you requested multiple codes, use this latest code.
 
 If you did not request this code, ignore this email.
 """
@@ -506,7 +507,8 @@ If you did not request this code, ignore this email.
     <div class="otp-container">
       <div class="otp-box"><strong>{otp_code}</strong></div>
     </div>
-    <p>This code expires in <strong>5 minutes</strong>.</p>
+    <p>This code expires in <strong>10 minutes</strong>. If you requested multiple codes, use this latest code.</p>
+    <p>Generated at {now_utc}.</p>
     <p>If you did not request this code, you can safely ignore this email.</p>
     <div class="footer">Quant.OS Algorithmic Trading Systems · Security Gateway</div>
   </div>

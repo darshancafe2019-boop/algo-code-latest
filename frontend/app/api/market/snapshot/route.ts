@@ -69,7 +69,7 @@ export async function GET(req: NextRequest) {
   const backendBase = getBackendBaseUrl() || CANONICAL_CLOUD_BACKEND_URL;
   const symbolsParam = searchParams.get("symbols") || searchParams.get("symbol") || "";
   const requestedSymbols = symbolsParam.split(",").map((s) => s.trim().toUpperCase()).filter(Boolean);
-  const effectiveSymbols = requestedSymbols.length > 0 ? requestedSymbols : ["NIFTY", "BANKNIFTY", "BTCUSDT", "ETHUSDT"];
+  const effectiveSymbols = requestedSymbols.length > 0 ? requestedSymbols : ["NIFTY", "BANKNIFTY", "SENSEX", "FINNIFTY", "RELIANCE", "TCS", "HDFCBANK", "INFY", "BTCUSDT", "ETHUSDT"];
   const finalSearchParams = new URLSearchParams(searchParams);
   if (!symbolsParam) {
     finalSearchParams.set("symbols", effectiveSymbols.join(","));

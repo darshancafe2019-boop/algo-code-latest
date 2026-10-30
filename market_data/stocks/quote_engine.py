@@ -77,45 +77,37 @@ class LiveQuoteFetcher:
         ist_min = (now_dt.minute + 30) % 60
         is_indian_open = ((ist_hour == 9 and ist_min >= 15) or (10 <= ist_hour < 15) or (ist_hour == 15 and ist_min <= 30)) and now_dt.weekday() < 5
 
-        # 0. Primary Authoritative Feed: Market Data Gateway
-        gw_base = os.environ.get("MARKET_GATEWAY_URL", "http://127.0.0.1:5051").strip().rstrip("/")
-        if gw_base and not (gw_base.startswith("http://") or gw_base.startswith("https://")):
-            gw_base = f"http://{gw_base}"
-        if gw_base:
-            try:
-                import urllib.request
-                import json
-                gw_url = f"{gw_base}/api/market/quote?symbol={symbol}"
-                req = urllib.request.Request(gw_url, headers={"User-Agent": "StockQuoteEngine"})
-                with urllib.request.urlopen(req, timeout=0.8) as resp:
-                    if resp.status == 200:
-                        gw_data = json.loads(resp.read().decode("utf-8"))
-                        if gw_data.get("ok") and gw_data.get("price"):
-                            p = float(gw_data["price"])
-                            vol = float(gw_data.get("volume") or 100000.0)
-                            open_p = float(gw_data.get("open") or p)
-                            high_p = float(gw_data.get("high") or p * 1.01)
-                            low_p = float(gw_data.get("low") or p * 0.99)
-                            prev_close = float(gw_data.get("previous_close") or open_p or p)
-                            chg_pct = round(((p - prev_close) / prev_close * 100.0), 2) if prev_close > 0 else 0.0
-                            chg_abs = round(p - prev_close, 2)
-                            data = {
-                                "last_price": round(p, 2),
-                                "open": round(open_p, 2),
-                                "high": round(high_p, 2),
-                                "low": round(low_p, 2),
-                                "previous_close": round(prev_close, 2),
-                                "change_pct": chg_pct,
-                                "change_abs": chg_abs,
-                                "volume": vol,
-                                "high_52w": round(float(gw_data.get("high_52w") or p * 1.25), 2),
-                                "low_52w": round(float(gw_data.get("low_52w") or p * 0.75), 2),
-                                "market_cap": None,
-                                "data_quality": "LIVE" if (is_indian_open if ex_upper in ["NSE", "BSE"] else True) else "LAST_TRADED",
-                                "provider": "Upstox-Live" if gw_data.get("source") == "UPSTOX" else (gw_data.get("source") or "Live-Market-Feed"),
-                            }
-            except Exception as e:
-                logger.debug(f"Gateway live fetch note for {symbol}: {e}")
+        # 0. Primary Authoritative Feed: Market Data Gateway (non-blocking availability check)
+        try:
+            from market_data_gateway.gateway_client import gateway_client
+            if gateway_client.is_gateway_available():
+                gw_data = gateway_client.get_quote(symbol)
+                if gw_data and gw_data.get("ok") and gw_data.get("price"):
+                    p = float(gw_data["price"])
+                    vol = float(gw_data.get("volume") or 100000.0)
+                    open_p = float(gw_data.get("open") or p)
+                    high_p = float(gw_data.get("high") or p * 1.01)
+                    low_p = float(gw_data.get("low") or p * 0.99)
+                    prev_close = float(gw_data.get("previous_close") or open_p or p)
+                    chg_pct = round(((p - prev_close) / prev_close * 100.0), 2) if prev_close > 0 else 0.0
+                    chg_abs = round(p - prev_close, 2)
+                    data = {
+                        "last_price": round(p, 2),
+                        "open": round(open_p, 2),
+                        "high": round(high_p, 2),
+                        "low": round(low_p, 2),
+                        "previous_close": round(prev_close, 2),
+                        "change_pct": chg_pct,
+                        "change_abs": chg_abs,
+                        "volume": vol,
+                        "high_52w": round(float(gw_data.get("high_52w") or p * 1.25), 2),
+                        "low_52w": round(float(gw_data.get("low_52w") or p * 0.75), 2),
+                        "market_cap": None,
+                        "data_quality": "LIVE" if (is_indian_open if ex_upper in ["NSE", "BSE"] else True) else "LAST_TRADED",
+                        "provider": "Upstox-Live" if gw_data.get("source") == "UPSTOX" else (gw_data.get("source") or "Live-Market-Feed"),
+                    }
+        except Exception as e:
+            logger.debug(f"Gateway live fetch note for {symbol}: {e}")
 
         # 1. Direct Upstox REST Feed for Indian Equities / Indices
         is_indian = (
@@ -157,7 +149,11 @@ class LiveQuoteFetcher:
 
         # 2. Secondary Live Feed: YFinance Fast Info (if gateway & upstox had no quote)
         if not data and ticker_str:
+            orig_timeout = None
             try:
+                import socket
+                orig_timeout = socket.getdefaulttimeout()
+                socket.setdefaulttimeout(1.5)
                 import logging as _log
                 _log.getLogger("yfinance").setLevel(_log.CRITICAL)
                 import yfinance as yf
@@ -201,6 +197,13 @@ class LiveQuoteFetcher:
                     }
             except Exception as e:
                 logger.debug(f"Live fetch note for {ticker_str}: {e}")
+            finally:
+                if orig_timeout is not None:
+                    try:
+                        import socket
+                        socket.setdefaulttimeout(orig_timeout)
+                    except Exception:
+                        pass
 
         # 3. Tertiary Fallback for Indian Equities: NseService
         if not data and ex_upper == "NSE":
@@ -358,56 +361,109 @@ class StockQuoteEngine:
         if not to_fetch:
             return
 
-        # 1. Batch Snapshot from Market Data Gateway (port 5051)
-        remaining = []
+        # 1. Batch Snapshot from Market Data Gateway (if available)
+        remaining = list(to_fetch)
         try:
-            import urllib.request
-            import json
-            symbols_to_gw = [inst.symbol for inst in to_fetch]
-            gw_url = f"http://127.0.0.1:5051/api/market/snapshot?symbols={','.join(symbols_to_gw)}"
-            req = urllib.request.Request(gw_url, headers={"User-Agent": "StockQuoteEngine"})
-            with urllib.request.urlopen(req, timeout=1.5) as resp:
-                if resp.status == 200:
-                    gw_data = json.loads(resp.read().decode("utf-8"))
-                    quotes_map = gw_data.get("quotes", {})
-                    for inst in to_fetch:
-                        q_data = quotes_map.get(inst.symbol) or quotes_map.get(inst.symbol.upper())
-                        if q_data and q_data.get("last_price"):
-                            p = float(q_data["last_price"])
-                            vol = float(q_data.get("volume") or 100000.0)
-                            open_p = float(q_data.get("open") or p)
-                            high_p = float(q_data.get("high") or p * 1.01)
-                            low_p = float(q_data.get("low") or p * 0.99)
-                            prev_close = float(q_data.get("previous_close") or open_p or p)
-                            chg_pct = round(((p - prev_close) / prev_close * 100.0), 2) if prev_close > 0 else 0.0
-                            chg_abs = round(p - prev_close, 2)
-                            norm = StockQuoteNormalizer.normalize_quote(
-                                raw={
-                                    "last_price": round(p, 2),
-                                    "open": round(open_p, 2),
-                                    "high": round(high_p, 2),
-                                    "low": round(low_p, 2),
-                                    "previous_close": round(prev_close, 2),
-                                    "change_pct": chg_pct,
-                                    "change_abs": chg_abs,
-                                    "volume": vol,
-                                    "high_52w": round(float(q_data.get("high_52w") or p * 1.25), 2),
-                                    "low_52w": round(float(q_data.get("low_52w") or p * 0.75), 2),
-                                    "market_cap": None,
-                                    "data_quality": "LIVE",
-                                },
-                                instrument_id=inst.instrument_id,
-                                symbol=inst.symbol,
-                                exchange=inst.exchange,
-                                currency=inst.currency,
-                                provider="Upstox-Live" if q_data.get("provider") == "upstox" else (q_data.get("provider") or "Live-Market-Feed"),
-                                avg_volume_30d=vol
-                            )
-                            self._quotes[inst.instrument_id] = norm
-                        else:
-                            remaining.append(inst)
-        except Exception:
-            remaining = to_fetch
+            from market_data_gateway.gateway_client import gateway_client
+            if gateway_client.is_gateway_available():
+                symbols_to_gw = [inst.symbol for inst in to_fetch]
+                gw_quotes = gateway_client.get_snapshot(symbols_to_gw)
+                new_remaining = []
+                for inst in remaining:
+                    q_data = gw_quotes.get(inst.symbol) or gw_quotes.get(inst.symbol.upper())
+                    if q_data and q_data.get("last_price"):
+                        p = float(q_data["last_price"])
+                        vol = float(q_data.get("volume") or 100000.0)
+                        open_p = float(q_data.get("open") or p)
+                        high_p = float(q_data.get("high") or p * 1.01)
+                        low_p = float(q_data.get("low") or p * 0.99)
+                        prev_close = float(q_data.get("previous_close") or open_p or p)
+                        chg_pct = round(((p - prev_close) / prev_close * 100.0), 2) if prev_close > 0 else 0.0
+                        chg_abs = round(p - prev_close, 2)
+                        norm = StockQuoteNormalizer.normalize_quote(
+                            raw={
+                                "last_price": round(p, 2),
+                                "open": round(open_p, 2),
+                                "high": round(high_p, 2),
+                                "low": round(low_p, 2),
+                                "previous_close": round(prev_close, 2),
+                                "change_pct": chg_pct,
+                                "change_abs": chg_abs,
+                                "volume": vol,
+                                "high_52w": round(float(q_data.get("high_52w") or p * 1.25), 2),
+                                "low_52w": round(float(q_data.get("low_52w") or p * 0.75), 2),
+                                "market_cap": None,
+                                "data_quality": "LIVE",
+                            },
+                            instrument_id=inst.instrument_id,
+                            symbol=inst.symbol,
+                            exchange=inst.exchange,
+                            currency=inst.currency,
+                            provider="Upstox-Live" if q_data.get("provider") == "upstox" else (q_data.get("provider") or "Live-Market-Feed"),
+                            avg_volume_30d=vol
+                        )
+                        self._quotes[inst.instrument_id] = norm
+                        self._quotes[f"{inst.exchange.lower()}:{inst.exchange}:{inst.symbol}"] = norm
+                        self._quotes[inst.symbol] = norm
+                    else:
+                        new_remaining.append(inst)
+                remaining = new_remaining
+        except Exception as gw_err:
+            logger.debug(f"Gateway client batch snapshot note: {gw_err}")
+
+        if not remaining:
+            return
+
+        # 2. Batch Snapshot directly from Upstox REST for Indian instruments
+        inr_candidates = [inst for inst in remaining if inst.currency == "INR" or inst.exchange in ["NSE", "BSE"]]
+        if inr_candidates:
+            try:
+                from src.upstox_service import upstox_service
+                if upstox_service.is_authenticated:
+                    inr_symbols = [inst.symbol for inst in inr_candidates]
+                    up_quotes = upstox_service.fetch_market_quotes(inr_symbols)
+                    if up_quotes:
+                        resolved_ids = set()
+                        for inst in inr_candidates:
+                            q_data = up_quotes.get(inst.symbol) or up_quotes.get(inst.symbol.upper())
+                            if q_data and q_data.get("last_price"):
+                                p = float(q_data["last_price"])
+                                vol = float(q_data.get("volume") or 100000.0)
+                                open_p = float(q_data.get("open") or p)
+                                high_p = float(q_data.get("high") or p * 1.01)
+                                low_p = float(q_data.get("low") or p * 0.99)
+                                prev_close = float(q_data.get("close") or q_data.get("previous_close") or open_p or p)
+                                chg_pct = round(((p - prev_close) / prev_close * 100.0), 2) if prev_close > 0 else 0.0
+                                chg_abs = round(p - prev_close, 2)
+                                norm = StockQuoteNormalizer.normalize_quote(
+                                    raw={
+                                        "last_price": round(p, 2),
+                                        "open": round(open_p, 2),
+                                        "high": round(high_p, 2),
+                                        "low": round(low_p, 2),
+                                        "previous_close": round(prev_close, 2),
+                                        "change_pct": chg_pct,
+                                        "change_abs": chg_abs,
+                                        "volume": vol,
+                                        "high_52w": round(float(q_data.get("high_52w") or p * 1.25), 2),
+                                        "low_52w": round(float(q_data.get("low_52w") or p * 0.75), 2),
+                                        "market_cap": None,
+                                        "data_quality": "LIVE",
+                                    },
+                                    instrument_id=inst.instrument_id,
+                                    symbol=inst.symbol,
+                                    exchange=inst.exchange,
+                                    currency=inst.currency,
+                                    provider="Upstox-Live",
+                                    avg_volume_30d=vol
+                                )
+                                self._quotes[inst.instrument_id] = norm
+                                self._quotes[f"{inst.exchange.lower()}:{inst.exchange}:{inst.symbol}"] = norm
+                                self._quotes[inst.symbol] = norm
+                                resolved_ids.add(inst.instrument_id)
+                        remaining = [inst for inst in remaining if inst.instrument_id not in resolved_ids]
+            except Exception as up_err:
+                logger.debug(f"Upstox direct batch fetch note: {up_err}")
 
         if not remaining:
             return
@@ -439,6 +495,10 @@ class StockQuoteEngine:
                             iid, norm = future.result()
                             if norm:
                                 self._quotes[iid] = norm
+                                inst_obj = global_stock_master.get_by_id(iid)
+                                if inst_obj:
+                                    self._quotes[f"{inst_obj.exchange.lower()}:{inst_obj.exchange}:{inst_obj.symbol}"] = norm
+                                    self._quotes[inst_obj.symbol] = norm
                         except Exception:
                             pass
                 except (TimeoutError, Exception):

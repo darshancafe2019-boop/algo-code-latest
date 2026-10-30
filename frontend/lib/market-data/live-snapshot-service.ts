@@ -117,10 +117,10 @@ const YAHOO_SYMBOLS_MAP: Record<string, string> = {
 
 // Background real market refresher
 let lastFetchTime = 0;
-export async function refreshRealMarketData(): Promise<void> {
+export async function refreshRealMarketData(targetSymbols?: string[]): Promise<void> {
   const now = Date.now();
-  if (now - lastFetchTime < 3000) return; // cache for 3s
-  lastFetchTime = now;
+  if (!targetSymbols && now - lastFetchTime < 3000) return; // cache for 3s
+  if (!targetSymbols) lastFetchTime = now;
 
   // 1. Fetch Binance Crypto
   try {
@@ -267,10 +267,21 @@ export async function refreshRealMarketData(): Promise<void> {
   try {
     const backendBase = getBackendBaseUrl() || CANONICAL_CLOUD_BACKEND_URL;
     if (backendBase) {
-      const snapUrl = `${backendBase.replace(/\/+$/, "")}/api/market/snapshot?symbols=NIFTY,BANKNIFTY,BTCUSDT,ETHUSDT`;
+      const baseSymbols = ["NIFTY", "BANKNIFTY", "SENSEX", "FINNIFTY", "RELIANCE", "TCS", "HDFCBANK", "INFY", "BTCUSDT", "ETHUSDT"];
+      const extraSymbols = (targetSymbols || [])
+        .map((s) => {
+          const raw = String(s || "").trim().toUpperCase();
+          const clean = raw.includes(":") ? raw.split(":").pop()! : raw;
+          return clean.includes("|") ? clean.split("|").pop()! : clean;
+        })
+        .filter((s) => Boolean(s) && !baseSymbols.includes(s))
+        .slice(0, 30);
+      const querySymbols = Array.from(new Set([...baseSymbols, ...extraSymbols])).join(",");
+
+      const snapUrl = `${backendBase.replace(/\/+$/, "")}/api/market/snapshot?symbols=${encodeURIComponent(querySymbols)}`;
       const snapRes = await fetch(snapUrl, {
         headers: { Accept: "application/json" },
-        signal: AbortSignal.timeout(3000),
+        signal: AbortSignal.timeout(3500),
         cache: "no-store",
       });
       if (snapRes.ok) {
@@ -280,7 +291,7 @@ export async function refreshRealMarketData(): Promise<void> {
           const ltp = Number((q as any).lastPrice || (q as any).last_price || (q as any).ltp || 0);
           if (ltp > 0) {
             const sym = rawSym.toUpperCase();
-            const prev = Number((q as any).previous_close || (q as any).previousClose || ltp);
+            const prev = Number((q as any).previous_close || (q as any).previousClose || (q as any).close || ltp);
             const chg = Number((q as any).change ?? (ltp - prev));
             const chgPct = Number((q as any).changePercent ?? (q as any).change_pct ?? (prev ? (chg / prev) * 100 : 0));
             const ex = (q as any).exchange || "NSE";
@@ -306,6 +317,10 @@ export async function refreshRealMarketData(): Promise<void> {
               const clean = sym.split(":").pop()!;
               liveCache[clean] = item;
             }
+            const cleanSym = (q as any).clean_symbol;
+            if (cleanSym) {
+              liveCache[String(cleanSym).toUpperCase()] = item;
+            }
           }
         }
       }
@@ -323,6 +338,11 @@ export function lookupLiveCache(rawSym: string): LiveMarketItem | undefined {
   // Try without exchange prefix e.g. "NSE:NIFTY" -> "NIFTY" or "NASDAQ:AAPL" -> "AAPL"
   const clean = sym.includes(":") ? sym.split(":").pop()! : sym;
   if (liveCache[clean]) return liveCache[clean];
+
+  if (clean.includes("|")) {
+    const afterPipe = clean.split("|").pop()!;
+    if (liveCache[afterPipe]) return liveCache[afterPipe];
+  }
 
   // Try stripping spaces or aliases e.g. "NIFTY 50" -> "NIFTY"
   const stripped = clean.replace(" 50", "").replace(" BANK", "").trim();
@@ -433,7 +453,7 @@ export async function getLiveSnapshotQuotes(
   requestedSymbols: string[] = [],
   providerParam: string = "UPSTOX"
 ): Promise<Record<string, NormalizedMarketTick>> {
-  await refreshRealMarketData();
+  await refreshRealMarketData(requestedSymbols);
 
   const quotes: Record<string, NormalizedMarketTick> = {};
   const requested = requestedSymbols.length > 0 ? requestedSymbols : Object.keys(liveCache);

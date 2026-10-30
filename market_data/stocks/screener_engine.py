@@ -29,6 +29,11 @@ class StockScreenerEngine:
         for inst in all_instruments:
             q = all_quotes.get(inst.instrument_id)
             if not q:
+                sym_key = f"{inst.exchange.lower()}:{inst.exchange}:{inst.symbol}"
+                q = all_quotes.get(sym_key) or all_quotes.get(inst.symbol)
+            if not q:
+                q = global_stock_quote_engine.get_quote(inst.instrument_id, fetch_live_if_missing=False)
+            if not q:
                 continue
 
             basic_record = {

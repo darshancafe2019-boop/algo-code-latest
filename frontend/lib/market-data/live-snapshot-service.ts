@@ -280,8 +280,11 @@ export async function refreshRealMarketData(targetSymbols?: string[]): Promise<v
 
       const snapUrl = `${backendBase.replace(/\/+$/, "")}/api/market/snapshot?symbols=${encodeURIComponent(querySymbols)}`;
       const snapRes = await fetch(snapUrl, {
-        headers: { Accept: "application/json" },
-        signal: AbortSignal.timeout(3500),
+        headers: {
+          Accept: "application/json",
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36 QuantOS/1.0",
+        },
+        signal: AbortSignal.timeout(4000),
         cache: "no-store",
       });
       if (snapRes.ok) {

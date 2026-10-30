@@ -172,12 +172,18 @@ async function handleProxy(req: NextRequest, ctx: { params?: { path: string[] } 
       );
     }
 
+    const healthHeaders = {
+      Accept: "application/json",
+      "X-Request-Id": requestId,
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36 QuantOS/1.0",
+    };
+
     if (subPath === "health/live") {
       try {
         const liveRes = await fetch(`${BACKEND_URL}/api/health/live`, {
           cache: "no-store",
           signal: AbortSignal.timeout(3000),
-          headers: { "Accept": "application/json", "X-Request-Id": requestId }
+          headers: healthHeaders,
         });
         if (liveRes.ok) {
           const liveData = await liveRes.json().catch(() => ({ status: "ok" }));
@@ -194,7 +200,7 @@ async function handleProxy(req: NextRequest, ctx: { params?: { path: string[] } 
           const liveRes = await fetch(`${BACKEND_URL}/health/live`, {
             cache: "no-store",
             signal: AbortSignal.timeout(3000),
-            headers: { "Accept": "application/json", "X-Request-Id": requestId }
+            headers: healthHeaders,
           });
           if (liveRes.ok) {
             return NextResponse.json({
@@ -236,7 +242,7 @@ async function handleProxy(req: NextRequest, ctx: { params?: { path: string[] } 
       const bRes = await fetch(`${BACKEND_URL}/api/health/ready`, {
         cache: "no-store",
         signal: AbortSignal.timeout(6000),
-        headers: { "Accept": "application/json", "X-Request-Id": requestId }
+        headers: healthHeaders,
       });
       const bLatency = Math.round(performance.now() - t0);
       if (bRes.ok) {
@@ -307,8 +313,17 @@ async function handleProxy(req: NextRequest, ctx: { params?: { path: string[] } 
   const isStatus = subPath === "status" || subPath.startsWith("status/") || subPath.includes("health");
   const isIndicator = subPath.includes("indicator");
   const isAuth = subPath.startsWith("auth") || subPath.includes("/auth") || subPath.includes("auth/");
+  const isUniverse = subPath.includes("universe") || subPath.includes("instruments") || subPath.includes("screener") || subPath.includes("expiries");
   const isHeavy = subPath.includes("backtest") || subPath.includes("simulate") || subPath.includes("risk/simulate");
-  const timeoutMs = isStream ? 5000 : (isStatus || isIndicator ? 4000 : (isAuth ? 25000 : (isHeavy ? 12000 : 8000)));
+  const timeoutMs = isStream
+    ? 5000
+    : (isStatus || isIndicator)
+    ? 4000
+    : (isAuth || isUniverse)
+    ? 25000
+    : isHeavy
+    ? 15000
+    : 10000;
 
   let bodyData: BodyInit | null = null;
   if (["POST", "PUT", "PATCH", "DELETE"].includes(req.method)) {

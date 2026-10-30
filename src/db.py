@@ -9745,6 +9745,17 @@ def bulk_upsert_instruments(instruments_list: List[Dict[str, Any]]) -> Tuple[int
     return inserted, updated
 
 
+_UNIVERSE_STATS_CACHE: Dict[str, Any] = {}
+_UNIVERSE_STATS_CACHE_TS: float = 0.0
+_UNIVERSE_STATS_CACHE_LOCK = threading.Lock()
+_UNIVERSE_STATS_CACHE_TTL = 15.0
+
+_INSTRUMENTS_MASTER_CACHE: Dict[str, Any] = {}
+_INSTRUMENTS_MASTER_CACHE_TS: float = 0.0
+_INSTRUMENTS_MASTER_CACHE_LOCK = threading.Lock()
+_INSTRUMENTS_MASTER_CACHE_TTL = 10.0
+
+
 def get_instruments_master(
     asset_class: str = "ALL",
     exchange: str = "ALL",
@@ -9755,7 +9766,21 @@ def get_instruments_master(
     limit: int = 100,
     offset: int = 0
 ) -> Dict[str, Any]:
-    """Queries instruments with pagination and multi-parameter filters."""
+    """Queries instruments with pagination and multi-parameter filters with fast in-memory cache for common views."""
+    # Fast-path cache for default unfiltered queries
+    can_cache = (not search) and (offset == 0) and (status.upper() == "ALL") and (volatility_filter.upper() == "ALL")
+    cache_key = f"{str(asset_class).upper()}:{str(exchange).upper()}:{str(instrument_type).upper()}:{limit}"
+    now_t = time.time()
+
+    if can_cache:
+        with _INSTRUMENTS_MASTER_CACHE_LOCK:
+            cached = _INSTRUMENTS_MASTER_CACHE.get(cache_key)
+            if cached and (now_t - cached.get("_cached_at", 0)) < _INSTRUMENTS_MASTER_CACHE_TTL:
+                # Return copy without internal cache metadata
+                ret = dict(cached)
+                ret.pop("_cached_at", None)
+                return ret
+
     conditions = []
     params = []
 
@@ -9890,12 +9915,21 @@ def get_instruments_master(
 
         enriched_rows.append(d)
 
-    return {
+    result_payload = {
         "total": total_count,
         "limit": limit,
         "offset": offset,
         "instruments": enriched_rows
     }
+
+    if can_cache:
+        with _INSTRUMENTS_MASTER_CACHE_LOCK:
+            _INSTRUMENTS_MASTER_CACHE[cache_key] = {
+                **result_payload,
+                "_cached_at": time.time()
+            }
+
+    return result_payload
 
 
 
@@ -9910,7 +9944,13 @@ def get_instrument_by_canonical(canonical_symbol: str) -> Optional[Dict[str, Any
 
 
 def get_universe_summary_stats() -> Dict[str, Any]:
-    """Returns real-time universe summary counts across asset classes and segments."""
+    """Returns real-time universe summary counts across asset classes and segments with TTL caching."""
+    global _UNIVERSE_STATS_CACHE, _UNIVERSE_STATS_CACHE_TS
+    now_t = time.time()
+    with _UNIVERSE_STATS_CACHE_LOCK:
+        if _UNIVERSE_STATS_CACHE and (now_t - _UNIVERSE_STATS_CACHE_TS) < _UNIVERSE_STATS_CACHE_TTL:
+            return dict(_UNIVERSE_STATS_CACHE)
+
     sql = """
         SELECT
             COUNT(*) as total_instruments,
@@ -10003,6 +10043,11 @@ def get_universe_summary_stats() -> Dict[str, Any]:
         "instruments_with_fresh_ticks": fresh_ticks,
         "instruments_with_stale_or_missing_ticks": max(0, catalogue_count - fresh_ticks),
     }
+
+    with _UNIVERSE_STATS_CACHE_LOCK:
+        _UNIVERSE_STATS_CACHE = dict(row)
+        _UNIVERSE_STATS_CACHE_TS = time.time()
+
     return row
 
 

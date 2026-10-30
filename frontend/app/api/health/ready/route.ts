@@ -40,18 +40,24 @@ export async function GET(req: Request) {
 
   const effectiveBackendUrl = config.url;
 
+  const probeHeaders = {
+    Accept: "application/json",
+    "X-Request-Id": requestId,
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36 QuantOS/1.0",
+  };
+
   try {
     let bRes = await fetch(`${effectiveBackendUrl}/health/ready`, {
       cache: "no-store",
       signal: AbortSignal.timeout(12000),
-      headers: { Accept: "application/json", "X-Request-Id": requestId },
+      headers: probeHeaders,
     }).catch(() => null);
 
     if (!bRes || !bRes.ok) {
       bRes = await fetch(`${effectiveBackendUrl}/api/health/ready`, {
         cache: "no-store",
         signal: AbortSignal.timeout(12000),
-        headers: { Accept: "application/json", "X-Request-Id": requestId },
+        headers: probeHeaders,
       }).catch(() => null);
     }
 

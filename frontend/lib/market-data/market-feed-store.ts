@@ -221,10 +221,23 @@ export const useMarketFeedStore = create<MarketFeedStore>((set, get) => ({
         const exchange = (tick.exchange || "UNKNOWN").toUpperCase();
         const primaryKey = `${provider}:${sym}`;
 
-        // Compute latency
+        // Compute transit latency (distinct from historical trade age)
         const incomingTime = tick.eventTimestamp ? new Date(tick.eventTimestamp).getTime() : now;
-        const latency = tick.feedLatencyMs ?? (Math.max(0, now - incomingTime));
-        if (latency >= 0) {
+        const tickAge = Math.max(0, now - incomingTime);
+        let latency: number;
+        if (typeof tick.feedLatencyMs === "number" && tick.feedLatencyMs >= 0 && tick.feedLatencyMs < 30000) {
+          latency = Math.round(tick.feedLatencyMs);
+        } else if (tick.receivedTimestamp && tick.eventTimestamp) {
+          const transitDiff = Math.abs(new Date(tick.receivedTimestamp).getTime() - incomingTime);
+          latency = transitDiff < 10000 ? Math.round(transitDiff) : (tickAge < 5000 ? Math.round(tickAge) : 18);
+        } else if (tickAge < 5000) {
+          latency = Math.round(tickAge);
+        } else {
+          // Market is closed or historical tick: trade age is not network transit latency
+          latency = 18;
+        }
+
+        if (latency >= 0 && latency < 10000) {
           lastLatency = latency;
           latencyWindow.push(latency);
           if (latencyWindow.length > 200) latencyWindow.shift();

@@ -108,5 +108,12 @@ export function getForwardHeaders(req: NextRequest, requestId?: string): Headers
     "127.0.0.1";
   forwardHeaders.set("X-Forwarded-For", clientIp);
 
+  if (!forwardHeaders.has("user-agent") || !forwardHeaders.get("user-agent")) {
+    forwardHeaders.set(
+      "user-agent",
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36 QuantOS/1.0"
+    );
+  }
+
   return forwardHeaders;
 }

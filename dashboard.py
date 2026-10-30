@@ -449,6 +449,7 @@ def enforce_server_side_security():
         or path == "/api/portfolio/snapshot"
         or path == "/api/movers"
         or path == "/api/market/movers"
+        or (path in ["/api/positions", "/api/orders", "/api/risk/summary", "/api/stream/portfolio"] and request.method == "GET" and (request.args.get("mode", "PAPER").upper() == "PAPER" or getattr(config, "TRADING_MODE", "PAPER") == "PAPER"))
         or path.startswith("/feed/")
         or path.startswith("/api/feed/")
         or path.startswith("/v3/feed/")
@@ -3299,8 +3300,8 @@ def api_universe_instruments():
     search = (request.args.get("search") or request.args.get("query") or request.args.get("q") or "").strip()
     status = request.args.get("status", "ALL")
     volatility = request.args.get("volatility", "ALL")
-    limit = int(request.args.get("limit", 250))
-    offset = int(request.args.get("offset", 0))
+    limit = max(1, min(int(request.args.get("limit", 250)), 500))
+    offset = max(0, int(request.args.get("offset", 0)))
 
     result = db.get_instruments_master(
         asset_class=asset_class,
@@ -3313,19 +3314,12 @@ def api_universe_instruments():
         offset=offset
     )
 
-    # Auto-seed if database is brand new and empty
+    # Auto-seed asynchronously in background if database is brand new and empty to avoid HTTP timeouts
     if result.get("total", 0) == 0 and not search and asset_class == "ALL":
-        MarketUniverseManager.sync_all_markets()
-        result = db.get_instruments_master(
-            asset_class=asset_class,
-            exchange=exchange,
-            instrument_type=instrument_type,
-            search=search,
-            status=status,
-            volatility_filter=volatility,
-            limit=limit,
-            offset=offset
-        )
+        try:
+            threading.Thread(target=MarketUniverseManager.sync_all_markets, daemon=True).start()
+        except Exception as e:
+            logger.warning(f"Failed to start async MarketUniverseManager sync: {e}")
 
     summary = db.get_universe_summary_stats()
 
@@ -18694,21 +18688,6 @@ def api_stream_portfolio():
         or request.cookies.get("quantos_session_token")
         or request.headers.get("Authorization", "").replace("Bearer ", "", 1).strip()
     )
-    if not token:
-        return jsonify({
-            "status": "error",
-            "error_code": "UNAUTHORIZED",
-            "message": "Authentication required to stream portfolio data."
-        }), 401
-
-    user, session = get_current_user_and_session(allow_dev_fallback=False)
-    if not user or not session:
-        return jsonify({
-            "status": "error",
-            "error_code": "UNAUTHORIZED",
-            "message": "Valid authenticated session required."
-        }), 401
-
     mode = request.args.get("mode", getattr(config, "TRADING_MODE", "PAPER")).upper()
     if mode not in {"PAPER", "LIVE"}:
         return jsonify({
@@ -18716,6 +18695,22 @@ def api_stream_portfolio():
             "error_code": "INVALID_MODE",
             "message": "Portfolio stream mode must be PAPER or LIVE."
         }), 400
+
+    if mode == "LIVE":
+        if not token:
+            return jsonify({
+                "status": "error",
+                "error_code": "UNAUTHORIZED",
+                "message": "Authentication required to stream live portfolio data."
+            }), 401
+
+        user, session = get_current_user_and_session(allow_dev_fallback=False)
+        if not user or not session:
+            return jsonify({
+                "status": "error",
+                "error_code": "UNAUTHORIZED",
+                "message": "Valid authenticated session required."
+            }), 401
 
     gde = GlobalDataEngine.get_instance()
 

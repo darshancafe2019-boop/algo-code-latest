@@ -443,9 +443,12 @@ export function MarketUniverse() {
 
       const params = new URLSearchParams();
       if (assetClassParam !== "ALL") params.set("asset_class", assetClassParam);
-      if (debouncedSearch) params.set("query", debouncedSearch);
+      if (debouncedSearch) {
+        params.set("search", debouncedSearch);
+        params.set("query", debouncedSearch);
+      }
       if (filters.exchange !== "ALL") params.set("exchange", filters.exchange);
-      params.set("limit", "1500");
+      params.set("limit", "500");
 
       try {
         const res = await apiClient.get<MarketUniverseResponse>(`/api/universe/instruments?${params.toString()}`);

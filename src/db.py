@@ -116,6 +116,12 @@ def translate_sqlite_sql_to_postgres(sql: str) -> str:
             if "ON CONFLICT" not in pg_sql.upper():
                 pg_sql = pg_sql.rstrip(" ;") + on_conflict
 
+    # 6. PRAGMA table_info(table_name) translation for PostgreSQL
+    pragma_match = re.search(r'PRAGMA\s+table_info\s*\(\s*[\'"]?([a-zA-Z0-9_]+)[\'"]?\s*\)', pg_sql, re.IGNORECASE)
+    if pragma_match:
+        tbl = pragma_match.group(1).lower()
+        return f"SELECT column_name as name, column_name as \"1\" FROM information_schema.columns WHERE table_name = '{tbl}' ORDER BY ordinal_position"
+
     return pg_sql
 
 
@@ -136,6 +142,14 @@ class CursorAdapter:
     """Cursor adapter providing RowAdapter instances for dictionary and numeric access."""
     def __init__(self, cur):
         self._cur = cur
+
+    def execute(self, sql: str, params: tuple = ()):
+        pg_sql = translate_sqlite_sql_to_postgres(sql)
+        return self._cur.execute(pg_sql, params)
+
+    def executemany(self, sql: str, seq_of_params):
+        pg_sql = translate_sqlite_sql_to_postgres(sql)
+        return self._cur.executemany(pg_sql, seq_of_params)
 
     def fetchone(self):
         r = self._cur.fetchone()
@@ -180,6 +194,18 @@ class PostgresConnectionAdapter:
     def __init__(self, pg_conn):
         self._pg_conn = pg_conn
 
+    @property
+    def row_factory(self):
+        return None
+
+    @row_factory.setter
+    def row_factory(self, val):
+        pass
+
+    @property
+    def total_changes(self):
+        return 0
+
     def execute(self, sql: str, params: tuple = ()):
         pg_sql = translate_sqlite_sql_to_postgres(sql)
         from psycopg.rows import dict_row
@@ -217,6 +243,23 @@ class PostgresConnectionAdapter:
             self._pg_conn.rollback()
         else:
             self._pg_conn.commit()
+
+
+class PooledPostgresConnectionAdapter(PostgresConnectionAdapter):
+    """Wraps a pooled psycopg connection so that .close() returns it to the pool."""
+    def __init__(self, pg_conn, pool):
+        super().__init__(pg_conn)
+        self._pool = pool
+        self._returned = False
+
+    def close(self):
+        if not self._returned:
+            self._returned = True
+            if self._pool is not None and self._pg_conn is not None:
+                try:
+                    self._pool.putconn(self._pg_conn)
+                except Exception:
+                    pass
 
 
 def with_db_retry(max_retries: int = 5, base_delay: float = 0.05, max_delay: float = 1.0) -> Callable[[F], F]:
@@ -713,11 +756,25 @@ _sqlite_pragmas_applied = False
 _sqlite_pragmas_lock = threading.Lock()
 
 
-def get_connection() -> sqlite3.Connection:
+def get_connection():
     """
-    Create and return an optimized SQLite connection with 30s timeout and busy_timeout=30000ms.
-    Applies high-throughput WAL mode, normal synchronous write, memory temp store, 64MB cache, and 256MB mmap.
+    Returns an active database connection:
+    - In PostgreSQL mode (production): checks out a pooled PostgreSQL connection wrapped in PooledPostgresConnectionAdapter.
+    - In SQLite mode (local dev/test): returns an optimized SQLite connection with 30s timeout and busy_timeout=30000ms.
     """
+    if getattr(config, "IS_POSTGRES", False):
+        pool = get_db_pool()
+        if pool is not None:
+            try:
+                pg_conn = pool.getconn(timeout=1.5)
+                return PooledPostgresConnectionAdapter(pg_conn, pool)
+            except Exception as pool_err:
+                logger.warning("Pool checkout failed in get_connection: %s, falling back to direct", pool_err)
+        clean_url = _get_pg_clean_url()
+        if clean_url:
+            direct_conn = _acquire_direct_pg_connection(timeout=3.0)
+            return PostgresConnectionAdapter(direct_conn)
+
     global _sqlite_pragmas_applied
     config.DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     try:
@@ -749,9 +806,16 @@ def get_connection() -> sqlite3.Connection:
 @contextmanager
 def get_db_transaction():
     """
-    Context manager for short, safe, atomic SQLite transactions.
+    Context manager for short, safe, atomic transactions.
+    In PostgreSQL mode, yields a pooled PostgreSQL adapter with automated transaction management.
+    In SQLite mode, yields an optimized SQLite connection with busy_timeout.
     Automatically commits on success, rolls back on exception, and ensures the connection is closed.
     """
+    if getattr(config, "IS_POSTGRES", False):
+        with get_authoritative_connection() as conn:
+            yield conn
+        return
+
     conn = get_connection()
     try:
         yield conn
@@ -783,41 +847,37 @@ def get_authoritative_connection():
         last_pool_exc = None
         if pool is not None:
             checkout_timeout = float(os.getenv("PG_POOL_CHECKOUT_TIMEOUT", "1.5"))
+            pool_conn = None
             try:
-                with pool.connection(timeout=checkout_timeout) as conn:
-                    adapter = PostgresConnectionAdapter(conn)
-                    try:
-                        yield adapter
-                        if not getattr(conn, "autocommit", False):
-                            conn.commit()
-                        return
-                    except Exception:
-                        try:
-                            if not getattr(conn, "autocommit", False):
-                                conn.rollback()
-                        except Exception:
-                            pass
-                        raise
+                pool_conn = pool.getconn(timeout=checkout_timeout)
             except Exception as pool_err:
                 pool_failed = True
                 last_pool_exc = pool_err
                 logger.warning("Pool checkout failed in get_authoritative_connection (%s). Falling back to direct connection...", pool_err)
+
+            if pool_conn is not None:
+                adapter = PostgresConnectionAdapter(pool_conn)
+                try:
+                    with pool_conn.transaction():
+                        yield adapter
+                    return
+                except Exception:
+                    raise
+                finally:
+                    try:
+                        pool.putconn(pool_conn)
+                    except Exception:
+                        pass
 
         clean_url = _get_pg_clean_url()
         if clean_url and (pool is None or pool_failed or getattr(config, "IS_PRODUCTION", False) or time.time() >= _pg_circuit_broken_until):
             direct_conn = _acquire_direct_pg_connection(timeout=3.0)
             try:
                 adapter = PostgresConnectionAdapter(direct_conn)
-                yield adapter
-                if not getattr(direct_conn, "autocommit", False):
-                    direct_conn.commit()
+                with direct_conn.transaction():
+                    yield adapter
                 return
             except Exception:
-                try:
-                    if not getattr(direct_conn, "autocommit", False):
-                        direct_conn.rollback()
-                except Exception:
-                    pass
                 raise
             finally:
                 try:

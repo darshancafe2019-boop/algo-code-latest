@@ -1416,9 +1416,6 @@ class GlobalDataEngine:
         signals: List[Dict[str, Any]] = []
 
         try:
-            conn = db.get_db_connection()
-            cursor = conn.cursor()
-
             # Fetch Trades on this date
             query = "SELECT * FROM trades_log WHERE execution_mode = ?"
             params: List[Any] = [trading_mode]
@@ -1434,8 +1431,7 @@ class GlobalDataEngine:
                 params.extend([symbol, symbol])
 
             query += " ORDER BY id ASC"
-            cursor.execute(query, tuple(params))
-            all_trades = [dict(r) for r in cursor.fetchall()]
+            all_trades = db.safe_query(query, tuple(params))
 
             for t in all_trades:
                 ts_str = t.get("exit_timestamp") or t.get("timestamp") or t.get("created_at") or ""
@@ -1448,9 +1444,7 @@ class GlobalDataEngine:
 
             # Fetch Audit Log Events on this date
             try:
-                cursor.execute("SELECT * FROM audit_log ORDER BY id DESC LIMIT 100")
-                for a in cursor.fetchall():
-                    a_dict = dict(a)
+                for a_dict in db.safe_query("SELECT * FROM audit_log ORDER BY id DESC LIMIT 100"):
                     a_ts = a_dict.get("timestamp") or ""
                     try:
                         a_dt = datetime.fromisoformat(a_ts.replace("Z", "+00:00")).astimezone(target_tz)
@@ -1470,9 +1464,7 @@ class GlobalDataEngine:
 
             # Fetch Signals on this date
             try:
-                cursor.execute("SELECT * FROM signals_log ORDER BY id DESC LIMIT 100")
-                for s in cursor.fetchall():
-                    s_dict = dict(s)
+                for s_dict in db.safe_query("SELECT * FROM signals_log ORDER BY id DESC LIMIT 100"):
                     s_ts = s_dict.get("timestamp") or ""
                     try:
                         s_dt = datetime.fromisoformat(s_ts.replace("Z", "+00:00")).astimezone(target_tz)
@@ -1491,8 +1483,6 @@ class GlobalDataEngine:
                         pass
             except Exception:
                 pass
-
-            conn.close()
         except Exception as e:
             logger.warning("Error reading day details database state: %s", e)
 

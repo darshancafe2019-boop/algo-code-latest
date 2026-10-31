@@ -129,8 +129,12 @@ def init_trade_ledger_schema() -> None:
         )
 
         # 5. Migrate trades_log columns for complete 40-field coverage
-        cursor.execute("PRAGMA table_info(trades_log)")
-        cols = [row["name"] for row in cursor.fetchall()]
+        if getattr(config, "IS_POSTGRES", False):
+            cursor.execute("SELECT column_name as name FROM information_schema.columns WHERE table_name = 'trades_log'")
+            cols = [row["name"] for row in cursor.fetchall()]
+        else:
+            cursor.execute("PRAGMA table_info(trades_log)")
+            cols = [row["name"] for row in cursor.fetchall()]
         schema_map = {
             "parent_order_id": "TEXT DEFAULT ''",
             "broker_order_id": "TEXT DEFAULT ''",

@@ -122,6 +122,12 @@ def translate_sqlite_sql_to_postgres(sql: str) -> str:
         tbl = pragma_match.group(1).lower()
         return f"SELECT column_name as name, column_name as \"1\" FROM information_schema.columns WHERE table_name = '{tbl}' ORDER BY ordinal_position"
 
+    # 7. CREATE VIEW IF NOT EXISTS -> CREATE OR REPLACE VIEW translation for PostgreSQL
+    pg_sql = re.sub(r'\bCREATE\s+VIEW\s+IF\s+NOT\s+EXISTS\b', 'CREATE OR REPLACE VIEW', pg_sql, flags=re.IGNORECASE)
+
+    # 8. Quote PostgreSQL reserved keywords when used as column names in DDL
+    pg_sql = re.sub(r'(?<=\s)user(?=\s+(?:TEXT|VARCHAR|CHARACTER|STRING|INT|BIGINT))', '"user"', pg_sql, flags=re.IGNORECASE)
+
     return pg_sql
 
 
@@ -3167,8 +3173,11 @@ def init_db(force: bool = False) -> None:
 
 
                 # Create authoritative trade_history view
-                cursor.execute("DROP VIEW IF EXISTS trade_history")
-                cursor.execute("CREATE VIEW IF NOT EXISTS trade_history AS SELECT * FROM trades_log")
+                if getattr(config, "IS_POSTGRES", False):
+                    cursor.execute("CREATE OR REPLACE VIEW trade_history AS SELECT * FROM trades_log")
+                else:
+                    cursor.execute("DROP VIEW IF EXISTS trade_history")
+                    cursor.execute("CREATE VIEW IF NOT EXISTS trade_history AS SELECT * FROM trades_log")
 
                 # Create indexes for analytics, audit, and trade query performance
                 cursor.execute("CREATE INDEX IF NOT EXISTS idx_trades_log_bot_id ON trades_log(bot_id)")
@@ -3515,7 +3524,7 @@ def init_db(force: bool = False) -> None:
                     CREATE TABLE IF NOT EXISTS assistant_commands (
                         command_id TEXT PRIMARY KEY,
                         timestamp TEXT NOT NULL,
-                        user TEXT NOT NULL DEFAULT 'Operator',
+                        "user" TEXT NOT NULL DEFAULT 'Operator',
                         prompt TEXT NOT NULL,
                         intent_type TEXT NOT NULL,
                         bot_id TEXT DEFAULT '',

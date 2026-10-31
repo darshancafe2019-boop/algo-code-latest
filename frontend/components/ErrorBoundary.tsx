@@ -74,14 +74,13 @@ export class ErrorBoundary extends Component<Props, State> {
       message.includes("Loading chunk") ||
       message.includes("Failed to fetch dynamically imported module");
 
-    console.error(`[REACT_ERROR_BOUNDARY] [${component}] caught an error:`, {
-      component,
-      errorClass,
-      message: sanitizeErrorLog(message),
-      route,
-      timestamp,
-      componentStack: errorInfo.componentStack ? sanitizeErrorLog(errorInfo.componentStack) : undefined,
-    });
+    console.error(`[REACT_ERROR_BOUNDARY] [${component}] caught an error:`, error);
+    if (error?.stack) {
+      console.error(`[REACT_ERROR_BOUNDARY] [${component}] Stack:`, error.stack);
+    }
+    if (errorInfo?.componentStack) {
+      console.error(`[REACT_ERROR_BOUNDARY] [${component}] ComponentStack:`, errorInfo.componentStack);
+    }
 
     // Auto-recover from stale Next.js chunks if not already attempted recently
     if (isChunkError && typeof window !== "undefined") {
@@ -98,12 +97,14 @@ export class ErrorBoundary extends Component<Props, State> {
   public handleRetry = () => {
     const err = this.state.error as any;
     const msg = String(err?.message || "");
-    const isChunkError =
+    const isChunkOrHookError =
       err?.name === "ChunkLoadError" ||
       msg.includes("Loading chunk") ||
-      msg.includes("Failed to fetch dynamically imported module");
+      msg.includes("Failed to fetch dynamically imported module") ||
+      msg.includes("Rendered more hooks") ||
+      msg.includes("Rendered fewer hooks");
 
-    if (isChunkError && typeof window !== "undefined") {
+    if (isChunkOrHookError && typeof window !== "undefined") {
       window.location.reload();
       return;
     }
@@ -145,6 +146,11 @@ export class ErrorBoundary extends Component<Props, State> {
               ? "A fresh build bundle was detected from the server. Click Reload below to synchronize components."
               : errorMessage}
           </p>
+          {err?.stack && (
+            <pre className="text-[10px] text-rose-300/80 bg-black/40 p-2 rounded mb-3 font-mono max-h-32 overflow-auto whitespace-pre-wrap select-text">
+              {String(err.stack).slice(0, 500)}
+            </pre>
+          )}
           <button
             onClick={this.handleRetry}
             className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[var(--theme-elevated)] hover:bg-[var(--theme-surface)] text-[var(--theme-text-primary)] text-xs font-mono font-bold transition-colors border border-[var(--theme-border)] shadow-sm"

@@ -884,11 +884,7 @@ class BotRuntimeService:
         """
         Validates each bot independently and starts eligible bots.
         """
-        conn = db.get_connection()
-        c = conn.cursor()
-        c.execute("SELECT * FROM bot_instances WHERE COALESCE(is_deleted, 0) = 0")
-        bots = [dict(r) for r in c.fetchall()]
-        conn.close()
+        bots = db.safe_query("SELECT * FROM bot_instances WHERE COALESCE(is_deleted, 0) = 0")
 
         started = []
         skipped = []
@@ -936,11 +932,7 @@ class BotRuntimeService:
 
     def bulk_resume_paused(self) -> Dict[str, Any]:
         """Resumes all currently paused bots."""
-        conn = db.get_connection()
-        c = conn.cursor()
-        c.execute("SELECT id, name FROM bot_instances WHERE status = 'PAUSED' AND COALESCE(is_deleted, 0) = 0")
-        paused_bots = [dict(r) for r in c.fetchall()]
-        conn.close()
+        paused_bots = db.safe_query("SELECT id, name FROM bot_instances WHERE status = 'PAUSED' AND COALESCE(is_deleted, 0) = 0")
 
         resumed = []
         for pb in paused_bots:
@@ -1019,13 +1011,10 @@ class BotRuntimeService:
 
             # Update database
             now_iso = datetime.now(timezone.utc).isoformat()
-            conn = db.get_connection()
-            conn.execute(
+            db.safe_execute(
                 "UPDATE bot_instances SET execution_mode = ?, updated_at = ? WHERE id = ?",
                 (mode, now_iso, bot_id)
             )
-            conn.commit()
-            conn.close()
 
             # If running, restart worker under new execution mode
             mgr = multi_bot_manager.get_manager(bot_id)

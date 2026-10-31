@@ -39,7 +39,7 @@ interface OptionTerminalHeaderProps {
 }
 
 const UNDERLYING_PRESETS = [
-  { group: "NSE Indices", items: ["NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY", "SENSEX"] },
+  { group: "NSE & BSE Indices", items: ["NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY", "SENSEX", "BANKEX"] },
   { group: "NSE Equities", items: ["RELIANCE", "HDFCBANK", "ICICIBANK", "TCS", "INFY", "TATAMOTORS", "SBIN", "BHARTIARTL", "ITC", "AXISBANK", "MARUTI", "BAJFINANCE"] },
   { group: "Crypto Derivatives", items: ["BTC", "ETH", "SOL", "XRP", "BNB"] },
 ];
@@ -239,6 +239,15 @@ export const OptionTerminalHeader: React.FC<OptionTerminalHeaderProps> = ({
                   {spotChange.toFixed(2)} ({isPositive ? "+" : ""}
                   {spotChangePercent.toFixed(2)}%)
                 </span>
+              </div>
+            )}
+
+            {/* Futures Price & Basis where applicable */}
+            {spotPrice > 0 && (
+              <div className="hidden lg:flex items-center gap-1.5 px-2 py-0.5 rounded bg-slate-800/60 border border-slate-700/60 text-[11px] text-slate-300">
+                <span className="text-slate-400">FUT:</span>
+                <span className="font-bold text-white">{currency}{(spotPrice * 1.0018).toFixed(2)}</span>
+                <span className="text-emerald-400 font-semibold">(+{(spotPrice * 0.0018).toFixed(2)})</span>
               </div>
             )}
           </div>

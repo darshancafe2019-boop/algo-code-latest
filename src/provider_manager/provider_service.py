@@ -468,16 +468,35 @@ class ProviderService:
                         "message": f"Delta Exchange ping successful ({latency}ms). REST and WebSocket endpoints reachable.",
                     }
             elif pid == "binance":
-                r = requests.get("https://api.binance.com/api/v3/ping", timeout=3.0)
-                latency = round((time.perf_counter() - t0) * 1000, 1)
-                if r.status_code == 200:
+                try:
+                    r = requests.get("https://api.binance.com/api/v3/ping", timeout=3.0)
+                    latency = round((time.perf_counter() - t0) * 1000, 1)
+                    if r.status_code == 200:
+                        return {
+                            "success": True,
+                            "status": "success",
+                            "connected": True,
+                            "connectionState": "CONNECTED",
+                            "latency_ms": latency,
+                            "message": f"Binance mainnet ping successful ({latency}ms). Public endpoints online.",
+                        }
+                    elif r.status_code in (418, 429):
+                        return {
+                            "success": True,
+                            "status": "warning",
+                            "connected": True,
+                            "connectionState": "RATE_LIMITED",
+                            "latency_ms": latency,
+                            "message": f"Binance reachable; rate-limit backoff active (HTTP {r.status_code}).",
+                        }
+                except Exception as b_err:
                     return {
-                        "success": True,
-                        "status": "success",
-                        "connected": True,
-                        "connectionState": "CONNECTED",
-                        "latency_ms": latency,
-                        "message": f"Binance mainnet ping successful ({latency}ms). Public endpoints online.",
+                        "success": False,
+                        "status": "error",
+                        "connected": False,
+                        "connectionState": "ERROR",
+                        "latency_ms": 0.0,
+                        "message": f"Binance ping failed: {b_err}",
                     }
             elif pid in ["dhan", "upstox", "fyers"]:
                 # Check gateway socket health or token validity

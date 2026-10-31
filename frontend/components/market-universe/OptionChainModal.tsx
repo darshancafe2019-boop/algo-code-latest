@@ -182,10 +182,10 @@ export function OptionChainModal({ underlying, isOpen, onClose, onSelectContract
                       </td>
                       {/* Call OI Chg */}
                       <td className="py-2 px-2 text-right text-[10px]">
-                        {s.call?.oi_change !== undefined ? (
+                        {s.call?.oi_change != null ? (
                           <span className={s.call.oi_change >= 0 ? "text-emerald-400" : "text-rose-400"}>
                             {s.call.oi_change > 0 ? "+" : ""}
-                            {(s.call.oi_change / 1000).toFixed(1)}k
+                            {(Number(s.call.oi_change) / 1000).toFixed(1)}k
                           </span>
                         ) : (
                           "—"
@@ -197,18 +197,18 @@ export function OptionChainModal({ underlying, isOpen, onClose, onSelectContract
                       </td>
                       {/* Call Delta */}
                       <td className="py-2 px-2 text-right text-cyan-300 text-[10px]">
-                        {s.call?.delta !== undefined ? s.call.delta.toFixed(2) : "—"}
+                        {s.call?.delta != null ? Number(s.call.delta).toFixed(2) : "—"}
                       </td>
                       {/* Call LTP */}
                       <td className={`py-2 px-2 text-right font-bold ${isCallItm ? "text-emerald-300" : "text-white"}`}>
-                        {s.call?.last_price ? `₹${s.call.last_price.toFixed(2)}` : "—"}
+                        {s.call?.last_price != null ? `₹${Number(s.call.last_price).toFixed(2)}` : "—"}
                       </td>
                       {/* Call Chg% */}
                       <td className="py-2 px-2 text-right text-[10px]">
-                        {s.call?.change_24h !== undefined ? (
+                        {s.call?.change_24h != null ? (
                           <span className={s.call.change_24h >= 0 ? "text-emerald-400" : "text-rose-400"}>
                             {s.call.change_24h > 0 ? "+" : ""}
-                            {s.call.change_24h.toFixed(1)}%
+                            {Number(s.call.change_24h).toFixed(1)}%
                           </span>
                         ) : (
                           "—"
@@ -259,10 +259,10 @@ export function OptionChainModal({ underlying, isOpen, onClose, onSelectContract
                       </td>
                       {/* Put Chg% */}
                       <td className="py-2 px-2 text-left text-[10px]">
-                        {s.put?.change_24h !== undefined ? (
+                        {s.put?.change_24h != null ? (
                           <span className={s.put.change_24h >= 0 ? "text-emerald-400" : "text-rose-400"}>
                             {s.put.change_24h > 0 ? "+" : ""}
-                            {s.put.change_24h.toFixed(1)}%
+                            {Number(s.put.change_24h).toFixed(1)}%
                           </span>
                         ) : (
                           "—"
@@ -270,11 +270,11 @@ export function OptionChainModal({ underlying, isOpen, onClose, onSelectContract
                       </td>
                       {/* Put LTP */}
                       <td className={`py-2 px-2 text-left font-bold ${isPutItm ? "text-rose-300" : "text-white"}`}>
-                        {s.put?.last_price ? `₹${s.put.last_price.toFixed(2)}` : "—"}
+                        {s.put?.last_price != null ? `₹${Number(s.put.last_price).toFixed(2)}` : "—"}
                       </td>
                       {/* Put Delta */}
                       <td className="py-2 px-2 text-left text-cyan-300 text-[10px]">
-                        {s.put?.delta !== undefined ? s.put.delta.toFixed(2) : "—"}
+                        {s.put?.delta != null ? Number(s.put.delta).toFixed(2) : "—"}
                       </td>
                       {/* Put IV */}
                       <td className="py-2 px-2 text-left text-slate-400 text-[10px]">
@@ -282,10 +282,10 @@ export function OptionChainModal({ underlying, isOpen, onClose, onSelectContract
                       </td>
                       {/* Put OI Chg */}
                       <td className="py-2 px-2 text-left text-[10px]">
-                        {s.put?.oi_change !== undefined ? (
+                        {s.put?.oi_change != null ? (
                           <span className={s.put.oi_change >= 0 ? "text-emerald-400" : "text-rose-400"}>
                             {s.put.oi_change > 0 ? "+" : ""}
-                            {(s.put.oi_change / 1000).toFixed(1)}k
+                            {(Number(s.put.oi_change) / 1000).toFixed(1)}k
                           </span>
                         ) : (
                           "—"

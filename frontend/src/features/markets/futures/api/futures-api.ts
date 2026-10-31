@@ -36,7 +36,7 @@ export async function fetchFuturesUniverseData(params?: {
     if (params?.fresh_only) query.set("fresh_only", "true");
 
     const res = await apiClient.get<any>(`/api/futures/universe?${query.toString()}`, {
-      timeoutMs: 5000,
+      timeoutMs: 12000,
       deduplicate: true,
     });
     if (!res.ok || !res.data) throw new Error(res.error?.message || "Failed to fetch futures universe");
@@ -50,8 +50,10 @@ export async function fetchFuturesUniverseData(params?: {
       total_providers_count: res.data.total_providers_count ?? 5,
       contracts: Array.isArray(res.data.contracts) ? res.data.contracts : [],
     };
-  } catch (err) {
-    console.warn("Error fetching futures universe data:", err);
+  } catch (err: any) {
+    if (process.env.NODE_ENV === "development" && !err?.message?.includes("timed out")) {
+      console.debug?.("[Futures] Universe data fallback:", err?.message || err);
+    }
     return {
       status: "ERROR",
       count: 0,
@@ -83,7 +85,7 @@ export async function fetchFuturesProvidersHealth(): Promise<{
 }> {
   try {
     const res = await apiClient.get<any>("/api/futures/providers/health", {
-      timeoutMs: 4000,
+      timeoutMs: 10000,
       deduplicate: true,
     });
     if (!res.ok || !res.data) throw new Error(res.error?.message || "Failed to fetch provider health");
@@ -93,8 +95,10 @@ export async function fetchFuturesProvidersHealth(): Promise<{
       total_providers_count: res.data.total_providers_count || 5,
       overall_status: res.data.overall_status || "STANDBY",
     };
-  } catch (err) {
-    console.warn("Provider health fetch fallback:", err);
+  } catch (err: any) {
+    if (process.env.NODE_ENV === "development" && !err?.message?.includes("timed out")) {
+      console.debug?.("[Futures] Provider health fallback:", err?.message || err);
+    }
     return {
       providers: [],
       live_providers_count: 0,

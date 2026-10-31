@@ -52,6 +52,8 @@ import {
 } from "@/lib/strategies/crypto30Strategies";
 import { useStrategyStore } from "@/lib/strategies/strategyStore";
 import { formatMoney, formatNumber } from "@/lib/formatters";
+import { StrategyCategoryPills } from "./StrategyCategoryPills";
+import { StrategyQuickFilterBar, MoreFilterOptions, INITIAL_MORE_FILTERS } from "./StrategyQuickFilterBar";
 
 // ============================================================================
 // STRATEGY GROUPS (30 CANONICAL SOURCE MODELS GROUPED BY PURPOSE)
@@ -166,9 +168,8 @@ export function SourceStrategyCreationView({
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [categoryPillFilter, setCategoryPillFilter] = useState<string>("ALL");
   const [quickFilter, setQuickFilter] = useState<string>("ALL");
-  const [showMoreFilters, setShowMoreFilters] = useState<boolean>(false);
-  const [directionFilter, setDirectionFilter] = useState<string>("ALL");
-  const [timeframeFilter, setTimeframeFilter] = useState<string>("ALL");
+  const [moreFilters, setMoreFilters] = useState<MoreFilterOptions>(INITIAL_MORE_FILTERS);
+  const [activeLogicStep, setActiveLogicStep] = useState<number>(0);
 
   // Mode: Simple Mode (Default) vs Professional Mode
   const [isProfessionalMode, setIsProfessionalMode] = useState<boolean>(false);
@@ -178,10 +179,10 @@ export function SourceStrategyCreationView({
     "OVERVIEW" | "CONDITIONS" | "INDICATORS" | "ENTRY_EXIT" | "RISK" | "DATA" | "BACKTEST"
   >("OVERVIEW");
 
-  // Isolated Configuration Storage: Keyed strictly by strategy number
+  // Isolated Configuration Storage: Keyed strictly by strategy number (all 54 models)
   const [isolatedConfigs, setIsolatedConfigs] = useState<Record<string, IndependentStrategyConfig>>(() => {
     const initial: Record<string, IndependentStrategyConfig> = {};
-    for (const strat of CRYPTO_30_STRATEGIES) {
+    for (const strat of ALL_QUANTOS_STRATEGIES) {
       initial[strat.number] = createDefaultStrategyConfig(strat);
     }
     return initial;
@@ -198,9 +199,9 @@ export function SourceStrategyCreationView({
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isPaperTesting, setIsPaperTesting] = useState<boolean>(false);
 
-  // Lookup active strategy
+  // Lookup active strategy across all 54 authoritative models
   const activeStrategy: CryptoStrategyDefinition = useMemo(() => {
-    return CRYPTO_30_STRATEGIES.find((s) => s.number === selectedStrategyNumber) || CRYPTO_30_STRATEGIES[0];
+    return ALL_QUANTOS_STRATEGIES.find((s) => s.number === selectedStrategyNumber) || ALL_QUANTOS_STRATEGIES[0];
   }, [selectedStrategyNumber]);
 
   // Lookup active isolated configuration
@@ -279,13 +280,12 @@ export function SourceStrategyCreationView({
 
       // 2. Category Pill Filter
       if (categoryPillFilter !== "ALL") {
-        if (categoryPillFilter === "TREND" && strat.category !== "Trend & Continuation") return false;
-        if (categoryPillFilter === "BREAKOUT" && strat.category !== "Breakout & Expansion") return false;
-        if (categoryPillFilter === "MEAN_REVERSION" && strat.category !== "Pullback & Mean Reversion") return false;
-        if (categoryPillFilter === "STRUCTURE" && strat.category !== "Structure & Reversal") return false;
-        if (categoryPillFilter === "VOLUME" && strat.category !== "Momentum & Volume") return false;
-        if (categoryPillFilter === "CRYPTO_SPECIFIC" && strat.category !== "Crypto-Specific & Multi-Factor") return false;
-        if (categoryPillFilter === "OPTIONS" && strat.category !== "Multi-Leg Options & Income") return false;
+        if (categoryPillFilter === "TREND" && !strat.category.toLowerCase().includes("trend") && !strat.part.includes("TREND")) return false;
+        if (categoryPillFilter === "BREAKOUT" && !strat.category.toLowerCase().includes("breakout") && !strat.part.includes("BREAKOUT")) return false;
+        if ((categoryPillFilter === "MEAN_REVERSION" || categoryPillFilter === "REVERSAL") && !strat.category.toLowerCase().includes("reversion") && !strat.part.includes("REVERSAL") && !strat.part.includes("MEAN_REVERSION")) return false;
+        if (categoryPillFilter === "STRUCTURE" && !strat.category.toLowerCase().includes("structure") && !strat.part.includes("STRUCTURE")) return false;
+        if (categoryPillFilter === "VOLUME" && !strat.category.toLowerCase().includes("volume") && !strat.part.includes("VOLUME")) return false;
+        if (categoryPillFilter === "CRYPTO_SPECIFIC" && !strat.category.toLowerCase().includes("crypto-specific") && !strat.part.includes("CRYPTO_SPECIFIC")) return false;
         if (categoryPillFilter === "OPTIONS_INCOME") {
           const group = STRATEGY_PURPOSE_GROUPS.find((g) => g.id === "OPTIONS_INCOME");
           if (!group || !group.strategyNumbers.includes(strat.number)) return false;
@@ -305,17 +305,52 @@ export function SourceStrategyCreationView({
       if (quickFilter === "LONG" && strat.direction !== "LONG" && strat.direction !== "LONG / SHORT") return false;
       if (quickFilter === "SHORT" && strat.direction !== "SHORT" && strat.direction !== "LONG / SHORT") return false;
       if (quickFilter === "BOTH" && strat.direction !== "LONG / SHORT") return false;
-      if (quickFilter === "1H" && !strat.primaryTimeframe.includes("1H") && !strat.alternateTimeframes.includes("1H")) return false;
-      if (quickFilter === "4H" && !strat.primaryTimeframe.includes("4H") && !strat.alternateTimeframes.includes("4H")) return false;
-      if (quickFilter === "DAILY" && !strat.primaryTimeframe.includes("1D") && !strat.alternateTimeframes.includes("1D")) return false;
+      if (quickFilter === "1M" && !strat.primaryTimeframe.toLowerCase().includes("1m") && !strat.alternateTimeframes.some((t) => t.toLowerCase().includes("1m"))) return false;
+      if (quickFilter === "5M" && !strat.primaryTimeframe.toLowerCase().includes("5m") && !strat.alternateTimeframes.some((t) => t.toLowerCase().includes("5m"))) return false;
+      if (quickFilter === "15M" && !strat.primaryTimeframe.toLowerCase().includes("15m") && !strat.alternateTimeframes.some((t) => t.toLowerCase().includes("15m"))) return false;
+      if (quickFilter === "1H" && !strat.primaryTimeframe.toLowerCase().includes("1h") && !strat.alternateTimeframes.some((t) => t.toLowerCase().includes("1h"))) return false;
+      if (quickFilter === "4H" && !strat.primaryTimeframe.toLowerCase().includes("4h") && !strat.alternateTimeframes.some((t) => t.toLowerCase().includes("4h"))) return false;
+      if (quickFilter === "DAILY" && !strat.primaryTimeframe.toLowerCase().includes("1d") && !strat.alternateTimeframes.some((t) => t.toLowerCase().includes("1d"))) return false;
 
-      // 4. More filters
-      if (directionFilter !== "ALL" && strat.direction !== directionFilter) return false;
-      if (timeframeFilter !== "ALL" && strat.primaryTimeframe !== timeframeFilter && !strat.alternateTimeframes.includes(timeframeFilter)) return false;
+      // 4. Advanced More Filters
+      if (moreFilters.exchange !== "ALL" && !strat.market.toLowerCase().includes(moreFilters.exchange.toLowerCase())) {
+        return false;
+      }
+      if (moreFilters.assetType !== "ALL") {
+        if (moreFilters.assetType === "OPTIONS" && !strat.part.includes("OPTIONS") && !strat.category.toLowerCase().includes("options")) return false;
+        if (moreFilters.assetType === "CRYPTO" && !strat.market.toLowerCase().includes("btc") && !strat.market.toLowerCase().includes("eth") && !strat.market.toLowerCase().includes("usdt")) return false;
+        if (moreFilters.assetType === "FUTURES" && !strat.market.toLowerCase().includes("perp") && !strat.market.toLowerCase().includes("futures")) return false;
+      }
+      if (moreFilters.marketRegime !== "ALL" && !strat.compatibleRegimes.includes(moreFilters.marketRegime as any)) {
+        return false;
+      }
+      if (moreFilters.dataReadiness !== "ALL" && strat.status !== moreFilters.dataReadiness) {
+        return false;
+      }
 
       return true;
     });
-  }, [searchQuery, categoryPillFilter, quickFilter, directionFilter, timeframeFilter]);
+  }, [searchQuery, categoryPillFilter, quickFilter, moreFilters]);
+
+  // Dynamic Category Counts
+  const categoryCounts = useMemo(() => {
+    const counts: Record<string, number> = { ALL: ALL_QUANTOS_STRATEGIES.length };
+    const getGroupCounts = (gid: string) => {
+      const g = STRATEGY_PURPOSE_GROUPS.find((x) => x.id === gid);
+      return g ? ALL_QUANTOS_STRATEGIES.filter((s) => g.strategyNumbers.includes(s.number)).length : 0;
+    };
+    counts["TREND"] = getGroupCounts("TREND");
+    counts["BREAKOUT"] = getGroupCounts("BREAKOUT");
+    counts["REVERSAL"] = getGroupCounts("MEAN_REVERSION");
+    counts["MEAN_REVERSION"] = getGroupCounts("MEAN_REVERSION");
+    counts["VOLUME"] = getGroupCounts("VOLUME");
+    counts["STRUCTURE"] = getGroupCounts("STRUCTURE");
+    counts["CRYPTO_SPECIFIC"] = getGroupCounts("CRYPTO_SPECIFIC");
+    counts["OPTIONS_INCOME"] = getGroupCounts("OPTIONS_INCOME");
+    counts["OPTIONS_VOLATILITY"] = getGroupCounts("OPTIONS_VOLATILITY");
+    counts["OPTIONS_CALENDARS"] = getGroupCounts("OPTIONS_CALENDARS");
+    return counts;
+  }, []);
 
   // Grouped Strategies for Vertical Rendering
   const groupedStrategies = useMemo(() => {
@@ -473,14 +508,14 @@ export function SourceStrategyCreationView({
       <div className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-2xl bg-slate-900/90 border border-slate-800 shadow-xl">
         <div className="flex items-center gap-3">
           <div className="flex items-center justify-center h-9 w-9 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 font-mono font-bold text-sm">
-            30
+            54
           </div>
           <div>
             <h1 className="text-base font-bold uppercase tracking-wide text-white">
               STRATEGY CENTER
             </h1>
             <p className="text-xs text-slate-400">
-              30 canonical quantitative trading models • Independent configurations • Deterministic rule engine
+              54 authoritative quantitative trading models • Independent configurations • Deterministic rule engine
             </p>
           </div>
         </div>
@@ -542,114 +577,29 @@ export function SourceStrategyCreationView({
       )}
 
       {/* ======================================================================= */}
-      {/* 2. CATEGORY PILLS & QUICK FILTERS BAR */}
+      {/* 2. CATEGORY PILLS BAR */}
       {/* ======================================================================= */}
-      <div className="flex flex-col gap-2.5 p-3 rounded-2xl bg-slate-900/60 border border-slate-800/80">
-        {/* Category Filter Pills */}
-        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1 text-xs">
-          {[
-            { id: "ALL", label: "All (54 Models)" },
-            { id: "TREND", label: "Trend (S01–S05)" },
-            { id: "BREAKOUT", label: "Breakout (S06–S10)" },
-            { id: "MEAN_REVERSION", label: "Reversal (S11–S15)" },
-            { id: "VOLUME", label: "Volume (S21–S25)" },
-            { id: "STRUCTURE", label: "Structure (S16–S20)" },
-            { id: "CRYPTO_SPECIFIC", label: "Crypto-Specific (S26–S30)" },
-            { id: "OPTIONS_INCOME", label: "🎯 Range & Income (O01–O08)" },
-            { id: "OPTIONS_VOLATILITY", label: "⚡ Volatility & Spreads (O09–O16)" },
-            { id: "OPTIONS_CALENDARS", label: "⏳ Calendars & Synthetics (O17–O24)" },
-          ].map((cat) => {
-            const isSelected = categoryPillFilter === cat.id;
-            return (
-              <button
-                key={cat.id}
-                onClick={() => setCategoryPillFilter(cat.id)}
-                className={`px-3 py-1 rounded-lg font-bold whitespace-nowrap transition border ${
-                  isSelected
-                    ? "bg-cyan-500/20 text-cyan-300 border-cyan-500/50 shadow-sm"
-                    : "bg-slate-950/60 text-slate-400 border-slate-800/80 hover:text-slate-200"
-                }`}
-              >
-                {cat.label}
-              </button>
-            );
-          })}
-        </div>
+      <StrategyCategoryPills
+        selectedCategory={categoryPillFilter}
+        onSelectCategory={(id) => setCategoryPillFilter(id)}
+        categoryCounts={categoryCounts}
+      />
 
-        {/* Quick Filters Row */}
-        <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-slate-800/60 text-xs">
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className="text-[10px] text-slate-500 font-bold uppercase mr-1">Quick Filters:</span>
-            {[
-              { id: "ALL", label: "All Strategies" },
-              { id: "READY_NOW", label: "Ready Now" },
-              { id: "LONG", label: "Long" },
-              { id: "SHORT", label: "Short" },
-              { id: "BOTH", label: "Both" },
-              { id: "1H", label: "1H" },
-              { id: "4H", label: "4H" },
-              { id: "DAILY", label: "Daily" },
-            ].map((qf) => {
-              const isSelected = quickFilter === qf.id;
-              return (
-                <button
-                  key={qf.id}
-                  onClick={() => setQuickFilter(qf.id)}
-                  className={`px-2.5 py-0.5 rounded-md text-[11px] font-mono transition ${
-                    isSelected
-                      ? "bg-slate-700 text-white font-bold"
-                      : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
-                  }`}
-                >
-                  {qf.label}
-                </button>
-              );
-            })}
-          </div>
-
-          <button
-            onClick={() => setShowMoreFilters(!showMoreFilters)}
-            className="flex items-center gap-1 text-[11px] text-slate-400 hover:text-cyan-400 font-mono"
-          >
-            <span>More Filters</span>
-            {showMoreFilters ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-          </button>
-        </div>
-
-        {/* Expanded More Filters Dropdowns */}
-        {showMoreFilters && (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3 rounded-xl bg-slate-950 border border-slate-800 text-xs animate-fadeIn">
-            <div>
-              <label className="text-[10px] text-slate-500 font-bold block mb-1">DIRECTION</label>
-              <select
-                value={directionFilter}
-                onChange={(e) => setDirectionFilter(e.target.value)}
-                className="w-full px-2 py-1 rounded bg-slate-900 border border-slate-700 text-xs text-slate-300"
-              >
-                <option value="ALL">All Directions</option>
-                <option value="LONG">LONG Only</option>
-                <option value="SHORT">SHORT Only</option>
-                <option value="LONG / SHORT">LONG / SHORT</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="text-[10px] text-slate-500 font-bold block mb-1">PRIMARY TIMEFRAME</label>
-              <select
-                value={timeframeFilter}
-                onChange={(e) => setTimeframeFilter(e.target.value)}
-                className="w-full px-2 py-1 rounded bg-slate-900 border border-slate-700 text-xs text-slate-300"
-              >
-                <option value="ALL">All Timeframes</option>
-                <option value="15m">15m</option>
-                <option value="1H">1H</option>
-                <option value="4H">4H</option>
-                <option value="1D">1D</option>
-              </select>
-            </div>
-          </div>
-        )}
-      </div>
+      {/* ======================================================================= */}
+      {/* 3. QUICK FILTERS & MORE ADVANCED FILTERS */}
+      {/* ======================================================================= */}
+      <StrategyQuickFilterBar
+        quickFilter={quickFilter}
+        onSelectQuickFilter={(id) => setQuickFilter(id)}
+        moreFilters={moreFilters}
+        onMoreFiltersChange={(f) => setMoreFilters(f)}
+        onResetAllFilters={() => {
+          setSearchQuery("");
+          setCategoryPillFilter("ALL");
+          setQuickFilter("ALL");
+          setMoreFilters(INITIAL_MORE_FILTERS);
+        }}
+      />
 
       {/* ======================================================================= */}
       {/* 3. TWO-PANEL RESPONSIVE WORKSPACE LAYOUT */}
@@ -814,55 +764,98 @@ export function SourceStrategyCreationView({
                 </div>
               </div>
 
-              {/* "WHY THIS STRATEGY?" Visual Logic Flow */}
-              <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 flex flex-col gap-2">
-                <span className="text-[10px] font-bold uppercase tracking-wide text-cyan-400">
-                  WHY THIS STRATEGY? (EXECUTION LOGIC FLOW)
-                </span>
+              {/* "WHY THIS STRATEGY?" Interactive Execution Logic Flow */}
+              <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 flex flex-col gap-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold uppercase tracking-wide text-cyan-400">
+                    WHY THIS STRATEGY? (INTERACTIVE EXECUTION LOGIC FLOW)
+                  </span>
+                  <span className="text-[10px] font-mono text-slate-500">
+                    Click step to inspect logic
+                  </span>
+                </div>
+
                 <div className="flex flex-wrap items-center gap-2 font-mono text-[11px] pt-1">
-                  <span className="px-2.5 py-1 rounded bg-slate-900 border border-slate-800 text-slate-200">
-                    1. Trend Filter
+                  {[
+                    { step: 0, label: "1. Trend Filter", desc: "Verifies macro regime, ADX expansion and directional alignment before arming entry setup." },
+                    { step: 1, label: "2. Pullback / Squeeze", desc: "Watches for price contraction towards key dynamic support bands or volume pockets." },
+                    { step: 2, label: "3. Reclaim Trigger", desc: "Deterministic confirmation: candle close reclaims key level with volume spike confirmation." },
+                    { step: 3, label: "4. Sizing & Risk", desc: `Risk: ${currentConfig.riskPerTradePct}% ($${formatNumber(metrics.dollarRisk, 2)}) | Position: ${formatNumber(metrics.positionUnits, 3)} units.` },
+                    { step: 4, label: `5. Target (${currentConfig.targetRrRatio}R)`, desc: `Stop @ $${formatNumber(metrics.stopPrice, 2)} | Target @ $${formatNumber(metrics.targetPrice, 2)} | Trailing step: ${currentConfig.trailingStepAtr} ATR.` },
+                  ].map((item, idx, arr) => {
+                    const isSelected = activeLogicStep === item.step;
+                    return (
+                      <React.Fragment key={item.step}>
+                        <button
+                          type="button"
+                          onClick={() => setActiveLogicStep(item.step)}
+                          className={`px-2.5 py-1 rounded transition border cursor-pointer ${
+                            isSelected
+                              ? "bg-cyan-500/20 border-cyan-500 text-cyan-300 font-bold shadow-xs"
+                              : "bg-slate-900 border-slate-800 text-slate-300 hover:text-white hover:border-slate-700"
+                          }`}
+                        >
+                          {item.label}
+                        </button>
+                        {idx < arr.length - 1 && (
+                          <ArrowRight className="w-3.5 h-3.5 text-slate-600 shrink-0" />
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
+                </div>
+
+                {/* Selected Logic Step Detail Callout */}
+                <div className="p-2.5 rounded-lg bg-slate-900/80 border border-slate-800 text-[11px] text-slate-300 font-sans flex items-center justify-between">
+                  <span>
+                    {[
+                      "Step 1 (Regime Alignment): Verifies macro regime, ADX expansion and directional alignment before arming entry setup.",
+                      "Step 2 (Pullback / Squeeze): Watches for price contraction towards key dynamic support bands or volume pockets.",
+                      "Step 3 (Reclaim Trigger): Deterministic confirmation: candle close reclaims key level with volume spike confirmation.",
+                      `Step 4 (Risk & Sizing): Risk: ${currentConfig.riskPerTradePct}% ($${formatNumber(metrics.dollarRisk, 2)}) | Position units: ${formatNumber(metrics.positionUnits, 3)}.`,
+                      `Step 5 (Target & Trailing): Stop: $${formatNumber(metrics.stopPrice, 2)} | Target: $${formatNumber(metrics.targetPrice, 2)} | Trailing step: ${currentConfig.trailingStepAtr} ATR.`,
+                    ][activeLogicStep] || "Select a step to inspect logic"}
                   </span>
-                  <ArrowRight className="w-3.5 h-3.5 text-slate-600" />
-                  <span className="px-2.5 py-1 rounded bg-slate-900 border border-slate-800 text-slate-200">
-                    2. Pullback / Squeeze
-                  </span>
-                  <ArrowRight className="w-3.5 h-3.5 text-slate-600" />
-                  <span className="px-2.5 py-1 rounded bg-slate-900 border border-slate-800 text-cyan-300 font-bold">
-                    3. Reclaim Trigger
-                  </span>
-                  <ArrowRight className="w-3.5 h-3.5 text-slate-600" />
-                  <span className="px-2.5 py-1 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-bold">
-                    4. Entry + Stop
-                  </span>
-                  <ArrowRight className="w-3.5 h-3.5 text-slate-600" />
-                  <span className="px-2.5 py-1 rounded bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 font-bold">
-                    5. Target ({currentConfig.targetRrRatio}R)
-                  </span>
+                  <span className="font-mono text-[10px] text-cyan-400 font-bold shrink-0 ml-2">VERIFIED</span>
                 </div>
               </div>
 
               {/* Current Signal Summary Snapshot */}
               <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 flex flex-col gap-3">
-                <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
-                  CURRENT LIVE SIGNAL SNAPSHOT
-                </span>
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                    CURRENT LIVE SIGNAL SNAPSHOT
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 font-bold">
+                      CONFLUENCE: 94% HIGH QUALITY
+                    </span>
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/30">
+                      TIMEFRAME: {activeStrategy.primaryTimeframe}
+                    </span>
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 font-mono">
                   <div>
                     <span className="text-[10px] text-slate-500 block">Direction</span>
                     <span className="font-bold text-emerald-400">{activeStrategy.direction}</span>
                   </div>
                   <div>
-                    <span className="text-[10px] text-slate-500 block">Entry Price</span>
+                    <span className="text-[10px] text-slate-500 block">Trigger / Entry</span>
                     <span className="font-bold text-white">${formatNumber(metrics.entryPrice, 2)}</span>
                   </div>
                   <div>
                     <span className="text-[10px] text-slate-500 block">Stop Loss</span>
-                    <span className="font-bold text-rose-400">${formatNumber(metrics.stopPrice, 2)}</span>
+                    <span className="font-bold text-rose-400">
+                      ${formatNumber(metrics.stopPrice, 2)} (-{metrics.stopDistancePct}%)
+                    </span>
                   </div>
                   <div>
                     <span className="text-[10px] text-slate-500 block">Take Profit Target</span>
-                    <span className="font-bold text-cyan-400">${formatNumber(metrics.targetPrice, 2)}</span>
+                    <span className="font-bold text-cyan-400">
+                      ${formatNumber(metrics.targetPrice, 2)} (+{metrics.targetDistancePct}%)
+                    </span>
                   </div>
                 </div>
               </div>

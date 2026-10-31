@@ -196,7 +196,7 @@ export function MarketScannerWorkbench({ onSelectInstrument }: MarketScannerWork
                     }`}
                   >
                     {isPos ? "+" : ""}
-                    {(inst.change_24h || 0).toFixed(2)}%
+                    {Number(inst.change_24h || 0).toFixed(2)}%
                   </span>
                 </div>
 

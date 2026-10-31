@@ -63,8 +63,8 @@ export function useMarketGateway(
   }, [sym, reason, subscribe, unsubscribe, subscribeSymbolQuote, getQuote]);
 
   const formattedPrice = useMemo(() => {
-    if (!quote) return "—";
-    const p = quote.last_price;
+    if (!quote || quote.last_price == null || isNaN(Number(quote.last_price))) return "—";
+    const p = Number(quote.last_price);
     if (p >= 10000) return formatNumber(p, 2);
     if (p >= 1) return p.toFixed(2);
     if (p >= 0.01) return p.toFixed(4);
@@ -72,9 +72,10 @@ export function useMarketGateway(
   }, [quote]);
 
   const formattedChangePct = useMemo(() => {
-    if (!quote || quote.change_pct == null) return "—";
-    const sign = quote.change_pct >= 0 ? "+" : "";
-    return `${sign}${quote.change_pct.toFixed(2)}%`;
+    if (!quote || quote.change_pct == null || isNaN(Number(quote.change_pct))) return "—";
+    const cp = Number(quote.change_pct);
+    const sign = cp >= 0 ? "+" : "";
+    return `${sign}${cp.toFixed(2)}%`;
   }, [quote]);
 
   return {

@@ -38,6 +38,9 @@ export function AlertsMonitoring() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [actionFeedback, setActionFeedback] = useState<string | null>(null);
 
+  // Track previous summary state to avoid redundant query invalidations on SSE heartbeats
+  const lastSummaryHashRef = React.useRef<string>("");
+
   // 1. Fetch Authoritative Incident Metrics Summary (Adaptive Polling)
   const { 
     data: summaryData, 
@@ -46,12 +49,12 @@ export function AlertsMonitoring() {
   } = useQuery<IncidentSummaryResponse>({
     queryKey: ["incidentsSummary"],
     queryFn: async () => {
-      const res = await apiClient.get<IncidentSummaryResponse>("/api/incidents/summary", { timeoutMs: 5000 });
+      const res = await apiClient.get<IncidentSummaryResponse>("/api/incidents/summary", { timeoutMs: 8000 });
       if (!res.ok || !res.data) throw new Error("Failed to fetch incident summary metrics");
       return res.data;
     },
-    refetchInterval: () => (apiClient.isOffline() || isStreaming ? false : 10000),
-    staleTime: 5000,
+    refetchInterval: () => (apiClient.isOffline() || isStreaming ? false : 30000),
+    staleTime: 15000,
     retry: 1
   });
 
@@ -59,12 +62,12 @@ export function AlertsMonitoring() {
   const { data: systemHealthData } = useQuery({
     queryKey: ["systemHealthStatus"],
     queryFn: async () => {
-      const res = await apiClient.get<any>("/api/system/health", { timeoutMs: 5000 });
+      const res = await apiClient.get<any>("/api/system/health", { timeoutMs: 8000 });
       if (!res.ok || !res.data) return null;
       return res.data;
     },
-    refetchInterval: () => (apiClient.isOffline() || isStreaming ? false : 15000),
-    staleTime: 10000,
+    refetchInterval: () => (apiClient.isOffline() || isStreaming ? false : 30000),
+    staleTime: 15000,
     retry: 1
   });
 
@@ -86,12 +89,12 @@ export function AlertsMonitoring() {
       if (searchQuery.trim()) params.append("search", searchQuery.trim());
       params.append("limit", "100");
 
-      const res = await apiClient.get<IncidentsListResponse>(`/api/incidents?${params.toString()}`, { timeoutMs: 6000 });
+      const res = await apiClient.get<IncidentsListResponse>(`/api/incidents?${params.toString()}`, { timeoutMs: 8000 });
       if (!res.ok || !res.data) throw new Error(res.error?.message || "Failed to fetch incidents");
       return res.data;
     },
-    refetchInterval: () => (apiClient.isOffline() || isStreaming ? false : 8000),
-    staleTime: 5000,
+    refetchInterval: () => (apiClient.isOffline() || isStreaming ? false : 30000),
+    staleTime: 15000,
     retry: 1
   });
 
@@ -107,15 +110,21 @@ export function AlertsMonitoring() {
         if (payload?.type === "INCIDENTS_STREAM") {
           if (payload.summary) {
             queryClient.setQueryData(["incidentsSummary"], { status: "success", metrics: payload.summary });
+
+            // Only invalidate list if metric signature actually changed
+            const summaryHash = `${payload.summary.active_incidents || 0}:${payload.summary.critical || 0}:${payload.summary.error || 0}:${payload.summary.unacknowledged || 0}:${payload.summary.total_incidents || 0}`;
+            if (lastSummaryHashRef.current && lastSummaryHashRef.current !== summaryHash) {
+              if (!debounceTimer) {
+                debounceTimer = setTimeout(() => {
+                  queryClient.invalidateQueries({ queryKey: ["incidentsList"] });
+                  debounceTimer = null;
+                }, 2000);
+              }
+            }
+            lastSummaryHashRef.current = summaryHash;
           }
           if (payload.system_health) {
             queryClient.setQueryData(["systemHealthStatus"], { status: "success", health: payload.system_health });
-          }
-          if (!debounceTimer) {
-            debounceTimer = setTimeout(() => {
-              queryClient.invalidateQueries({ queryKey: ["incidentsList"] });
-              debounceTimer = null;
-            }, 3000);
           }
         }
       },

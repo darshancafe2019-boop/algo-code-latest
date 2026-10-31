@@ -302,14 +302,11 @@ class BotProcessManager:
 
             # Persist RUNNING state to DB
             try:
-                from src.db import get_connection
-                conn = get_connection()
-                conn.execute(
+                from src.db import safe_execute
+                safe_execute(
                     "UPDATE bot_instances SET status = 'RUNNING', desired_state = 'RUNNING', started_at = ?, stopped_at = NULL, process_id = ?, lease_token = ? WHERE id = ?",
                     (now_utc.isoformat(), str(self.process.pid), lease_token or '', self.bot_id)
                 )
-                conn.commit()
-                conn.close()
             except Exception as dbe:
                 logger.warning(f"Could not update bot_instances status for {self.bot_id}: {dbe}")
 
@@ -387,14 +384,10 @@ class BotProcessManager:
                 import src.db as db
                 db.release_bot_worker_lease(self.bot_id)
                 now_iso = datetime.now(timezone.utc).isoformat()
-                from src.db import get_connection
-                conn = get_connection()
-                conn.execute(
+                db.safe_execute(
                     "UPDATE bot_instances SET status = 'STOPPED', desired_state = 'STOPPED', stopped_at = ?, process_id = '', lease_token = '' WHERE id = ?",
                     (now_iso, self.bot_id)
                 )
-                conn.commit()
-                conn.close()
             except Exception as e:
                 logger.warning(f"Error updating DB on stop_bot for {self.bot_id}: {e}")
 
@@ -448,14 +441,11 @@ class BotProcessManager:
         # Persist PAUSED state to DB
         try:
             now_iso = datetime.now(timezone.utc).isoformat()
-            from src.db import get_connection
-            conn = get_connection()
-            conn.execute(
+            from src.db import safe_execute
+            safe_execute(
                 "UPDATE bot_instances SET status = 'PAUSED', paused_at = ? WHERE id = ?",
                 (now_iso, self.bot_id)
             )
-            conn.commit()
-            conn.close()
         except Exception:
             pass
 
@@ -494,14 +484,11 @@ class BotProcessManager:
         # Persist RUNNING state to DB
         try:
             now_iso = datetime.now(timezone.utc).isoformat()
-            from src.db import get_connection
-            conn = get_connection()
-            conn.execute(
+            from src.db import safe_execute
+            safe_execute(
                 "UPDATE bot_instances SET status = 'RUNNING', resumed_at = ? WHERE id = ?",
                 (now_iso, self.bot_id)
             )
-            conn.commit()
-            conn.close()
         except Exception:
             pass
 
@@ -554,11 +541,8 @@ class BotProcessManager:
             if self.status_state == BOT_STATE_HALTED:
                 self.status_state = BOT_STATE_STOPPED
             try:
-                from src.db import get_connection
-                conn = get_connection()
-                conn.execute("UPDATE bot_instances SET status = 'STOPPED' WHERE status = 'HALTED'")
-                conn.commit()
-                conn.close()
+                from src.db import safe_execute
+                safe_execute("UPDATE bot_instances SET status = 'STOPPED' WHERE status = 'HALTED'")
             except Exception:
                 pass
             log_audit_event(action="KILL_SWITCH_DEACTIVATED", user="Trader")
@@ -828,12 +812,8 @@ class MultiBotManager:
             return {"status": "error", "message": "Kill switch is active."}
 
         try:
-            from src.db import get_connection
-            conn = get_connection()
-            cursor = conn.cursor()
-            cursor.execute("SELECT * FROM bot_instances WHERE COALESCE(is_deleted, 0) = 0")
-            bots = [dict(r) for r in cursor.fetchall()]
-            conn.close()
+            from src.db import safe_query
+            bots = safe_query("SELECT * FROM bot_instances WHERE COALESCE(is_deleted, 0) = 0")
         except Exception as e:
             return {"status": "error", "message": f"DB Error: {e}"}
 
@@ -867,12 +847,8 @@ class MultiBotManager:
     def pause_all_bots(self) -> Dict[str, Any]:
         """Pauses all currently running bot instances."""
         try:
-            from src.db import get_connection
-            conn = get_connection()
-            cursor = conn.cursor()
-            cursor.execute("SELECT id, name FROM bot_instances WHERE status = 'RUNNING' AND COALESCE(is_deleted, 0) = 0")
-            running_bots = [dict(r) for r in cursor.fetchall()]
-            conn.close()
+            from src.db import safe_query
+            running_bots = safe_query("SELECT id, name FROM bot_instances WHERE status = 'RUNNING' AND COALESCE(is_deleted, 0) = 0")
         except Exception as e:
             return {"status": "error", "message": str(e)}
 
@@ -895,12 +871,8 @@ class MultiBotManager:
                 pass
 
         try:
-            from src.db import get_connection
-            conn = get_connection()
-            cursor = conn.cursor()
-            cursor.execute("SELECT id, name FROM bot_instances WHERE status IN ('RUNNING', 'PAUSED') AND COALESCE(is_deleted, 0) = 0")
-            active_bots = [dict(r) for r in cursor.fetchall()]
-            conn.close()
+            from src.db import safe_query
+            active_bots = safe_query("SELECT id, name FROM bot_instances WHERE status IN ('RUNNING', 'PAUSED') AND COALESCE(is_deleted, 0) = 0")
         except Exception as e:
             return {"status": "error", "message": str(e)}
 
@@ -926,12 +898,8 @@ class MultiBotManager:
             return {"status": "error", "message": "Cannot start/resume group bots: 🔴 TRADING HALTED via Emergency Kill Switch."}
 
         try:
-            from src.db import get_connection
-            conn = get_connection()
-            cursor = conn.cursor()
-            cursor.execute("SELECT * FROM bot_instances WHERE group_name = ? AND COALESCE(is_deleted, 0) = 0 ORDER BY id ASC", (group_name,))
-            bots = [dict(r) for r in cursor.fetchall()]
-            conn.close()
+            from src.db import safe_query
+            bots = safe_query("SELECT * FROM bot_instances WHERE group_name = ? AND COALESCE(is_deleted, 0) = 0 ORDER BY id ASC", (group_name,))
         except Exception as e:
             return {"status": "error", "message": f"Failed to fetch bots for group '{group_name}': {e}"}
 
@@ -984,27 +952,20 @@ class MultiBotManager:
             active_ids = [bid for bid, mgr in self.managers.items() if mgr.is_running()]
         if not active_ids:
             try:
-                from src.db import get_connection
-                conn = get_connection()
-                cursor = conn.cursor()
-                cursor.execute("SELECT id FROM bot_instances WHERE status = 'RUNNING' AND COALESCE(is_deleted, 0) = 0")
-                rows = cursor.fetchall()
-                conn.close()
+                from src.db import safe_query
+                rows = safe_query("SELECT id FROM bot_instances WHERE status = 'RUNNING' AND COALESCE(is_deleted, 0) = 0")
                 active_ids = [r["id"] if isinstance(r, dict) else r[0] for r in rows]
             except Exception:
                 pass
         return active_ids
 
     def _update_db_status(self, bot_id: str, status: str, pid: Optional[int] = None, error: Optional[str] = None) -> None:
-
         try:
-            from src.db import get_connection
-            conn = get_connection()
-            c = conn.cursor()
+            from src.db import safe_execute
             now_str = datetime.now(timezone.utc).isoformat()
 
             if status == BOT_STATE_RUNNING:
-                c.execute("""
+                safe_execute("""
                     UPDATE bot_instances 
                     SET status = 'RUNNING', 
                         started_at = COALESCE(started_at, ?), 
@@ -1014,16 +975,13 @@ class MultiBotManager:
                     WHERE id = ?
                 """, (now_str, now_str, str(pid) if pid else None, bot_id))
             elif status == BOT_STATE_PAUSED:
-                c.execute("UPDATE bot_instances SET status = 'PAUSED', paused_at = ? WHERE id = ?", (now_str, bot_id))
+                safe_execute("UPDATE bot_instances SET status = 'PAUSED', paused_at = ? WHERE id = ?", (now_str, bot_id))
             elif status == BOT_STATE_STOPPED:
-                c.execute("UPDATE bot_instances SET status = 'STOPPED', stopped_at = ?, process_id = '' WHERE id = ?", (now_str, bot_id))
+                safe_execute("UPDATE bot_instances SET status = 'STOPPED', stopped_at = ?, process_id = '' WHERE id = ?", (now_str, bot_id))
             elif status == BOT_STATE_ERROR:
-                c.execute("UPDATE bot_instances SET status = 'ERROR', last_error = ? WHERE id = ?", (error or "Runtime error", bot_id))
+                safe_execute("UPDATE bot_instances SET status = 'ERROR', last_error = ? WHERE id = ?", (error or "Runtime error", bot_id))
             else:
-                c.execute("UPDATE bot_instances SET status = ? WHERE id = ?", (status, bot_id))
-
-            conn.commit()
-            conn.close()
+                safe_execute("UPDATE bot_instances SET status = ? WHERE id = ?", (status, bot_id))
         except Exception as e:
             logger.error(f"Failed to update db status for bot {bot_id}: {e}")
 
@@ -1046,14 +1004,10 @@ class BotWatchdog(threading.Thread):
             time.sleep(self.check_interval)
 
     def _check_stalled_bots(self):
-        from src.db import get_connection, log_bot_activity
+        from src.db import safe_query, safe_execute, log_bot_activity
         from src.self_healing_manager import global_self_healing_manager
         try:
-            conn = get_connection()
-            cursor = conn.cursor()
-            cursor.execute("SELECT id, name, timeframe, status, last_checked_at FROM bot_instances WHERE status IN ('RUNNING', 'PAUSED') AND COALESCE(is_deleted, 0) = 0")
-            rows = cursor.fetchall()
-            conn.close()
+            rows = safe_query("SELECT id, name, timeframe, status, last_checked_at FROM bot_instances WHERE status IN ('RUNNING', 'PAUSED') AND COALESCE(is_deleted, 0) = 0")
 
             now_utc = datetime.now(timezone.utc)
             
@@ -1089,10 +1043,7 @@ class BotWatchdog(threading.Thread):
 
                     def _on_exhausted_cb():
                         try:
-                            conn2 = get_connection()
-                            conn2.execute("UPDATE bot_instances SET status = 'ERROR', last_error = 'Auto-recovery exhausted. Manual restart required.' WHERE id = ?", (bot_id,))
-                            conn2.commit()
-                            conn2.close()
+                            safe_execute("UPDATE bot_instances SET status = 'ERROR', last_error = 'Auto-recovery exhausted. Manual restart required.' WHERE id = ?", (bot_id,))
                         except Exception:
                             pass
 

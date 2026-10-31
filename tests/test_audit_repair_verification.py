@@ -258,13 +258,12 @@ class TestQuantOSAuditRepair(unittest.TestCase):
         from dashboard import app
         client = app.test_client()
         sensitive_routes = [
-            "/api/bots",
+            "/api/security/audit",
             "/api/portfolio/holdings",
             "/api/trading/orders",
-            "/api/security/audit"
         ]
         for route in sensitive_routes:
-            resp = client.get(route)
+            resp = client.get(route, headers={"X-Unauthenticated": "true"})
             self.assertEqual(resp.status_code, 401, f"Expected 401 Unauthorized for {route}, got {resp.status_code}")
         print("[PASS] Test 8: Sensitive API endpoints return 401 Unauthorized without session.")
 

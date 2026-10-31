@@ -26,6 +26,7 @@ from src.domain.strategy_registry import StrategyRegistry, OptionLeg
 from src.domain.indicator_registry import IndicatorRegistry
 from src.domain.bot_wizard import BotWizardPayload, PreDeploymentCheck, PreDeploymentResult
 from src.domain.enums import BotStatus, ExecutionMode, AssetClass, Exchange, ProviderType
+import src.config as config
 
 logger = logging.getLogger("BotWizardService")
 
@@ -116,13 +117,11 @@ def _ensure_schema():
                 conn.execute("CREATE INDEX IF NOT EXISTS idx_orders_status ON orders (status);")
                 conn.execute("CREATE INDEX IF NOT EXISTS idx_trades_bot_id ON trades (bot_id);")
                 conn.execute("CREATE INDEX IF NOT EXISTS idx_positions_bot_id ON positions (bot_id);")
-                conn.commit()
             except Exception as ext_err:
                 logger.debug(f"Extended schema creation notice: {ext_err}")
-
-            conn.commit()
     except Exception as e:
-        logger.error(f"Failed to ensure schema in {DB_PATH}: {e}")
+        db_target = "PostgreSQL" if getattr(config, "IS_POSTGRES", False) else DB_PATH
+        logger.error(f"Failed to ensure schema in {db_target}: {e}")
 
 
 def detect_bot_currency(symbol: str = "", exchange: str = "", provider: str = "", market_type: str = "", explicit_currency: str = "", name: str = "") -> str:

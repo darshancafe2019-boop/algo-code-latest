@@ -22,8 +22,10 @@ import {
   X,
   Menu,
   Activity,
+  Filter,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useDashboardFilterStore } from "@/lib/store/useDashboardFilterStore";
 
 interface LeftNavigationSidebarProps {
   isCollapsed: boolean;
@@ -63,6 +65,8 @@ export function LeftNavigationSidebar({
   const pathname = usePathname();
   const router = useRouter();
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
+  const { toggleFilterOpen, isFilterOpen, getActiveFiltersCount } = useDashboardFilterStore();
+  const activeFiltersCount = getActiveFiltersCount();
 
   // Pre-cache all primary routes for instant zero-lag tab transitions
   useEffect(() => {
@@ -153,6 +157,33 @@ export function LeftNavigationSidebar({
               </Link>
             );
           })}
+        </div>
+
+        {/* Filter Station Quick Toggle */}
+        <div className="px-2 pb-1 shrink-0">
+          <button
+            type="button"
+            onClick={toggleFilterOpen}
+            title={isCollapsed ? "Dashboard Filter Station" : undefined}
+            className={cn(
+              "w-full h-[38px] flex items-center gap-2 px-2.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer border text-left",
+              isFilterOpen
+                ? "bg-[#00F0FF]/15 text-[#00F0FF] border-[#00F0FF]/50 shadow-sm"
+                : "bg-[#0A1422] text-[#7D8EA5] hover:text-[#F8FAFC] border-[#12304A] hover:bg-[#0E1E34]"
+            )}
+          >
+            <Filter className={cn("h-4 w-4 shrink-0", isFilterOpen ? "text-[#00F0FF]" : "text-[#7D8EA5]")} />
+            {!isCollapsed && (
+              <div className="flex-1 flex items-center justify-between min-w-0">
+                <span className="truncate text-xs">Filter Station</span>
+                {activeFiltersCount > 0 && (
+                  <span className="px-1.5 py-0.2 rounded-full text-[9px] font-mono font-bold bg-[#168BFF] text-white">
+                    {activeFiltersCount}
+                  </span>
+                )}
+              </div>
+            )}
+          </button>
         </div>
 
         {/* Bottom Sidebar Status & Controls */}

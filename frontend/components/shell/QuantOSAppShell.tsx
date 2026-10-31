@@ -13,6 +13,7 @@ import { CreateBotModal } from "@/components/bot-control/CreateBotModal";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AuthGuard } from "@/components/auth/AuthGuard";
 import { ProviderFailoverBanner } from "@/components/providers/ProviderFailoverBanner";
+import { DashboardFilterPanel } from "@/components/filters/DashboardFilterPanel";
 
 export interface DrawerConfig {
   isOpen: boolean;
@@ -266,7 +267,7 @@ export function QuantOSAppShell({
             </ErrorBoundary>
 
             {/* Main Center Workspace */}
-            <main className="flex-1 overflow-y-auto bg-[#060B14] p-3 sm:p-4 pb-20 md:pb-4 min-w-0">
+            <main className="flex-1 overflow-y-auto bg-[#050B14] p-2.5 sm:p-3.5 pb-20 md:pb-4 min-w-0">
               <ErrorBoundary title="Workspace View Failed">{children}</ErrorBoundary>
             </main>
           </div>
@@ -302,6 +303,7 @@ export function QuantOSAppShell({
           <MobileCommandSheet />
           <QuickOrderModal />
           <CreateBotModal />
+          <DashboardFilterPanel />
         </div>
       </AuthGuard>
     </QuantOSShellContext.Provider>

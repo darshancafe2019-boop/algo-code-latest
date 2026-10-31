@@ -138,10 +138,10 @@ export function OptionsCommandCenter({ underlyingSymbol }: OptionsCommandCenterP
                       {call?.implied_volatility ? `${call.implied_volatility.toFixed(1)}%` : "N/A"}
                     </td>
                     <td className="py-3 px-3 text-right text-cyan-300">
-                      {call?.delta !== undefined ? call.delta.toFixed(2) : "N/A"}
+                      {call?.delta != null ? Number(call.delta).toFixed(2) : "N/A"}
                     </td>
                     <td className="py-3 px-3 text-right font-bold text-[#22D3EE]">
-                      {call?.last_price !== undefined ? `$${call.last_price.toFixed(2)}` : "N/A"}
+                      {call?.last_price != null ? `$${Number(call.last_price).toFixed(2)}` : "N/A"}
                     </td>
 
                     {/* STRIKE */}
@@ -158,10 +158,10 @@ export function OptionsCommandCenter({ underlyingSymbol }: OptionsCommandCenterP
 
                     {/* PUTS */}
                     <td className="py-3 px-3 text-left font-bold text-red-400">
-                      {put?.last_price !== undefined ? `$${put.last_price.toFixed(2)}` : "N/A"}
+                      {put?.last_price != null ? `$${Number(put.last_price).toFixed(2)}` : "N/A"}
                     </td>
                     <td className="py-3 px-3 text-left text-cyan-300">
-                      {put?.delta !== undefined ? put.delta.toFixed(2) : "N/A"}
+                      {put?.delta != null ? Number(put.delta).toFixed(2) : "N/A"}
                     </td>
                     <td className="py-3 px-3 text-left text-purple-300">
                       {put?.implied_volatility ? `${put.implied_volatility.toFixed(1)}%` : "N/A"}

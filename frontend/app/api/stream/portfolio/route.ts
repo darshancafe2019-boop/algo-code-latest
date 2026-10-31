@@ -57,40 +57,71 @@ export async function GET(req: NextRequest) {
         });
       }
 
-      const bodyText = await upstreamRes.text().catch(() => "");
-      if (bodyText && upstreamRes.headers.get("content-type")?.includes("application/json")) {
-        try {
-          const jsonBody = JSON.parse(bodyText);
-          return NextResponse.json(jsonBody, { status: upstreamRes.status });
-        } catch {}
-      }
+      // If upstream SSE returned non-OK or failed, fallback to polling authoritative snapshot or ping
+      try {
+        const snapRes = await fetch(`${backendUrl}/api/portfolio/snapshot?mode=${encodeURIComponent(mode)}`, {
+          headers: getForwardHeaders(req),
+          cache: "no-store",
+        });
+        if (snapRes.ok) {
+          const snapData = await snapRes.json();
+          const sseBody = `: ping\n\ndata: ${JSON.stringify({ type: "PORTFOLIO_SNAPSHOT", data: snapData })}\n\n`;
+          return new Response(sseBody, {
+            status: 200,
+            headers: {
+              "Content-Type": "text/event-stream",
+              "Cache-Control": "no-cache, no-transform",
+              Connection: "keep-alive",
+              "X-Accel-Buffering": "no",
+            },
+          });
+        }
+      } catch {}
 
-      return NextResponse.json(
-        {
-          ok: false,
-          success: false,
-          status: "error",
-          error: {
-            code: upstreamRes.status === 401 ? "UNAUTHORIZED" : "STREAM_UNAVAILABLE",
-            message: `Portfolio stream unavailable (HTTP ${upstreamRes.status}).`,
-          },
+      // Resilient fallback SSE stream instead of raw HTTP 500 crash
+      const fallbackStream = `: ping\n\ndata: ${JSON.stringify({ type: "STREAM_RETRYING", message: "Connecting to portfolio feed..." })}\n\n`;
+      return new Response(fallbackStream, {
+        status: 200,
+        headers: {
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache, no-transform",
+          Connection: "keep-alive",
+          "X-Accel-Buffering": "no",
         },
-        { status: upstreamRes.status || 503, headers: { "X-Request-Id": req.headers.get("x-request-id") || "portfolio-stream" } }
-      );
+      });
     } catch (err: any) {
       clearTimeout(connectTimer);
-      return NextResponse.json(
-        {
-          ok: false,
-          success: false,
-          status: "error",
-          error: {
-            code: "STREAM_ERROR",
-            message: err?.message || "Failed to connect to portfolio stream.",
-          },
+      // Graceful fallback on connection/timeout error
+      try {
+        const snapRes = await fetch(`${backendUrl}/api/portfolio/snapshot?mode=${encodeURIComponent(mode)}`, {
+          headers: getForwardHeaders(req),
+          cache: "no-store",
+        });
+        if (snapRes.ok) {
+          const snapData = await snapRes.json();
+          const sseBody = `: ping\n\ndata: ${JSON.stringify({ type: "PORTFOLIO_SNAPSHOT", data: snapData })}\n\n`;
+          return new Response(sseBody, {
+            status: 200,
+            headers: {
+              "Content-Type": "text/event-stream",
+              "Cache-Control": "no-cache, no-transform",
+              Connection: "keep-alive",
+              "X-Accel-Buffering": "no",
+            },
+          });
+        }
+      } catch {}
+
+      const fallbackStream = `: ping\n\ndata: ${JSON.stringify({ type: "STREAM_RETRYING", message: "Reconnecting to portfolio feed..." })}\n\n`;
+      return new Response(fallbackStream, {
+        status: 200,
+        headers: {
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache, no-transform",
+          Connection: "keep-alive",
+          "X-Accel-Buffering": "no",
         },
-        { status: 503, headers: { "X-Request-Id": req.headers.get("x-request-id") || "portfolio-stream" } }
-      );
+      });
     }
   }
 

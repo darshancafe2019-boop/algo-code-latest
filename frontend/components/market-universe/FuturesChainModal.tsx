@@ -168,13 +168,13 @@ export function FuturesChainModal({ underlying, isOpen, onClose, onSelectContrac
                         <div>
                           <span className="text-[10px] text-slate-500 block">Open Interest</span>
                           <span className="text-slate-300">
-                            {c.open_interest ? (c.open_interest / 1000).toFixed(1) + "k" : "—"}
+                            {c.open_interest != null && Number(c.open_interest) > 0 ? (Number(c.open_interest) / 1000).toFixed(1) + "k" : "—"}
                           </span>
                         </div>
                         <div>
                           <span className="text-[10px] text-slate-500 block">24h Volume</span>
                           <span className="text-slate-300">
-                            {c.volume_24h ? (c.volume_24h / 1000).toFixed(0) + "k" : "—"}
+                            {c.volume_24h != null && Number(c.volume_24h) > 0 ? (Number(c.volume_24h) / 1000).toFixed(0) + "k" : "—"}
                           </span>
                         </div>
                       </div>

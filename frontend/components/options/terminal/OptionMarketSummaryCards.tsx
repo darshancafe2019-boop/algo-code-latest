@@ -57,6 +57,13 @@ export const OptionMarketSummaryCards: React.FC<OptionMarketSummaryCardsProps> =
 
   const totalOI = (pcr.totalCallOI || 0) + (pcr.totalPutOI || 0);
   const totalVolume = (pcr.totalCallVolume || 0) + (pcr.totalPutVolume || 0);
+  const atmRow = snapshot.strikes?.find((s) => s.isATM) || snapshot.strikes?.[Math.floor((snapshot.strikes?.length || 0) / 2)];
+  const atmCallLtp = atmRow?.call?.ltp ? atmRow.call.ltp.toFixed(1) : "—";
+  const atmPutLtp = atmRow?.put?.ltp ? atmRow.put.ltp.toFixed(1) : "—";
+  const maxPainDistFromATM = snapshot.maxPain && snapshot.atmStrike ? Math.abs(snapshot.maxPain - snapshot.atmStrike) : 0;
+
+  const callBuildupLabel = (pcr.totalCallOIChange || 0) > 0 ? "BUILDUP" : (pcr.totalCallOIChange || 0) < 0 ? "UNWINDING" : "NEUTRAL";
+  const putBuildupLabel = (pcr.totalPutOIChange || 0) > 0 ? "BUILDUP" : (pcr.totalPutOIChange || 0) < 0 ? "UNWINDING" : "NEUTRAL";
 
   return (
     <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2.5 font-mono text-xs sm:text-sm">
@@ -64,7 +71,9 @@ export const OptionMarketSummaryCards: React.FC<OptionMarketSummaryCardsProps> =
       <div className="p-3 rounded-xl bg-[#090E17] border border-slate-800/90 flex flex-col justify-between">
         <div className="flex items-center justify-between text-xs text-slate-400 font-bold">
           <span>CALL OI</span>
-          <span className="text-rose-400 text-[10px] sm:text-xs font-bold">CE RES</span>
+          <span className={callBuildupLabel === "BUILDUP" ? "text-rose-400 text-[10px] font-bold" : "text-amber-300 text-[10px] font-bold"}>
+            {callBuildupLabel}
+          </span>
         </div>
         <div className="text-sm sm:text-base md:text-lg font-black text-rose-300 mt-1">
           {pcr.totalCallOI && pcr.totalCallOI > 0 ? formatIndianQuantity(pcr.totalCallOI) : "—"}
@@ -83,7 +92,9 @@ export const OptionMarketSummaryCards: React.FC<OptionMarketSummaryCardsProps> =
       <div className="p-3 rounded-xl bg-[#090E17] border border-slate-800/90 flex flex-col justify-between">
         <div className="flex items-center justify-between text-xs text-slate-400 font-bold">
           <span>PUT OI</span>
-          <span className="text-emerald-400 text-[10px] sm:text-xs font-bold">PE SUP</span>
+          <span className={putBuildupLabel === "BUILDUP" ? "text-emerald-400 text-[10px] font-bold" : "text-amber-300 text-[10px] font-bold"}>
+            {putBuildupLabel}
+          </span>
         </div>
         <div className="text-sm sm:text-base md:text-lg font-black text-emerald-300 mt-1">
           {pcr.totalPutOI && pcr.totalPutOI > 0 ? formatIndianQuantity(pcr.totalPutOI) : "—"}
@@ -133,11 +144,9 @@ export const OptionMarketSummaryCards: React.FC<OptionMarketSummaryCardsProps> =
           {snapshot.maxPain !== null && snapshot.maxPain !== undefined && snapshot.maxPain > 0 ? formatPrice(snapshot.maxPain) : "—"}
         </div>
         <div className="text-xs text-slate-400 flex items-center justify-between mt-1 font-semibold">
-          <span>Spot Diff</span>
-          <span className={snapshot.spotVsMaxPainDistance && snapshot.spotVsMaxPainDistance > 0 ? "text-emerald-400" : "text-rose-400"}>
-            {snapshot.spotVsMaxPainDistance !== null && snapshot.spotVsMaxPainDistance !== undefined && snapshot.maxPain && snapshot.maxPain > 0
-              ? `${snapshot.spotVsMaxPainDistance > 0 ? "+" : ""}${snapshot.spotVsMaxPainDistance}`
-              : "—"}
+          <span>Dist ATM</span>
+          <span className="text-slate-300">
+            {maxPainDistFromATM > 0 ? `±${maxPainDistFromATM} pts` : "At ATM"}
           </span>
         </div>
       </div>
@@ -153,9 +162,10 @@ export const OptionMarketSummaryCards: React.FC<OptionMarketSummaryCardsProps> =
         <div className="text-sm sm:text-base md:text-lg font-black text-purple-300 mt-1">
           {snapshot.atmStrike ? formatNumber(snapshot.atmStrike) : "—"}
         </div>
-        <div className="text-xs text-slate-400 flex items-center justify-between mt-1 font-semibold">
-          <span>Total OI</span>
-          <span className="text-slate-300">{totalOI > 0 ? formatIndianQuantity(totalOI) : "—"}</span>
+        <div className="text-[10px] text-slate-400 flex items-center justify-between mt-1 font-mono">
+          <span>CE {currency}{atmCallLtp}</span>
+          <span className="text-slate-600">•</span>
+          <span>PE {currency}{atmPutLtp}</span>
         </div>
       </div>
 

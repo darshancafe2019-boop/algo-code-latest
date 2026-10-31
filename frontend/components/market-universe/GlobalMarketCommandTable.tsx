@@ -246,9 +246,9 @@ export function GlobalMarketCommandTable({
                       {/* 24H Change */}
                       {visibleCols.change && (
                         <td className="py-3 px-3 text-right font-bold">
-                          {inst.change_24h !== undefined ? (
+                          {inst.change_24h != null ? (
                             <span className={isPositive ? "text-emerald-400" : "text-rose-400"}>
-                              {isPositive ? "+" : ""}{inst.change_24h.toFixed(2)}%
+                              {isPositive ? "+" : ""}{Number(inst.change_24h).toFixed(2)}%
                             </span>
                           ) : (
                             <span className="text-slate-500">—</span>

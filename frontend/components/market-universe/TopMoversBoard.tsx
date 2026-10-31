@@ -118,7 +118,7 @@ export function TopMoversBoard({ onSelectInstrument }: TopMoversBoardProps) {
                     }`}
                   >
                     {isPos ? "+" : ""}
-                    {(inst.change_24h || 0).toFixed(2)}%
+                    {Number(inst.change_24h || 0).toFixed(2)}%
                   </span>
                 </div>
 
@@ -128,7 +128,7 @@ export function TopMoversBoard({ onSelectInstrument }: TopMoversBoardProps) {
                     {formatPrice(inst.last_price)}
                   </span>
                   <span className="text-[10px] text-slate-500">
-                    Vol: {currSymbol}{(inst.volume_24h || 0) > 1e6 ? `${((inst.volume_24h || 0) / 1e6).toFixed(1)}M` : `${((inst.volume_24h || 0) / 1e3).toFixed(0)}k`}
+                    Vol: {currSymbol}{Number(inst.volume_24h || 0) > 1e6 ? `${(Number(inst.volume_24h || 0) / 1e6).toFixed(1)}M` : `${(Number(inst.volume_24h || 0) / 1e3).toFixed(0)}k`}
                   </span>
                 </div>
               </div>

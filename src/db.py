@@ -4,6 +4,7 @@ import json
 import logging
 import random
 import re
+import select
 import shutil
 import sqlite3
 import threading
@@ -230,10 +231,22 @@ class PostgresConnectionAdapter:
         return CursorAdapter(self._pg_conn.cursor(row_factory=dict_row))
 
     def commit(self):
-        self._pg_conn.commit()
+        try:
+            self._pg_conn.commit()
+        except Exception as exc:
+            if "forbidden within a Transaction context" in str(exc):
+                pass
+            else:
+                raise
 
     def rollback(self):
-        self._pg_conn.rollback()
+        try:
+            self._pg_conn.rollback()
+        except Exception as exc:
+            if "forbidden within a Transaction context" in str(exc):
+                pass
+            else:
+                raise
 
     def close(self):
         try:
@@ -246,9 +259,9 @@ class PostgresConnectionAdapter:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if exc_type is not None:
-            self._pg_conn.rollback()
+            self.rollback()
         else:
-            self._pg_conn.commit()
+            self.commit()
 
 
 class PooledPostgresConnectionAdapter(PostgresConnectionAdapter):
@@ -263,9 +276,22 @@ class PooledPostgresConnectionAdapter(PostgresConnectionAdapter):
             self._returned = True
             if self._pool is not None and self._pg_conn is not None:
                 try:
+                    if not getattr(self._pg_conn, "closed", True):
+                        status = getattr(self._pg_conn.info, "transaction_status", None)
+                        if status is not None and status != 0:  # Not IDLE
+                            try:
+                                self._pg_conn.rollback()
+                            except Exception:
+                                try:
+                                    self._pg_conn.close()
+                                except Exception:
+                                    pass
                     self._pool.putconn(self._pg_conn)
                 except Exception:
                     pass
+
+    def __del__(self):
+        self.close()
 
 
 def with_db_retry(max_retries: int = 5, base_delay: float = 0.05, max_delay: float = 1.0) -> Callable[[F], F]:
@@ -336,6 +362,10 @@ def _trip_pg_circuit_breaker(duration_sec: float = 60.0, reason: str = ""):
         "InsufficientPrivilege",
         "permission denied",
         "SyntaxError",
+        "ProgrammingError",
+        "DataError",
+        "IntegrityError",
+        "placeholders",
         "UniqueViolation",
         "NotNullViolation",
         "ForeignKeyViolation",
@@ -421,8 +451,11 @@ def _acquire_direct_pg_connection(timeout: float = 3.0):
 
 def _fast_check_connection(conn) -> None:
     """Probes a connection's health before handing it out from the pool.
-    Fast in-memory check without incurring a costly 200ms network round-trip on every checkout.
-    Only sends a wire test if the connection has been idle for > 45 seconds or transaction state is dirty.
+    - Rejects closed, broken or corrupted SSL connections.
+    - Fast socket select probe: checks if remote server sent FIN/RST or SSL alert on an idle socket.
+    - If idle for > 30 seconds, sends a zero-cost wire ping (empty statement).
+    - Ensures transactions are rolled back to IDLE.
+    - If check fails, explicitly closes the connection so psycopg_pool discards it and provisions a fresh one.
     """
     try:
         if getattr(conn, "closed", False) or getattr(conn, "broken", False):
@@ -439,11 +472,33 @@ def _fast_check_connection(conn) -> None:
                     pass
                 raise RuntimeError(f"Connection transaction status dirty ({status}), closed")
 
+        # Fast non-blocking socket select: detects remote EOF or TLS alert on idle socket (0.0ms)
+        try:
+            fn = conn.fileno()
+            if fn >= 0:
+                r, _, _ = select.select([fn], [], [], 0)
+                if r:
+                    # Remote server closed socket or sent TLS alert
+                    if getattr(conn, "autocommit", False):
+                        conn.execute("")
+                    else:
+                        with conn.cursor() as cur:
+                            cur.execute("SELECT 1;")
+        except Exception as sel_err:
+            try:
+                conn.close()
+            except Exception:
+                pass
+            raise RuntimeError(f"Connection socket severed by remote server: {sel_err}")
+
         now = time.monotonic()
         last_used = getattr(conn, "_last_checked_at", 0.0)
-        if now - last_used > 45.0:
-            with conn.cursor() as cur:
-                cur.execute("SELECT 1;")
+        if now - last_used > 30.0:
+            if getattr(conn, "autocommit", False):
+                conn.execute("")
+            else:
+                with conn.cursor() as cur:
+                    cur.execute("SELECT 1;")
             setattr(conn, "_last_checked_at", now)
         else:
             setattr(conn, "_last_checked_at", now)
@@ -487,26 +542,27 @@ def get_db_pool():
                     from psycopg_pool import ConnectionPool
                     min_conns = int(os.getenv("PG_POOL_MIN", "5"))
                     max_conns = int(os.getenv("PG_POOL_MAX", "25"))
+                    pool_timeout = float(os.getenv("PG_POOL_CHECKOUT_TIMEOUT", "5.0"))
                     _pg_pool = ConnectionPool(
                         conninfo=clean_conninfo,
                         min_size=min_conns,
                         max_size=max_conns,
-                        timeout=15.0,
-                        max_idle=300.0,
-                        max_lifetime=600.0,
-                        reconnect_timeout=15.0,
+                        timeout=pool_timeout,
+                        max_idle=45.0,
+                        max_lifetime=300.0,
+                        reconnect_timeout=10.0,
                         check=_fast_check_connection,
                         open=True,
                         kwargs={
                             "autocommit": True,
-                            "connect_timeout": 15,
+                            "connect_timeout": 10,
                             "keepalives": 1,
-                            "keepalives_idle": 30,
-                            "keepalives_interval": 10,
+                            "keepalives_idle": 15,
+                            "keepalives_interval": 5,
                             "keepalives_count": 3,
                         }
                     )
-                    logger.info("Initialized cloud-hardened PostgreSQL ConnectionPool (min=%d, max=%d, check=fast)", min_conns, max_conns)
+                    logger.info("Initialized cloud-hardened PostgreSQL ConnectionPool (min=%d, max=%d, check=fast, idle=45s)", min_conns, max_conns)
                 except Exception as e:
                     logger.exception("Failed to initialize PostgreSQL ConnectionPool: %s", e)
                     _trip_pg_circuit_breaker(60.0, str(e))
@@ -536,17 +592,24 @@ def get_db_pool_stats() -> Dict[str, Any]:
         stats = pool.get_stats() if hasattr(pool, "get_stats") else {}
         active_waiting_count = len(getattr(pool, "_waiting", [])) if hasattr(pool, "_waiting") else stats.get("requests_waiting", 0)
         direct_active = 4 - _direct_pg_semaphore._value if hasattr(_direct_pg_semaphore, "_value") else 0
+        p_size = stats.get("pool_size", 0)
+        p_avail = stats.get("pool_available", 0)
         return {
             "configured": True,
             "engine": "postgresql",
             "pool_min": stats.get("pool_min", 1),
             "pool_max": stats.get("pool_max", 25),
-            "pool_size": stats.get("pool_size", 0),
-            "pool_available": stats.get("pool_available", 0),
+            "pool_size": p_size,
+            "pool_available": p_avail,
+            "connections_in_use": max(0, p_size - p_avail),
             "requests_waiting": active_waiting_count,
             "requests_queued": stats.get("requests_queued", active_waiting_count),
+            "returns_bad": stats.get("returns_bad", 0),
+            "connections_lost": stats.get("connections_lost", 0),
             "connection_errors": stats.get("errors", 0),
             "usage_ms": stats.get("usage_ms", 0),
+            "requests_wait_ms": stats.get("requests_wait_ms", 0),
+            "connections_ms": stats.get("connections_ms", 0),
             "direct_fallback_count": _direct_fallback_count,
             "direct_fallback_active": max(0, direct_active),
         }
@@ -852,7 +915,7 @@ def get_authoritative_connection():
         pool_failed = False
         last_pool_exc = None
         if pool is not None:
-            checkout_timeout = float(os.getenv("PG_POOL_CHECKOUT_TIMEOUT", "1.5"))
+            checkout_timeout = float(os.getenv("PG_POOL_CHECKOUT_TIMEOUT", "5.0"))
             pool_conn = None
             try:
                 pool_conn = pool.getconn(timeout=checkout_timeout)
@@ -867,7 +930,13 @@ def get_authoritative_connection():
                     with pool_conn.transaction():
                         yield adapter
                     return
-                except Exception:
+                except Exception as pg_err:
+                    err_str = str(pg_err).lower()
+                    if any(term in err_str for term in ("ssl", "bad record mac", "decryption failed", "broken pipe", "closed", "eof", "server closed")):
+                        try:
+                            pool_conn.close()
+                        except Exception:
+                            pass
                     raise
                 finally:
                     try:
@@ -922,13 +991,22 @@ def safe_execute(sql: str, params: tuple = ()) -> bool:
         if pool is not None:
             pg_sql = translate_sqlite_sql_to_postgres(sql)
             is_ddl = sql.strip().upper().startswith(("CREATE ", "ALTER ", "DROP ", "VACUUM"))
-            checkout_timeout = float(os.getenv("PG_POOL_CHECKOUT_TIMEOUT", "1.5"))
+            checkout_timeout = float(os.getenv("PG_POOL_CHECKOUT_TIMEOUT", "5.0"))
             for attempt in range(2):
                 try:
                     with pool.connection(timeout=checkout_timeout) as conn:
-                        with conn.transaction():
-                            with conn.cursor() as cur:
-                                getattr(cur, "execute")(pg_sql, params)
+                        try:
+                            with conn.transaction():
+                                with conn.cursor() as cur:
+                                    getattr(cur, "execute")(pg_sql, params)
+                        except Exception as inner_exc:
+                            err_msg = str(inner_exc).lower()
+                            if any(term in err_msg for term in ("ssl", "bad record mac", "decryption failed", "broken pipe", "closed", "eof", "server closed")):
+                                try:
+                                    conn.close()
+                                except Exception:
+                                    pass
+                            raise
                     _record_pg_success()
                     duration_ms = round((time.perf_counter() - t0) * 1000, 2)
                     if duration_ms > 250.0:
@@ -1043,16 +1121,25 @@ def safe_query(sql: str, params: tuple = ()) -> list:
         pool = get_db_pool()
         if pool is not None:
             pg_sql = translate_sqlite_sql_to_postgres(sql)
-            checkout_timeout = float(os.getenv("PG_POOL_CHECKOUT_TIMEOUT", "1.5"))
+            checkout_timeout = float(os.getenv("PG_POOL_CHECKOUT_TIMEOUT", "5.0"))
             for attempt in range(2):
                 try:
                     from psycopg.rows import dict_row
                     with pool.connection(timeout=checkout_timeout) as conn:
-                        with conn.cursor(row_factory=dict_row) as cur:
-                            getattr(cur, "execute")(pg_sql, params)
-                            res = [sanitize_for_json(dict(r)) for r in cur.fetchall()]
-                        if not getattr(conn, "autocommit", False):
-                            conn.commit()
+                        try:
+                            with conn.cursor(row_factory=dict_row) as cur:
+                                getattr(cur, "execute")(pg_sql, params)
+                                res = [sanitize_for_json(dict(r)) for r in cur.fetchall()]
+                            if not getattr(conn, "autocommit", False):
+                                conn.commit()
+                        except Exception as inner_exc:
+                            err_msg = str(inner_exc).lower()
+                            if any(term in err_msg for term in ("ssl", "bad record mac", "decryption failed", "broken pipe", "closed", "eof", "server closed")):
+                                try:
+                                    conn.close()
+                                except Exception:
+                                    pass
+                            raise
                         duration_ms = round((time.perf_counter() - t0) * 1000, 2)
                         if duration_ms > 250.0:
                             logger.warning("SLOW QUERY DETECTED [duration=%0.2fms, req_id=%s] sql=%s", duration_ms, req_id, sql[:120].strip())
@@ -1113,9 +1200,6 @@ def safe_query(sql: str, params: tuple = ()) -> list:
                 _record_pg_success()
                 return res
             except Exception as e:
-                _trip_pg_circuit_breaker(60.0, str(e))
-                logger.exception("Direct PostgreSQL query failed: %s", e)
-                raise RuntimeError(f"Direct PostgreSQL query failed: {e}")
                 _trip_pg_circuit_breaker(60.0, str(e))
                 logger.exception("Direct PostgreSQL query failed: %s", e)
                 raise RuntimeError(f"Direct PostgreSQL query failed: {e}")

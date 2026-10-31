@@ -17,7 +17,7 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "BTC/USDT | Alpha Algo Terminal",
+  title: "Quant.OS | Institutional Algo Trading Terminal",
   description: "Next-Generation Institutional Algorithmic Trading Terminal",
   icons: {
     icon: "/favicon.ico",
@@ -26,7 +26,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Alpha Algo",
+    title: "Quant.OS Algo Trading",
   },
 };
 

@@ -43,6 +43,7 @@ import { StrategyClustersView } from "./StrategyClustersView";
 import { StrategyRegimeView } from "./StrategyRegimeView";
 import { StrategyTradeJournalView } from "./StrategyTradeJournalView";
 import { SourceStrategyCreationView } from "./SourceStrategyCreationView";
+import { StrategyExecutiveHeader } from "./StrategyExecutiveHeader";
 import { formatMoney } from "@/lib/formatters";
 import { useBotCreationIntentStore } from "@/lib/store/useBotCreationIntentStore";
 
@@ -213,76 +214,13 @@ export function StrategyCenter() {
   return (
     <div className="w-full space-y-6 min-w-0 font-sans text-slate-100 pb-12">
       {/* 1. Master Strategy Center Executive Header */}
-      <div className="relative overflow-hidden p-5 sm:p-6 rounded-3xl bg-gradient-to-r from-[#0C1322] via-[#0E172A] to-[#121B2F] border border-[#1E293B] shadow-2xl">
-        <div className="flex flex-col xl:flex-row items-start xl:items-center justify-between gap-6 relative z-10">
-          {/* Left Title & Status */}
-          <div className="flex items-center gap-4">
-            <div className="h-14 w-14 rounded-2xl bg-gradient-to-tr from-cyan-600 via-blue-600 to-indigo-600 p-0.5 shadow-xl shadow-cyan-900/40 flex items-center justify-center shrink-0">
-              <div className="h-full w-full bg-[#0B0F19] rounded-[14px] flex items-center justify-center">
-                <Compass className="h-7 w-7 text-cyan-400 animate-pulse" />
-              </div>
-            </div>
-            <div>
-              <div className="flex items-center gap-2.5">
-                <h1 className="text-xl sm:text-2xl font-extrabold text-white tracking-wide">
-                  Quant.OS Strategy Center
-                </h1>
-                <span className="text-xs font-mono font-bold px-2.5 py-0.5 rounded-full bg-cyan-950/90 text-cyan-400 border border-cyan-700/60">
-                  {strategies.length} AUTHORITATIVE STRATEGIES
-                </span>
-                <span className="hidden sm:inline text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-950/80 text-emerald-400 border border-emerald-800">
-                  PAPER DEFAULT
-                </span>
-              </div>
-              <p className="text-xs sm:text-sm text-slate-400 font-mono mt-1">
-                Quantitative strategy research, multi-leg options architectures, signal validation, centralized risk sizing, backtesting, and execution fleet.
-              </p>
-            </div>
-          </div>
-
-          {/* Right Executive Telemetry Metrics */}
-          <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs font-mono">
-            {/* Regime Pill */}
-            <div
-              onClick={() => setActiveViewTab("REGIME")}
-              className="cursor-pointer p-2.5 rounded-xl bg-[#090E1A] hover:bg-[#121A2C] border border-[#1E2E4A] transition flex items-center gap-2"
-              title="Click to inspect Market Regime Engine"
-            >
-              <Compass className="h-4 w-4 text-amber-400" />
-              <div>
-                <span className="text-[9px] text-slate-400 block">MARKET REGIME</span>
-                <span className="font-bold text-amber-300">{regimeState.regime}</span>
-              </div>
-            </div>
-
-            {/* Signal Clusters Pill */}
-            <div
-              onClick={() => setActiveViewTab("CLUSTERS")}
-              className="cursor-pointer p-2.5 rounded-xl bg-[#090E1A] hover:bg-[#121A2C] border border-[#1E2E4A] transition flex items-center gap-2"
-              title="Click to inspect Cross-Strategy Signal Clusters"
-            >
-              <Layers className="h-4 w-4 text-purple-400" />
-              <div>
-                <span className="text-[9px] text-slate-400 block">SIGNAL CLUSTERS</span>
-                <span className="font-bold text-purple-300">{signalClusters.length} Active</span>
-              </div>
-            </div>
-
-            {/* Paper Fleet Pill */}
-            <div
-              onClick={() => setActiveViewTab("PAPER")}
-              className="cursor-pointer p-2.5 rounded-xl bg-[#090E1A] hover:bg-[#121A2C] border border-[#1E2E4A] transition flex items-center gap-2"
-              title="Click to inspect Paper Trading fleet"
-            >
-              <Radio className="h-4 w-4 text-emerald-400" />
-              <div>
-                <span className="text-[9px] text-slate-400 block">PAPER FLEET</span>
-                <span className="font-bold text-emerald-400">{paperInstances.length} Active</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+      <StrategyExecutiveHeader
+        totalStrategiesCount={strategies.length}
+        regimeState={regimeState}
+        signalClusters={signalClusters}
+        paperInstances={paperInstances}
+        onSelectTab={setActiveViewTab}
+      />
 
       {/* 2. Top Navigation View Tabs */}
       <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1 border-b border-[#1A253A]">
@@ -579,7 +517,9 @@ export function StrategyCenter() {
                           <td className="py-2.5 px-3 text-white font-bold">{strat.name}</td>
                           <td className="py-2.5 px-3 text-slate-400">{strat.category}</td>
                           <td className="py-2.5 px-3 text-white">{strat.primaryTimeframe}</td>
-                          <td className="py-2.5 px-3 text-slate-300">{strat.market}</td>
+                          <td className="py-2.5 px-3 text-slate-300">
+                            {typeof strat.market === "object" && strat.market ? ((strat.market as any).exchange || (strat.market as any).market_type || (strat.market as any).symbol || "NSE") : String(strat.market || "NSE")}
+                          </td>
                           <td className="py-2.5 px-3 text-cyan-300">{strat.direction}</td>
                           <td className="py-2.5 px-3 text-slate-300">{strat.complexity}</td>
                           <td className="py-2.5 px-3">

@@ -51,6 +51,7 @@ import { SelectedOptionInspectionDrawer } from "../SelectedOptionInspectionDrawe
 import { DirectOptionOrderPanel } from "../DirectOptionOrderPanel";
 import { OptionOrderPreviewModal } from "../OptionOrderPreviewModal";
 import { RecentDirectOrdersTable } from "../RecentDirectOrdersTable";
+import { OptionsBottomPortfolioWorkspace } from "./OptionsBottomPortfolioWorkspace";
 import {
   OptionOrderIntent,
   OptionOrderPreview,
@@ -1076,6 +1077,14 @@ export const OptionChainTerminal: React.FC<OptionChainTerminalProps> = ({
       {terminalTab === "ANALYTICS" && snapshot && (
         <OptionAnalyticsPanel snapshot={snapshot} currency={currency} />
       )}
+
+      {/* 5. POSITIONS, WORKING ORDERS & AUDIT TRAIL WORKSPACE (SECTION 13) */}
+      <div className="pt-2">
+        <OptionsBottomPortfolioWorkspace
+          currency={currency}
+          underlying={underlying}
+        />
+      </div>
 
       {/* Actionable Quick Order Ticket */}
       <OptionQuickOrderTicket

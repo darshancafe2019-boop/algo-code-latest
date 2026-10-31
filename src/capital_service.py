@@ -479,37 +479,35 @@ class CapitalAccountingService:
             return True, f"Idempotent replay: Capital movement '{existing[0]['entry_id']}' already recorded.", dict(existing[0])
 
         try:
-            conn = db.get_connection()
-            cursor = conn.cursor()
-            cursor.execute(
-                """
-                INSERT INTO capital_ledger (
-                    entry_id, customer_id, department_id, broker_folder_id, broker_account_id,
-                    bot_id, strategy_id, entry_type, amount, currency, environment,
-                    source, reference_id, user_id, status, notes, idempotency_key, timestamp, audit_id
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'CONFIRMED', ?, ?, ?, ?)
-                """,
-                (
-                    entry_id, customer_id, department_id, broker_folder_id, broker_account_id,
-                    bot_id, strategy_id, entry_type, amount, currency, environment,
-                    source, reference_id, user_id, notes, idem_key, now_str, audit_id
-                )
-            )
-
-            # Update broker account balance cache if verified deposit or withdrawal
-            if entry_type in ["DEPOSIT", "FUNDING"]:
+            with db.get_db_transaction() as conn:
+                cursor = conn.cursor()
                 cursor.execute(
-                    "UPDATE broker_accounts SET broker_cash = broker_cash + ?, broker_balance = broker_balance + ?, available_margin = available_margin + ?, updated_at = ? WHERE id = ?",
-                    (amount, amount, amount, now_str, broker_account_id)
-                )
-            elif entry_type in ["WITHDRAWAL"]:
-                cursor.execute(
-                    "UPDATE broker_accounts SET broker_cash = MAX(0.0, broker_cash - ?), broker_balance = MAX(0.0, broker_balance - ?), available_margin = MAX(0.0, available_margin - ?), updated_at = ? WHERE id = ?",
-                    (amount, amount, amount, now_str, broker_account_id)
+                    """
+                    INSERT INTO capital_ledger (
+                        entry_id, customer_id, department_id, broker_folder_id, broker_account_id,
+                        bot_id, strategy_id, entry_type, amount, currency, environment,
+                        source, reference_id, user_id, status, notes, idempotency_key, timestamp, audit_id
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'CONFIRMED', ?, ?, ?, ?)
+                    """,
+                    (
+                        entry_id, customer_id, department_id, broker_folder_id, broker_account_id,
+                        bot_id, strategy_id, entry_type, amount, currency, environment,
+                        source, reference_id, user_id, notes, idem_key, now_str, audit_id
+                    )
                 )
 
-            conn.commit()
-            conn.close()
+                # Update broker account balance cache if verified deposit or withdrawal
+                if entry_type in ["DEPOSIT", "FUNDING"]:
+                    cursor.execute(
+                        "UPDATE broker_accounts SET broker_cash = broker_cash + ?, broker_balance = broker_balance + ?, available_margin = available_margin + ?, updated_at = ? WHERE id = ?",
+                        (amount, amount, amount, now_str, broker_account_id)
+                    )
+                elif entry_type in ["WITHDRAWAL"]:
+                    cursor.execute(
+                        "UPDATE broker_accounts SET broker_cash = MAX(0.0, broker_cash - ?), broker_balance = MAX(0.0, broker_balance - ?), available_margin = MAX(0.0, available_margin - ?), updated_at = ? WHERE id = ?",
+                        (amount, amount, amount, now_str, broker_account_id)
+                    )
+
             logger.info(f"Recorded capital movement {entry_id} ({entry_type}: {amount} {currency}) for account {broker_account_id}")
             return True, "Capital movement successfully recorded.", {
                 "entry_id": entry_id,
@@ -558,24 +556,22 @@ class CapitalAccountingService:
             return True, f"Idempotent replay: Expense '{existing[0]['expense_id']}' already recorded.", dict(existing[0])
 
         try:
-            conn = db.get_connection()
-            cursor = conn.cursor()
-            cursor.execute(
-                """
-                INSERT INTO brokerage_expenses_ledger (
-                    expense_id, customer_id, department_id, broker_folder_id, broker_account_id,
-                    bot_id, strategy_id, order_id, trade_id, expense_type, amount,
-                    currency, provider, source, audit_id, idempotency_key, timestamp
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    expense_id, customer_id, department_id, broker_folder_id, broker_account_id,
-                    bot_id, strategy_id, order_id, str(trade_id), expense_type, amount,
-                    currency, provider, source, audit_id, idem_key, now_str
+            with db.get_db_transaction() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    """
+                    INSERT INTO brokerage_expenses_ledger (
+                        expense_id, customer_id, department_id, broker_folder_id, broker_account_id,
+                        bot_id, strategy_id, order_id, trade_id, expense_type, amount,
+                        currency, provider, source, audit_id, idempotency_key, timestamp
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        expense_id, customer_id, department_id, broker_folder_id, broker_account_id,
+                        bot_id, strategy_id, order_id, str(trade_id), expense_type, amount,
+                        currency, provider, source, audit_id, idem_key, now_str
+                    )
                 )
-            )
-            conn.commit()
-            conn.close()
             logger.info(f"Recorded brokerage expense {expense_id} ({expense_type}: {amount} {currency}) for trade {trade_id}")
             return True, "Brokerage expense recorded.", {
                 "expense_id": expense_id,

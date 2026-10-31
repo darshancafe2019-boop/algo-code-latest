@@ -1234,9 +1234,9 @@ function generateRealWorldFuturesUniverse(): CanonicalFuturesContract[] {
   return rawList as CanonicalFuturesContract[];
 }
 
-// High-speed in-memory micro-cache (TTL 1000ms)
+// High-speed in-memory micro-cache (TTL 30000ms)
 const futuresMicroCache = new Map<string, { data: FuturesUniverseResponse; timestamp: number }>();
-const FUTURES_CACHE_TTL_MS = 1000;
+const FUTURES_CACHE_TTL_MS = 30000;
 
 export async function GET(req: NextRequest) {
   const url = new URL(req.url);
@@ -1265,7 +1265,7 @@ export async function GET(req: NextRequest) {
         method: "GET",
         headers: getForwardHeaders(req),
         cache: "no-store",
-        signal: AbortSignal.timeout(3000),
+        signal: AbortSignal.timeout(800),
       });
 
       if (backendRes.ok) {

@@ -5,7 +5,16 @@ import { getForwardHeaders } from "@/lib/proxy-headers";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
+// In-memory micro-cache (TTL 15000ms)
+let cachedHealthData: any = null;
+let lastCacheTime = 0;
+const HEALTH_CACHE_TTL_MS = 15000;
+
 export async function GET(req: NextRequest) {
+  if (cachedHealthData && Date.now() - lastCacheTime < HEALTH_CACHE_TTL_MS) {
+    return NextResponse.json(cachedHealthData, { status: 200, headers: { "X-Cache-Hit": "true" } });
+  }
+
   const BACKEND_URL = getBackendBaseUrl();
   const requestId = req.headers.get("x-request-id") || `fut_h_${Date.now()}`;
 
@@ -15,11 +24,13 @@ export async function GET(req: NextRequest) {
         method: "GET",
         headers: getForwardHeaders(req, requestId),
         cache: "no-store",
-        signal: AbortSignal.timeout(4000),
+        signal: AbortSignal.timeout(800),
       });
 
       if (backendRes.ok) {
         const data = await backendRes.json();
+        cachedHealthData = data;
+        lastCacheTime = Date.now();
         return NextResponse.json(data, { status: 200 });
       }
     } catch (err) {

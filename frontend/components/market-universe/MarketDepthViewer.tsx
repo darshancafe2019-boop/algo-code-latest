@@ -145,14 +145,14 @@ export function MarketDepthViewer({ quote, provider }: MarketDepthViewerProps) {
         <div className="flex items-center justify-between text-[11px] font-mono">
           <span className="text-emerald-400 font-bold flex items-center gap-1">
             <TrendingUp className="h-3 w-3" />
-            BIDS: {totalBidQty.toLocaleString()} ({imbalancePct.toFixed(1)}%)
+            BIDS: {Number(totalBidQty || 0).toLocaleString()} ({Number(imbalancePct || 50).toFixed(1)}%)
           </span>
           <span className="text-slate-400 text-[10px]">
             Spread: <strong className="text-slate-200">{spread !== null ? formatPrice(spread) : "--"}</strong>
-            {spreadPct !== null && ` (${spreadPct.toFixed(3)}%)`}
+            {spreadPct !== null && !isNaN(Number(spreadPct)) && ` (${Number(spreadPct).toFixed(3)}%)`}
           </span>
           <span className="text-rose-400 font-bold flex items-center gap-1">
-            ASKS: {totalAskQty.toLocaleString()} ({(100 - imbalancePct).toFixed(1)}%)
+            ASKS: {Number(totalAskQty || 0).toLocaleString()} ({Number(100 - (imbalancePct || 50)).toFixed(1)}%)
             <TrendingDown className="h-3 w-3" />
           </span>
         </div>

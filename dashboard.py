@@ -449,7 +449,14 @@ def enforce_server_side_security():
         or path == "/api/portfolio/snapshot"
         or path == "/api/movers"
         or path == "/api/market/movers"
-        or (path in ["/api/positions", "/api/orders", "/api/risk/summary", "/api/stream/portfolio"] and request.method == "GET" and (request.args.get("mode", "PAPER").upper() == "PAPER" or getattr(config, "TRADING_MODE", "PAPER") == "PAPER"))
+        or path == "/api/incidents"
+        or path.startswith("/api/incidents/")
+        or path == "/api/alerts/test"
+        or path.startswith("/api/alerts/")
+        or path == "/api/stream/alerts"
+        or path.startswith("/api/futures/")
+        or (path in ["/api/positions", "/api/orders", "/api/risk/summary", "/api/risk/overview", "/api/stream/portfolio", "/api/audit/events"] and request.method == "GET" and (request.args.get("mode", "PAPER").upper() == "PAPER" or getattr(config, "TRADING_MODE", "PAPER") == "PAPER"))
+        or (path.startswith("/api/tax/") and request.method == "GET")
         or path.startswith("/feed/")
         or path.startswith("/api/feed/")
         or path.startswith("/v3/feed/")
@@ -945,7 +952,6 @@ def api_stream_ticker():
         headers={
             "Cache-Control": "no-cache",
             "X-Accel-Buffering": "no",
-            "Connection": "keep-alive"
         }
     )
 
@@ -998,7 +1004,6 @@ def api_stream_events():
         headers={
             "Cache-Control": "no-cache",
             "X-Accel-Buffering": "no",
-            "Connection": "keep-alive"
         }
     )
 
@@ -1041,7 +1046,6 @@ def api_stream_alerts():
         headers={
             "Cache-Control": "no-cache",
             "X-Accel-Buffering": "no",
-            "Connection": "keep-alive"
         }
     )
 
@@ -1181,7 +1185,6 @@ def api_reports_live_stream():
         headers={
             "Cache-Control": "no-cache",
             "X-Accel-Buffering": "no",
-            "Connection": "keep-alive",
         }
     )
 
@@ -4561,7 +4564,6 @@ def api_stream_centralized():
         headers={
             "Cache-Control": "no-cache",
             "X-Accel-Buffering": "no",
-            "Connection": "keep-alive"
         }
     )
 
@@ -15888,6 +15890,21 @@ def api_auth_me():
     is_explicit_unauth = request.headers.get("X-Unauthenticated") == "true"
     allow_fallback = (is_testing or bootstrap_enabled) and not is_explicit_unauth and not auth_require_login
 
+    auth_hdr = request.headers.get("Authorization", "")
+    token = auth_hdr.split(" ")[1].strip() if auth_hdr.startswith("Bearer ") else ""
+    if not token:
+        token = request.cookies.get("algo_session_token", "") or request.cookies.get("quantos_session_token", "")
+
+    # Fast path: unauthenticated requests without token and without fallback return immediately (0ms DB load)
+    if not token and not allow_fallback:
+        dur_ms = round((time.perf_counter() - t_start) * 1000.0, 2)
+        logger.info("[AUTH_ME] [req_id=%s] [duration=%0.2fms] authenticated=False (no token)", req_id, dur_ms)
+        return jsonify({
+            "status": "success",
+            "authenticated": False,
+            "user": None
+        }), 200
+
     user, session = get_current_user_and_session(allow_dev_fallback=allow_fallback)
     dur_ms = round((time.perf_counter() - t_start) * 1000.0, 2)
     if not user or not session:
@@ -18328,7 +18345,6 @@ def api_stream_intelligence():
         headers={
             "Cache-Control": "no-cache",
             "X-Accel-Buffering": "no",
-            "Connection": "keep-alive"
         }
     )
 
@@ -18715,16 +18731,20 @@ def api_stream_portfolio():
     gde = GlobalDataEngine.get_instance()
 
     def event_stream():
-        while True:
-            try:
-                snapshot = gde.get_portfolio_snapshot(mode=mode)
-                data = json.dumps({"type": "PORTFOLIO_SNAPSHOT", "data": snapshot})
-                yield f"data: {data}\n\n"
-            except Exception as e:
-                err_data = json.dumps({"type": "STREAM_ERROR", "error": str(e)})
-                yield f"data: {err_data}\n\n"
-                break
-            time.sleep(3.0)
+        try:
+            yield ": ping\n\n"
+            while True:
+                try:
+                    snapshot = gde.get_portfolio_snapshot(mode=mode)
+                    data = json.dumps({"type": "PORTFOLIO_SNAPSHOT", "data": snapshot})
+                    yield f"data: {data}\n\n"
+                except Exception as e:
+                    err_data = json.dumps({"type": "STREAM_ERROR", "error": str(e)})
+                    yield f"data: {err_data}\n\n"
+                    break
+                time.sleep(3.0)
+        except GeneratorExit:
+            logger.info("SSE client disconnected from /api/stream/portfolio")
 
     return Response(
         event_stream(),
@@ -18732,7 +18752,6 @@ def api_stream_portfolio():
         headers={
             "Cache-Control": "no-cache, no-transform",
             "X-Accel-Buffering": "no",
-            "Connection": "keep-alive",
         }
     )
 
@@ -20095,19 +20114,22 @@ def api_market_quotes_snapshot():
         workers = min(len(missing_symbols), 6)
         with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
             future_to_sym = {executor.submit(_fetch_single_symbol, s): s for s in missing_symbols}
-            for fut in concurrent.futures.as_completed(future_to_sym, timeout=5.0):
-                orig_s = future_to_sym[fut]
-                try:
-                    q = fut.result()
-                    if q:
-                        result[orig_s] = q
-                        clean_sym = q.get("clean_symbol") or orig_s
-                        result[clean_sym] = q
-                        with _SNAPSHOT_CACHE_LOCK:
-                            _SNAPSHOT_QUOTE_CACHE[orig_s] = (now_t, q)
-                            _SNAPSHOT_QUOTE_CACHE[clean_sym] = (now_t, q)
-                except Exception as ex:
-                    logger.debug("Parallel quote fetch error for %s: %s", orig_s, ex)
+            try:
+                for fut in concurrent.futures.as_completed(future_to_sym, timeout=4.0):
+                    orig_s = future_to_sym[fut]
+                    try:
+                        q = fut.result()
+                        if q:
+                            result[orig_s] = q
+                            clean_sym = q.get("clean_symbol") or orig_s
+                            result[clean_sym] = q
+                            with _SNAPSHOT_CACHE_LOCK:
+                                _SNAPSHOT_QUOTE_CACHE[orig_s] = (now_t, q)
+                                _SNAPSHOT_QUOTE_CACHE[clean_sym] = (now_t, q)
+                    except Exception as ex:
+                        logger.debug("Parallel quote fetch error for %s: %s", orig_s, ex)
+            except (concurrent.futures.TimeoutError, TimeoutError):
+                logger.warning("Parallel snapshot quote fetch timed out after 4.0s; proceeding with available quotes and UNAVAILABLE fallbacks.")
 
     # 4. Standardized Explicit UNAVAILABLE fallback for instruments that could not be fetched
     for s in symbols:
@@ -21825,7 +21847,6 @@ def api_market_data_stream():
         headers={
             "Cache-Control": "no-cache",
             "X-Accel-Buffering": "no",
-            "Connection": "keep-alive",
         },
     )
 

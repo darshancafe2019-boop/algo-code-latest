@@ -347,11 +347,13 @@ export function SpreadsheetTradeLedgerTable({
                     <td className="py-2 px-2.5 text-slate-300">{row.asset}</td>
 
                     {/* Market */}
-                    <td className="py-2 px-2.5 text-slate-400">{row.market}</td>
+                    <td className="py-2 px-2.5 text-slate-400">
+                      {typeof row.market === "object" && row.market ? ((row.market as any).exchange || (row.market as any).market_type || (row.market as any).symbol || "NSE") : String(row.market || "NSE")}
+                    </td>
 
                     {/* Symbol */}
                     <td className="py-2 px-3 font-bold text-white border-r border-slate-800/80 group-hover:text-sky-400">
-                      {row.symbol}
+                      {typeof row.symbol === "object" && row.symbol ? ((row.symbol as any).symbol || (row.symbol as any).name || "—") : String(row.symbol || "—")}
                     </td>
 
                     {/* Side */}

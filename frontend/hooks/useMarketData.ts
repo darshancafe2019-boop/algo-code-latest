@@ -64,7 +64,7 @@ class ClientStreamMultiplexer {
       }
       const symbolsParam = Array.from(this.subscribedSymbols).slice(0, 50).join(",");
       const url = `/api/market-data/stream${symbolsParam ? `?symbols=${encodeURIComponent(symbolsParam)}` : ""}`;
-      this.eventSource = new EventSource(url);
+      this.eventSource = new EventSource(url, { withCredentials: true });
 
       this.eventSource.onopen = () => {
         this.isConnected = true;

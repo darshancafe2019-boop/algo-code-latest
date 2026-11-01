@@ -39,13 +39,23 @@ from src.bot_wizard_service import validate_wizard_draft, deploy_wizard_bot, lis
 
 class TestQuantOSAuditRepair(unittest.TestCase):
 
+    _original_admin_email = "ashishparadkar1999@gmail.com"
+
     @classmethod
     def setUpClass(cls):
+        admin = db.get_user_by_username("admin")
+        if admin and admin.get("email"):
+            cls._original_admin_email = admin["email"]
+        os.environ["AUTH_ADMIN_EMAIL"] = "admin_test@quantos.local"
         db.init_db()
 
     @classmethod
     def tearDownClass(cls):
+        restored_email = cls._original_admin_email or "ashishparadkar1999@gmail.com"
+        os.environ["AUTH_ADMIN_EMAIL"] = restored_email
         os.environ["AUTH_BOOTSTRAP_PASSWORD"] = "AlgoTrading@2026!"
+        SecurityAuthManager.initialize_bootstrap_admin()
+        db.sync_admin_email_in_db("admin", restored_email)
         h_def, s_def = PasswordManager.hash_password("AlgoTrading@2026!")
         admin = db.get_user_by_username("admin")
         if admin:

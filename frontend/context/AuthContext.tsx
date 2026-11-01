@@ -615,7 +615,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const errorMessage =
         data.message ||
         data.error?.message ||
-        "Failed to send verification code.";
+        (typeof data.error === "string" ? data.error : null) ||
+        data.detail ||
+        (!res.ok && res.status ? `Authentication server unavailable (${res.status} ${res.statusText || ""}). Please ensure the Quant.OS backend is running.` : "Failed to send verification code.");
       const diagnosticMessage =
         !res.ok && requestId
           ? `${errorMessage} (Request ID: ${requestId})`

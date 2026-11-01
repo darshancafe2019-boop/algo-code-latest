@@ -29,7 +29,7 @@ class FuturesMarketService:
 
         self._cached_contracts: List[CanonicalFuturesContract] = []
         self._last_cache_time: float = 0.0
-        self._cache_ttl_sec: float = 3.0  # 3s cache
+        self._cache_ttl_sec: float = 15.0  # 15s cache to prevent request timeouts under concurrent load
 
     @classmethod
     def get_instance(cls) -> FuturesMarketService:

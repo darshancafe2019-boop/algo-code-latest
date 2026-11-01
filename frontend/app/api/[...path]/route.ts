@@ -320,9 +320,11 @@ async function handleProxy(req: NextRequest, ctx: { params?: { path: string[] } 
     ? 5000
     : (isStatus || isIndicator)
     ? 4000
+    : isAuth
+    ? 20000
     : isProductionEnv
-    ? 9000
-    : (isAuth || isUniverse)
+    ? 12000
+    : isUniverse
     ? 25000
     : isHeavy
     ? 15000

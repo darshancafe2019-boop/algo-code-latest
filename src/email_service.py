@@ -240,6 +240,55 @@ class ResendEmailProvider(BaseEmailProvider):
             logger.info("[OTP] Local test recipient '%s' simulated sandbox delivery [ID: %s]", mask_email_address(clean_to), mock_id)
             return True, None, mock_id
 
+        # Primary Fast Path: Direct HTTP to Resend REST API (zero thread-pool overhead, ~450ms)
+        try:
+            import urllib.request
+            import urllib.error
+            import json
+
+            t0 = time.monotonic()
+            payload = {
+                "from": sender,
+                "to": [clean_to],
+                "subject": subject,
+                "html": html_content,
+                "text": text_content,
+            }
+            data_bytes = json.dumps(payload).encode("utf-8")
+            req = urllib.request.Request(
+                "https://api.resend.com/emails",
+                data=data_bytes,
+                headers={
+                    "Authorization": f"Bearer {self.api_key}",
+                    "Content-Type": "application/json",
+                    "User-Agent": "QuantOS/1.0",
+                },
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=4.0) as http_resp:
+                body = http_resp.read().decode("utf-8")
+                elapsed_ms = (time.monotonic() - t0) * 1000
+                resp_dict = json.loads(body) if body else {}
+                msg_id = resp_dict.get("id")
+                if msg_id:
+                    logger.info("[RESEND_DISPATCH_TIMING] latency_ms=%.1f msg_id=%s recipient=%s", elapsed_ms, msg_id, mask_email_address(clean_to))
+                    logger.info("[OTP] Resend message ID: %s", msg_id)
+                    logger.info("[OTP] Email accepted by Resend for recipient: %s", mask_email_address(clean_to))
+                    return True, None, str(msg_id)
+        except urllib.error.HTTPError as http_err:
+            err_body = http_err.read().decode("utf-8") if hasattr(http_err, "read") else ""
+            err_dict = {}
+            try:
+                err_dict = json.loads(err_body)
+            except Exception:
+                pass
+            err_msg = err_dict.get("message") or err_dict.get("error") or str(http_err)
+            logger.error("[OTP] [RESEND_HTTP_ERROR] HTTP %d: %s", http_err.code, err_msg)
+            return False, err_msg, None
+        except Exception as fast_err:
+            logger.warning("[OTP] [RESEND_FAST_PATH_FAIL] Direct HTTP attempt failed (%s), falling back to SDK...", fast_err)
+
+        # Fallback Path: Resend SDK
         try:
             import resend
             import concurrent.futures

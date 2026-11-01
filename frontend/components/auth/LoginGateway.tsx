@@ -707,6 +707,25 @@ export function LoginGateway() {
                     )}
                   </button>
                 </div>
+
+                {/* Direct Bypass: Enter OTP Code if already received */}
+                <div className="pt-2 text-center">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAuthStep("email_otp");
+                      const target = emailInput.trim() || "ashishparadkar1999@gmail.com";
+                      setDestinationEmail(target);
+                      try {
+                        sessionStorage.setItem("quantos_otp_destination_email", target);
+                      } catch {}
+                    }}
+                    className="text-xs font-mono text-cyan-400/90 hover:text-cyan-300 transition-colors inline-flex items-center gap-1.5 hover:underline underline-offset-4"
+                  >
+                    <span>Already received an email code? Enter 6-digit OTP</span>
+                    <ArrowRight className="h-3 w-3" />
+                  </button>
+                </div>
               </form>
             )}
 

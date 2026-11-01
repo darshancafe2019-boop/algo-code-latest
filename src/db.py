@@ -258,10 +258,13 @@ class PostgresConnectionAdapter:
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        if exc_type is not None:
-            self.rollback()
-        else:
-            self.commit()
+        try:
+            if exc_type is not None:
+                self.rollback()
+            else:
+                self.commit()
+        finally:
+            self.close()
 
 
 class PooledPostgresConnectionAdapter(PostgresConnectionAdapter):
@@ -542,7 +545,7 @@ def get_db_pool():
                     from psycopg_pool import ConnectionPool
                     min_conns = int(os.getenv("PG_POOL_MIN", "5"))
                     max_conns = int(os.getenv("PG_POOL_MAX", "25"))
-                    pool_timeout = float(os.getenv("PG_POOL_CHECKOUT_TIMEOUT", "5.0"))
+                    pool_timeout = float(os.getenv("PG_POOL_CHECKOUT_TIMEOUT", "1.5"))
                     _pg_pool = ConnectionPool(
                         conninfo=clean_conninfo,
                         min_size=min_conns,
@@ -915,7 +918,7 @@ def get_authoritative_connection():
         pool_failed = False
         last_pool_exc = None
         if pool is not None:
-            checkout_timeout = float(os.getenv("PG_POOL_CHECKOUT_TIMEOUT", "5.0"))
+            checkout_timeout = float(os.getenv("PG_POOL_CHECKOUT_TIMEOUT", "1.5"))
             pool_conn = None
             try:
                 pool_conn = pool.getconn(timeout=checkout_timeout)
@@ -991,7 +994,7 @@ def safe_execute(sql: str, params: tuple = ()) -> bool:
         if pool is not None:
             pg_sql = translate_sqlite_sql_to_postgres(sql)
             is_ddl = sql.strip().upper().startswith(("CREATE ", "ALTER ", "DROP ", "VACUUM"))
-            checkout_timeout = float(os.getenv("PG_POOL_CHECKOUT_TIMEOUT", "5.0"))
+            checkout_timeout = float(os.getenv("PG_POOL_CHECKOUT_TIMEOUT", "1.5"))
             for attempt in range(2):
                 try:
                     with pool.connection(timeout=checkout_timeout) as conn:
@@ -1121,7 +1124,7 @@ def safe_query(sql: str, params: tuple = ()) -> list:
         pool = get_db_pool()
         if pool is not None:
             pg_sql = translate_sqlite_sql_to_postgres(sql)
-            checkout_timeout = float(os.getenv("PG_POOL_CHECKOUT_TIMEOUT", "5.0"))
+            checkout_timeout = float(os.getenv("PG_POOL_CHECKOUT_TIMEOUT", "1.5"))
             for attempt in range(2):
                 try:
                     from psycopg.rows import dict_row
@@ -4721,12 +4724,17 @@ def init_db(force: bool = False) -> None:
 
 def seed_market_universe_if_needed() -> None:
     """Auto-sync market universe instruments on startup if table is empty."""
+    conn = None
     try:
         conn = get_connection()
         cursor = conn.cursor()
         cursor.execute("SELECT COUNT(*) as count FROM market_universe")
         cnt = cursor.fetchone()["count"]
-        conn.close()
+        try:
+            conn.close()
+        except Exception:
+            pass
+        conn = None
         if cnt == 0:
             import importlib
             try:
@@ -4739,10 +4747,17 @@ def seed_market_universe_if_needed() -> None:
                 mu_module.MarketUniverseManager.sync_all_markets()
     except Exception as exc:
         logger.error(f"Error seeding market universe: {exc}")
+    finally:
+        if conn:
+            try:
+                conn.close()
+            except Exception:
+                pass
 
 
 def seed_bot_templates_if_needed() -> None:
     """Seed default pre-configured trading bot templates if table is empty."""
+    conn = None
     try:
         conn = get_connection()
         cursor = conn.cursor()
@@ -4856,9 +4871,14 @@ def seed_bot_templates_if_needed() -> None:
                 templates
             )
             conn.commit()
-        conn.close()
     except Exception as exc:
         logger.error(f"Error seeding bot templates: {exc}")
+    finally:
+        if conn:
+            try:
+                conn.close()
+            except Exception:
+                pass
 
 
 def seed_demo_data_if_needed() -> None:
@@ -4866,221 +4886,230 @@ def seed_demo_data_if_needed() -> None:
     seed_indicator_configs_if_needed()
     seed_market_universe_if_needed()
     seed_bot_templates_if_needed()
-    conn = get_connection()
-    cursor = conn.cursor()
+    conn = None
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
     
-    # Check if initial bootstrap was ever executed
-    cursor.execute("SELECT value FROM telegram_settings WHERE key = 'initial_bot_bootstrap_done'")
-    bootstrapped_row = cursor.fetchone()
-    is_bootstrapped = bool(bootstrapped_row and bootstrapped_row["value"] == "true")
+        # Check if initial bootstrap was ever executed
+        cursor.execute("SELECT value FROM telegram_settings WHERE key = 'initial_bot_bootstrap_done'")
+        bootstrapped_row = cursor.fetchone()
+        is_bootstrapped = bool(bootstrapped_row and bootstrapped_row["value"] == "true")
 
-    # Seed default bot instances ONLY if table is empty AND bootstrap was never run
-    if not is_bootstrapped:
-        cursor.execute("SELECT COUNT(*) as count FROM bot_instances")
+        # Seed default bot instances ONLY if table is empty AND bootstrap was never run
+        if not is_bootstrapped:
+            cursor.execute("SELECT COUNT(*) as count FROM bot_instances")
+            if cursor.fetchone()["count"] == 0:
+                now_str = datetime.now(timezone.utc).isoformat()
+                bot1_config = {
+                    "risk_pct": 0.02,
+                    "indicators": [
+                        {"id": "ema", "name": "EMA (Exponential Moving Average)", "params": {"period": 20}},
+                        {"id": "macd", "name": "MACD (Moving Average Convergence Divergence)", "params": {"fast": 12, "slow": 26, "signal": 9}},
+                        {"id": "vp", "name": "Visible Range Volume Profile", "params": {"bins": 50}}
+                    ]
+                }
+                bot2_config = {
+                    "risk_pct": 0.015,
+                    "indicators": [
+                        {"id": "ema", "name": "EMA (Exponential Moving Average)", "params": {"period": 9}},
+                        {"id": "rsi", "name": "RSI (Relative Strength Index)", "params": {"period": 14}},
+                        {"id": "adx", "name": "Average Directional Index (ADX)", "params": {"period": 14}}
+                    ]
+                }
+                bot3_config = {
+                    "risk_pct": 0.025,
+                    "indicators": [
+                        {"id": "rsi", "name": "RSI (Relative Strength Index)", "params": {"period": 14}},
+                        {"id": "momentum", "name": "Momentum", "params": {"period": 10}},
+                        {"id": "bollinger", "name": "Bollinger Bands", "params": {"period": 20, "stdDev": 2.0}}
+                    ]
+                }
+                bots = [
+                    ("bot-1", "Alpha BTC Scalper", "BTC/USDT", "EMA_MACD_VP", "5m", 10000.0, "RUNNING", now_str, now_str, json.dumps(bot1_config)),
+                    ("bot-2", "Trend Breakout Pro", "BTC/USDT", "EMA9_RSI", "15m", 10000.0, "RUNNING", now_str, now_str, json.dumps(bot2_config)),
+                    ("bot-3", "Altcoin Momentum", "ETH/USDT", "RSI_MEAN_REVERSION", "1h", 15000.0, "STOPPED", now_str, now_str, json.dumps(bot3_config)),
+                ]
+                cursor.executemany(
+                    "INSERT INTO bot_instances (id, name, symbol, strategy, timeframe, allocated_capital, status, created_at, updated_at, config_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    bots
+                )
+            # Mark bootstrap as permanently executed so deleted bots never get recreated
+            now_dt = datetime.now(timezone.utc).isoformat()
+            cursor.execute("INSERT OR REPLACE INTO telegram_settings (key, value, updated_at) VALUES ('initial_bot_bootstrap_done', 'true', ?)", (now_dt,))
+            conn.commit()
+
+        # Seed default Indicator Profiles if empty
+        cursor.execute("SELECT COUNT(*) as count FROM indicator_profiles")
         if cursor.fetchone()["count"] == 0:
             now_str = datetime.now(timezone.utc).isoformat()
-            bot1_config = {
-                "risk_pct": 0.02,
-                "indicators": [
-                    {"id": "ema", "name": "EMA (Exponential Moving Average)", "params": {"period": 20}},
-                    {"id": "macd", "name": "MACD (Moving Average Convergence Divergence)", "params": {"fast": 12, "slow": 26, "signal": 9}},
-                    {"id": "vp", "name": "Visible Range Volume Profile", "params": {"bins": 50}}
-                ]
-            }
-            bot2_config = {
-                "risk_pct": 0.015,
-                "indicators": [
-                    {"id": "ema", "name": "EMA (Exponential Moving Average)", "params": {"period": 9}},
-                    {"id": "rsi", "name": "RSI (Relative Strength Index)", "params": {"period": 14}},
-                    {"id": "adx", "name": "Average Directional Index (ADX)", "params": {"period": 14}}
-                ]
-            }
-            bot3_config = {
-                "risk_pct": 0.025,
-                "indicators": [
-                    {"id": "rsi", "name": "RSI (Relative Strength Index)", "params": {"period": 14}},
-                    {"id": "momentum", "name": "Momentum", "params": {"period": 10}},
-                    {"id": "bollinger", "name": "Bollinger Bands", "params": {"period": 20, "stdDev": 2.0}}
-                ]
-            }
-            bots = [
-                ("bot-1", "Alpha BTC Scalper", "BTC/USDT", "EMA_MACD_VP", "5m", 10000.0, "RUNNING", now_str, now_str, json.dumps(bot1_config)),
-                ("bot-2", "Trend Breakout Pro", "BTC/USDT", "EMA9_RSI", "15m", 10000.0, "RUNNING", now_str, now_str, json.dumps(bot2_config)),
-                ("bot-3", "Altcoin Momentum", "ETH/USDT", "RSI_MEAN_REVERSION", "1h", 15000.0, "STOPPED", now_str, now_str, json.dumps(bot3_config)),
+            profiles = [
+                (
+                    "profile-btc-15m-trend", "BTC 15m Trend", 1, 1, "TRENDING", "BALANCED", 75.0, 75.0, "WEIGHTED",
+                    json.dumps({
+                        "ema": {"enabled": True, "weight": 20, "timeframe": "15m", "fast": 20, "slow": 50, "source": "close"},
+                        "rsi": {"enabled": True, "weight": 15, "timeframe": "15m", "period": 14, "oversold": 30, "overbought": 70},
+                        "macd": {"enabled": True, "weight": 20, "timeframe": "15m", "fast": 12, "slow": 26, "signal": 9},
+                        "adx": {"enabled": True, "weight": 15, "timeframe": "15m", "period": 14, "threshold": 25.0},
+                        "supertrend": {"enabled": True, "weight": 15, "timeframe": "15m", "atr_period": 10, "multiplier": 3.0},
+                        "vwap": {"enabled": True, "weight": 15, "timeframe": "15m", "mode": "session"},
+                        "volume": {"enabled": True, "weight": 10, "timeframe": "15m", "vol_sma_period": 20}
+                    }),
+                    "Optimized trend-following profile for BTC on 15m timeframe.",
+                    now_str, now_str
+                ),
+                (
+                    "profile-btc-15m-scalping", "BTC 15m Scalping", 1, 1, "TRENDING", "AGGRESSIVE", 70.0, 70.0, "WEIGHTED",
+                    json.dumps({
+                        "ema": {"enabled": True, "weight": 25, "timeframe": "15m", "fast": 9, "slow": 21, "source": "close"},
+                        "rsi": {"enabled": True, "weight": 20, "timeframe": "15m", "period": 7, "oversold": 25, "overbought": 75},
+                        "vwap": {"enabled": True, "weight": 20, "timeframe": "15m", "mode": "session"},
+                        "supertrend": {"enabled": True, "weight": 15, "timeframe": "15m", "atr_period": 7, "multiplier": 2.0},
+                        "volume": {"enabled": True, "weight": 10, "timeframe": "15m", "vol_sma_period": 10},
+                        "atr": {"enabled": True, "weight": 10, "timeframe": "15m", "period": 14, "multiplier": 1.5}
+                    }),
+                    "Fast momentum scalping profile with tight EMA crosses & RSI(7).",
+                    now_str, now_str
+                ),
+                (
+                    "profile-btc-15m-breakout", "BTC 15m Breakout", 1, 1, "BREAKOUT", "BALANCED", 75.0, 75.0, "WEIGHTED",
+                    json.dumps({
+                        "ema": {"enabled": True, "weight": 15, "timeframe": "15m", "fast": 20, "slow": 50, "source": "close"},
+                        "bollinger": {"enabled": True, "weight": 25, "timeframe": "15m", "period": 20, "std_dev": 2.0},
+                        "atr": {"enabled": True, "weight": 15, "timeframe": "15m", "period": 14, "multiplier": 2.0},
+                        "volume": {"enabled": True, "weight": 20, "timeframe": "15m", "vol_sma_period": 20},
+                        "vwap": {"enabled": True, "weight": 15, "timeframe": "15m", "mode": "session"},
+                        "donchian": {"enabled": True, "weight": 10, "timeframe": "15m", "period": 20}
+                    }),
+                    "Volatile expansion and channel breakout detection profile.",
+                    now_str, now_str
+                ),
+                (
+                    "profile-conservative-trend", "Conservative Trend", 1, 1, "TRENDING", "CONSERVATIVE", 80.0, 80.0, "WEIGHTED",
+                    json.dumps({
+                        "ema": {"enabled": True, "weight": 25, "timeframe": "15m", "fast": 50, "slow": 200, "source": "close"},
+                        "macd": {"enabled": True, "weight": 20, "timeframe": "15m", "fast": 12, "slow": 26, "signal": 9},
+                        "adx": {"enabled": True, "weight": 20, "timeframe": "15m", "period": 14, "threshold": 25.0},
+                        "vwap": {"enabled": True, "weight": 15, "timeframe": "15m", "mode": "session"},
+                        "volume": {"enabled": True, "weight": 10, "timeframe": "15m", "vol_sma_period": 20},
+                        "rsi": {"enabled": True, "weight": 10, "timeframe": "15m", "period": 14, "oversold": 30, "overbought": 70}
+                    }),
+                    "High-confidence trend confirmation profile requiring EMA 50/200 & ADX.",
+                    now_str, now_str
+                ),
+                (
+                    "profile-mean-reversion", "Mean Reversion", 1, 1, "RANGING", "BALANCED", 75.0, 75.0, "WEIGHTED",
+                    json.dumps({
+                        "rsi": {"enabled": True, "weight": 25, "timeframe": "15m", "period": 14, "oversold": 30, "overbought": 70},
+                        "bollinger": {"enabled": True, "weight": 25, "timeframe": "15m", "period": 20, "std_dev": 2.0},
+                        "vwap": {"enabled": True, "weight": 20, "timeframe": "15m", "mode": "session"},
+                        "stoch_rsi": {"enabled": True, "weight": 15, "timeframe": "15m", "period": 14, "k": 3, "d": 3, "oversold": 20, "overbought": 80},
+                        "pivot": {"enabled": True, "weight": 15, "timeframe": "15m", "type": "standard"}
+                    }),
+                    "Oscillator & envelope profile for sideways / ranging markets.",
+                    now_str, now_str
+                )
             ]
             cursor.executemany(
-                "INSERT INTO bot_instances (id, name, symbol, strategy, timeframe, allocated_capital, status, created_at, updated_at, config_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                bots
+                """
+                INSERT INTO indicator_profiles 
+                (profile_id, name, version, is_active, market_regime, adaptive_mode, signal_threshold_long, signal_threshold_short, scoring_mode, config_json, description, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                profiles
             )
-        # Mark bootstrap as permanently executed so deleted bots never get recreated
-        now_dt = datetime.now(timezone.utc).isoformat()
-        cursor.execute("INSERT OR REPLACE INTO telegram_settings (key, value, updated_at) VALUES ('initial_bot_bootstrap_done', 'true', ?)", (now_dt,))
-        conn.commit()
-
-    # Seed default Indicator Profiles if empty
-    cursor.execute("SELECT COUNT(*) as count FROM indicator_profiles")
-    if cursor.fetchone()["count"] == 0:
-        now_str = datetime.now(timezone.utc).isoformat()
-        profiles = [
-            (
-                "profile-btc-15m-trend", "BTC 15m Trend", 1, 1, "TRENDING", "BALANCED", 75.0, 75.0, "WEIGHTED",
-                json.dumps({
-                    "ema": {"enabled": True, "weight": 20, "timeframe": "15m", "fast": 20, "slow": 50, "source": "close"},
-                    "rsi": {"enabled": True, "weight": 15, "timeframe": "15m", "period": 14, "oversold": 30, "overbought": 70},
-                    "macd": {"enabled": True, "weight": 20, "timeframe": "15m", "fast": 12, "slow": 26, "signal": 9},
-                    "adx": {"enabled": True, "weight": 15, "timeframe": "15m", "period": 14, "threshold": 25.0},
-                    "supertrend": {"enabled": True, "weight": 15, "timeframe": "15m", "atr_period": 10, "multiplier": 3.0},
-                    "vwap": {"enabled": True, "weight": 15, "timeframe": "15m", "mode": "session"},
-                    "volume": {"enabled": True, "weight": 10, "timeframe": "15m", "vol_sma_period": 20}
-                }),
-                "Optimized trend-following profile for BTC on 15m timeframe.",
-                now_str, now_str
-            ),
-            (
-                "profile-btc-15m-scalping", "BTC 15m Scalping", 1, 1, "TRENDING", "AGGRESSIVE", 70.0, 70.0, "WEIGHTED",
-                json.dumps({
-                    "ema": {"enabled": True, "weight": 25, "timeframe": "15m", "fast": 9, "slow": 21, "source": "close"},
-                    "rsi": {"enabled": True, "weight": 20, "timeframe": "15m", "period": 7, "oversold": 25, "overbought": 75},
-                    "vwap": {"enabled": True, "weight": 20, "timeframe": "15m", "mode": "session"},
-                    "supertrend": {"enabled": True, "weight": 15, "timeframe": "15m", "atr_period": 7, "multiplier": 2.0},
-                    "volume": {"enabled": True, "weight": 10, "timeframe": "15m", "vol_sma_period": 10},
-                    "atr": {"enabled": True, "weight": 10, "timeframe": "15m", "period": 14, "multiplier": 1.5}
-                }),
-                "Fast momentum scalping profile with tight EMA crosses & RSI(7).",
-                now_str, now_str
-            ),
-            (
-                "profile-btc-15m-breakout", "BTC 15m Breakout", 1, 1, "BREAKOUT", "BALANCED", 75.0, 75.0, "WEIGHTED",
-                json.dumps({
-                    "ema": {"enabled": True, "weight": 15, "timeframe": "15m", "fast": 20, "slow": 50, "source": "close"},
-                    "bollinger": {"enabled": True, "weight": 25, "timeframe": "15m", "period": 20, "std_dev": 2.0},
-                    "atr": {"enabled": True, "weight": 15, "timeframe": "15m", "period": 14, "multiplier": 2.0},
-                    "volume": {"enabled": True, "weight": 20, "timeframe": "15m", "vol_sma_period": 20},
-                    "vwap": {"enabled": True, "weight": 15, "timeframe": "15m", "mode": "session"},
-                    "donchian": {"enabled": True, "weight": 10, "timeframe": "15m", "period": 20}
-                }),
-                "Volatile expansion and channel breakout detection profile.",
-                now_str, now_str
-            ),
-            (
-                "profile-conservative-trend", "Conservative Trend", 1, 1, "TRENDING", "CONSERVATIVE", 80.0, 80.0, "WEIGHTED",
-                json.dumps({
-                    "ema": {"enabled": True, "weight": 25, "timeframe": "15m", "fast": 50, "slow": 200, "source": "close"},
-                    "macd": {"enabled": True, "weight": 20, "timeframe": "15m", "fast": 12, "slow": 26, "signal": 9},
-                    "adx": {"enabled": True, "weight": 20, "timeframe": "15m", "period": 14, "threshold": 25.0},
-                    "vwap": {"enabled": True, "weight": 15, "timeframe": "15m", "mode": "session"},
-                    "volume": {"enabled": True, "weight": 10, "timeframe": "15m", "vol_sma_period": 20},
-                    "rsi": {"enabled": True, "weight": 10, "timeframe": "15m", "period": 14, "oversold": 30, "overbought": 70}
-                }),
-                "High-confidence trend confirmation profile requiring EMA 50/200 & ADX.",
-                now_str, now_str
-            ),
-            (
-                "profile-mean-reversion", "Mean Reversion", 1, 1, "RANGING", "BALANCED", 75.0, 75.0, "WEIGHTED",
-                json.dumps({
-                    "rsi": {"enabled": True, "weight": 25, "timeframe": "15m", "period": 14, "oversold": 30, "overbought": 70},
-                    "bollinger": {"enabled": True, "weight": 25, "timeframe": "15m", "period": 20, "std_dev": 2.0},
-                    "vwap": {"enabled": True, "weight": 20, "timeframe": "15m", "mode": "session"},
-                    "stoch_rsi": {"enabled": True, "weight": 15, "timeframe": "15m", "period": 14, "k": 3, "d": 3, "oversold": 20, "overbought": 80},
-                    "pivot": {"enabled": True, "weight": 15, "timeframe": "15m", "type": "standard"}
-                }),
-                "Oscillator & envelope profile for sideways / ranging markets.",
-                now_str, now_str
-            )
-        ]
-        cursor.executemany(
-            """
-            INSERT INTO indicator_profiles 
-            (profile_id, name, version, is_active, market_regime, adaptive_mode, signal_threshold_long, signal_threshold_short, scoring_mode, config_json, description, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            profiles
-        )
         
-        # Seed version history
-        for p in profiles:
-            cursor.execute(
-                "INSERT INTO indicator_profile_versions (profile_id, version, name, config_json, config_snapshot_json, created_at, change_notes) VALUES (?, 1, ?, ?, ?, ?, 'Initial default release')",
-                (p[0], p[1], p[9], p[9], now_str)
+            # Seed version history
+            for p in profiles:
+                cursor.execute(
+                    "INSERT INTO indicator_profile_versions (profile_id, version, name, config_json, config_snapshot_json, created_at, change_notes) VALUES (?, 1, ?, ?, ?, ?, 'Initial default release')",
+                    (p[0], p[1], p[9], p[9], now_str)
+                )
+
+
+            # Bind bot-1 to profile-btc-15m-trend
+            cursor.execute("INSERT OR IGNORE INTO bot_indicator_profiles (bot_id, profile_id, applied_at) VALUES ('bot-1', 'profile-btc-15m-trend', ?)", (now_str,))
+            cursor.execute("INSERT OR IGNORE INTO bot_indicator_profiles (bot_id, profile_id, applied_at) VALUES ('bot-2', 'profile-btc-15m-breakout', ?)", (now_str,))
+            cursor.execute("INSERT OR IGNORE INTO bot_indicator_profiles (bot_id, profile_id, applied_at) VALUES ('bot-3', 'profile-mean-reversion', ?)", (now_str,))
+
+            conn.commit()
+
+        # Seed default Scenario Profiles if empty
+        cursor.execute("SELECT COUNT(*) as count FROM scenario_profiles")
+        if cursor.fetchone()["count"] == 0:
+            scenarios = [
+                ("sc-trending-bull", "sc-trending-bull", "Trending Bull Market", "TRENDING_BULL", json.dumps(["ema", "macd", "adx", "supertrend", "vwap", "volume"]), json.dumps({"ema": {"fast": 20, "slow": 50}, "adx": {"threshold": 25}}), "Strong upward momentum trend preferred indicators."),
+                ("sc-trending-bear", "sc-trending-bear", "Trending Bear Market", "TRENDING_BEAR", json.dumps(["ema", "macd", "adx", "supertrend", "vwap", "volume"]), json.dumps({"ema": {"fast": 20, "slow": 50}, "adx": {"threshold": 25}}), "Strong downward trend preferred indicators."),
+                ("sc-sideways-range", "sc-sideways-range", "Sideways / Range Market", "SIDEWAYS_RANGE", json.dumps(["rsi", "stoch_rsi", "bollinger", "vwap", "support_resistance"]), json.dumps({"rsi": {"oversold": 30, "overbought": 70}}), "Oscillator and band-reversion preferred indicators."),
+                ("sc-high-volatility", "sc-high-volatility", "High Volatility", "HIGH_VOLATILITY", json.dumps(["atr", "bollinger", "adx", "volume", "supertrend"]), json.dumps({"atr": {"multiplier": 2.0}}), "Expansion and volatility envelope preferred indicators."),
+                ("sc-low-volatility", "sc-low-volatility", "Low Volatility", "LOW_VOLATILITY", json.dumps(["bollinger", "vwap", "rsi", "volume"]), json.dumps({"bollinger": {"period": 20, "std_dev": 2.0}}), "Contraction and range building preferred indicators."),
+                ("sc-breakout", "sc-breakout", "Breakout Scenario", "BREAKOUT", json.dumps(["volume", "bollinger", "atr", "donchian", "vwap", "ema"]), json.dumps({"donchian": {"period": 20}}), "Channel breakout & volume expansion preferred indicators."),
+                ("sc-pullback", "sc-pullback", "Pullback Scenario", "PULLBACK", json.dumps(["ema", "vwap", "rsi", "macd", "volume"]), json.dumps({"rsi": {"period": 14}}), "Trend retracement entry preferred indicators.")
+            ]
+            cursor.executemany(
+                "INSERT INTO scenario_profiles (id, scenario_id, name, regime, preferred_indicators_json, default_params_json, description) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                scenarios
             )
+            conn.commit()
 
-
-        # Bind bot-1 to profile-btc-15m-trend
-        cursor.execute("INSERT OR IGNORE INTO bot_indicator_profiles (bot_id, profile_id, applied_at) VALUES ('bot-1', 'profile-btc-15m-trend', ?)", (now_str,))
-        cursor.execute("INSERT OR IGNORE INTO bot_indicator_profiles (bot_id, profile_id, applied_at) VALUES ('bot-2', 'profile-btc-15m-breakout', ?)", (now_str,))
-        cursor.execute("INSERT OR IGNORE INTO bot_indicator_profiles (bot_id, profile_id, applied_at) VALUES ('bot-3', 'profile-mean-reversion', ?)", (now_str,))
-
-        conn.commit()
-
-    # Seed default Scenario Profiles if empty
-    cursor.execute("SELECT COUNT(*) as count FROM scenario_profiles")
-    if cursor.fetchone()["count"] == 0:
-        scenarios = [
-            ("sc-trending-bull", "sc-trending-bull", "Trending Bull Market", "TRENDING_BULL", json.dumps(["ema", "macd", "adx", "supertrend", "vwap", "volume"]), json.dumps({"ema": {"fast": 20, "slow": 50}, "adx": {"threshold": 25}}), "Strong upward momentum trend preferred indicators."),
-            ("sc-trending-bear", "sc-trending-bear", "Trending Bear Market", "TRENDING_BEAR", json.dumps(["ema", "macd", "adx", "supertrend", "vwap", "volume"]), json.dumps({"ema": {"fast": 20, "slow": 50}, "adx": {"threshold": 25}}), "Strong downward trend preferred indicators."),
-            ("sc-sideways-range", "sc-sideways-range", "Sideways / Range Market", "SIDEWAYS_RANGE", json.dumps(["rsi", "stoch_rsi", "bollinger", "vwap", "support_resistance"]), json.dumps({"rsi": {"oversold": 30, "overbought": 70}}), "Oscillator and band-reversion preferred indicators."),
-            ("sc-high-volatility", "sc-high-volatility", "High Volatility", "HIGH_VOLATILITY", json.dumps(["atr", "bollinger", "adx", "volume", "supertrend"]), json.dumps({"atr": {"multiplier": 2.0}}), "Expansion and volatility envelope preferred indicators."),
-            ("sc-low-volatility", "sc-low-volatility", "Low Volatility", "LOW_VOLATILITY", json.dumps(["bollinger", "vwap", "rsi", "volume"]), json.dumps({"bollinger": {"period": 20, "std_dev": 2.0}}), "Contraction and range building preferred indicators."),
-            ("sc-breakout", "sc-breakout", "Breakout Scenario", "BREAKOUT", json.dumps(["volume", "bollinger", "atr", "donchian", "vwap", "ema"]), json.dumps({"donchian": {"period": 20}}), "Channel breakout & volume expansion preferred indicators."),
-            ("sc-pullback", "sc-pullback", "Pullback Scenario", "PULLBACK", json.dumps(["ema", "vwap", "rsi", "macd", "volume"]), json.dumps({"rsi": {"period": 14}}), "Trend retracement entry preferred indicators.")
-        ]
-        cursor.executemany(
-            "INSERT INTO scenario_profiles (id, scenario_id, name, regime, preferred_indicators_json, default_params_json, description) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            scenarios
-        )
-        conn.commit()
-
-    # Seed demo trades if trade history has fewer than 10 trades
-    cursor.execute("SELECT COUNT(*) as count FROM trades_log")
-    if cursor.fetchone()["count"] < 5:
-        now = datetime.now(timezone.utc)
-        sample_trades = [
-            (
-                (now - timedelta(days=14, hours=3)).isoformat(), "BTC/USDT", "LONG", 62500.0, 61250.0, 65000.0, 0.25, "CLOSED", 64800.0,
-                (now - timedelta(days=14, hours=1)).isoformat(), 575.0, "bot-1", "EMA_MACD_VP", 2.50, "🎯 Disciplined", "Perfect EMA cross + VP confirmation"
-            ),
-            (
-                (now - timedelta(days=12, hours=5)).isoformat(), "BTC/USDT", "SHORT", 64200.0, 65500.0, 61600.0, 0.20, "CLOSED", 65500.0,
-                (now - timedelta(days=12, hours=3)).isoformat(), -260.0, "bot-1", "EMA_MACD_VP", 2.20, "😤 FOMO", "Entered early before RSI rejection confirmed"
-            ),
-            (
-                (now - timedelta(days=10, hours=8)).isoformat(), "BTC/USDT", "LONG", 63100.0, 62000.0, 66000.0, 0.30, "CLOSED", 65900.0,
-                (now - timedelta(days=9, hours=14)).isoformat(), 840.0, "bot-2", "EMA9_RSI", 3.10, "🎯 Disciplined", "Clean trend retest at 9 EMA"
-            ),
-            (
-                (now - timedelta(days=8, hours=2)).isoformat(), "ETH/USDT", "LONG", 3400.0, 3300.0, 3650.0, 3.5, "CLOSED", 3620.0,
-                (now - timedelta(days=7, hours=19)).isoformat(), 770.0, "bot-3", "RSI_MEAN_REVERSION", 4.50, "🧘 Calm", "Oversold RSI dip play hit target"
-            ),
-            (
-                (now - timedelta(days=6, hours=10)).isoformat(), "BTC/USDT", "SHORT", 66500.0, 67800.0, 64000.0, 0.18, "CLOSED", 67800.0,
-                (now - timedelta(days=6, hours=8)).isoformat(), -234.0, "bot-1", "EMA_MACD_VP", 1.80, "⚡ Impulsive", "Breakout stop hunted"
-            ),
-            (
-                (now - timedelta(days=4, hours=12)).isoformat(), "BTC/USDT", "LONG", 65200.0, 64100.0, 68000.0, 0.25, "CLOSED", 67600.0,
-                (now - timedelta(days=3, hours=22)).isoformat(), 600.0, "bot-2", "EMA9_RSI", 2.80, "🎯 Disciplined", "Solid risk reward follow through"
-            ),
-            (
-                (now - timedelta(days=2, hours=6)).isoformat(), "ETH/USDT", "SHORT", 3550.0, 3650.0, 3350.0, 4.0, "CLOSED", 3550.0,
-                (now - timedelta(days=2, hours=4)).isoformat(), 0.0, "bot-3", "RSI_MEAN_REVERSION", 3.20, "🧘 Calm", "Breakeven exit after momentum stalled"
-            ),
-            (
-                (now - timedelta(hours=14)).isoformat(), "BTC/USDT", "LONG", 66800.0, 65800.0, 69500.0, 0.22, "CLOSED", 68500.0,
-                (now - timedelta(hours=4)).isoformat(), 374.0, "bot-1", "EMA_MACD_VP", 2.10, "🎯 Disciplined", "Trail stop hit at profit zone"
-            ),
-            (
-                (now - timedelta(hours=2)).isoformat(), "BTC/USDT", "LONG", 68200.0, 67000.0, 71000.0, 0.20, "OPEN", None,
-                None, 0.0, "bot-1", "EMA_MACD_VP", 0.0, "🎯 Disciplined", "Active trade trailing SL"
+        # Seed demo trades if trade history has fewer than 10 trades
+        cursor.execute("SELECT COUNT(*) as count FROM trades_log")
+        if cursor.fetchone()["count"] < 5:
+            now = datetime.now(timezone.utc)
+            sample_trades = [
+                (
+                    (now - timedelta(days=14, hours=3)).isoformat(), "BTC/USDT", "LONG", 62500.0, 61250.0, 65000.0, 0.25, "CLOSED", 64800.0,
+                    (now - timedelta(days=14, hours=1)).isoformat(), 575.0, "bot-1", "EMA_MACD_VP", 2.50, "🎯 Disciplined", "Perfect EMA cross + VP confirmation"
+                ),
+                (
+                    (now - timedelta(days=12, hours=5)).isoformat(), "BTC/USDT", "SHORT", 64200.0, 65500.0, 61600.0, 0.20, "CLOSED", 65500.0,
+                    (now - timedelta(days=12, hours=3)).isoformat(), -260.0, "bot-1", "EMA_MACD_VP", 2.20, "😤 FOMO", "Entered early before RSI rejection confirmed"
+                ),
+                (
+                    (now - timedelta(days=10, hours=8)).isoformat(), "BTC/USDT", "LONG", 63100.0, 62000.0, 66000.0, 0.30, "CLOSED", 65900.0,
+                    (now - timedelta(days=9, hours=14)).isoformat(), 840.0, "bot-2", "EMA9_RSI", 3.10, "🎯 Disciplined", "Clean trend retest at 9 EMA"
+                ),
+                (
+                    (now - timedelta(days=8, hours=2)).isoformat(), "ETH/USDT", "LONG", 3400.0, 3300.0, 3650.0, 3.5, "CLOSED", 3620.0,
+                    (now - timedelta(days=7, hours=19)).isoformat(), 770.0, "bot-3", "RSI_MEAN_REVERSION", 4.50, "🧘 Calm", "Oversold RSI dip play hit target"
+                ),
+                (
+                    (now - timedelta(days=6, hours=10)).isoformat(), "BTC/USDT", "SHORT", 66500.0, 67800.0, 64000.0, 0.18, "CLOSED", 67800.0,
+                    (now - timedelta(days=6, hours=8)).isoformat(), -234.0, "bot-1", "EMA_MACD_VP", 1.80, "⚡ Impulsive", "Breakout stop hunted"
+                ),
+                (
+                    (now - timedelta(days=4, hours=12)).isoformat(), "BTC/USDT", "LONG", 65200.0, 64100.0, 68000.0, 0.25, "CLOSED", 67600.0,
+                    (now - timedelta(days=3, hours=22)).isoformat(), 600.0, "bot-2", "EMA9_RSI", 2.80, "🎯 Disciplined", "Solid risk reward follow through"
+                ),
+                (
+                    (now - timedelta(days=2, hours=6)).isoformat(), "ETH/USDT", "SHORT", 3550.0, 3650.0, 3350.0, 4.0, "CLOSED", 3550.0,
+                    (now - timedelta(days=2, hours=4)).isoformat(), 0.0, "bot-3", "RSI_MEAN_REVERSION", 3.20, "🧘 Calm", "Breakeven exit after momentum stalled"
+                ),
+                (
+                    (now - timedelta(hours=14)).isoformat(), "BTC/USDT", "LONG", 66800.0, 65800.0, 69500.0, 0.22, "CLOSED", 68500.0,
+                    (now - timedelta(hours=4)).isoformat(), 374.0, "bot-1", "EMA_MACD_VP", 2.10, "🎯 Disciplined", "Trail stop hit at profit zone"
+                ),
+                (
+                    (now - timedelta(hours=2)).isoformat(), "BTC/USDT", "LONG", 68200.0, 67000.0, 71000.0, 0.20, "OPEN", None,
+                    None, 0.0, "bot-1", "EMA_MACD_VP", 0.0, "🎯 Disciplined", "Active trade trailing SL"
+                )
+            ]
+            cursor.executemany(
+                """
+                INSERT INTO trades_log (timestamp, symbol, direction, entry_price, stop_loss, take_profit, position_size, status, exit_price, exit_timestamp, result_pnl, bot_id, strategy, fees, emotion_tag, remarks)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                sample_trades
             )
-        ]
-        cursor.executemany(
-            """
-            INSERT INTO trades_log (timestamp, symbol, direction, entry_price, stop_loss, take_profit, position_size, status, exit_price, exit_timestamp, result_pnl, bot_id, strategy, fees, emotion_tag, remarks)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            sample_trades
-        )
-        conn.commit()
-    conn.close()
+            conn.commit()
+    except Exception as exc:
+        logger.error(f"Error seeding demo data: {exc}")
+    finally:
+        if conn:
+            try:
+                conn.close()
+            except Exception:
+                pass
 
 
 def seed_institutional_hierarchy_if_needed() -> None:
@@ -5089,6 +5118,7 @@ def seed_institutional_hierarchy_if_needed() -> None:
     Customer -> Department -> Broker Folder -> Broker Account -> Capital Ledger
     Guarantees strict separation across Customer, Department, Broker Folder, Broker Account, Currency, PAPER/LIVE.
     """
+    conn = None
     try:
         conn = get_connection()
         cursor = conn.cursor()
@@ -5194,10 +5224,15 @@ def seed_institutional_hierarchy_if_needed() -> None:
         )
 
         conn.commit()
-        conn.close()
         logger.info("[OK] Institutional 8-tier hierarchy verified and seeded.")
     except Exception as exc:
         logger.error(f"Error seeding institutional hierarchy: {exc}")
+    finally:
+        if conn:
+            try:
+                conn.close()
+            except Exception:
+                pass
 
 
 def _json_dumps(value: Any) -> str:
@@ -6912,6 +6947,7 @@ def audit_and_clean_db() -> Dict[str, Any]:
         "inconsistent_trades_fixed": 0,
         "details": []
     }
+    conn = None
     try:
         conn = get_connection()
         cursor = conn.cursor()
@@ -7075,10 +7111,15 @@ def audit_and_clean_db() -> Dict[str, Any]:
             )
 
         conn.commit()
-        conn.close()
     except Exception as exc:
         logger.error("Error during DB audit and clean: %s", exc)
         report["error"] = str(exc)
+    finally:
+        if conn:
+            try:
+                conn.close()
+            except Exception:
+                pass
 
     return report
 
@@ -8115,6 +8156,7 @@ def bulk_upsert_market_universe(instruments: list[Dict[str, Any]]) -> Tuple[int,
     if not instruments:
         return inserted, updated
 
+    conn = None
     try:
         conn = get_connection()
         cursor = conn.cursor()
@@ -8214,9 +8256,14 @@ def bulk_upsert_market_universe(instruments: list[Dict[str, Any]]) -> Tuple[int,
                 inserted += 1
 
         conn.commit()
-        conn.close()
     except Exception as exc:
         logger.error(f"Error during bulk upsert market universe: {exc}")
+    finally:
+        if conn:
+            try:
+                conn.close()
+            except Exception:
+                pass
 
     return inserted, updated
 
@@ -8233,6 +8280,7 @@ def get_market_universe(
     """Retrieve filtered, searched, and paginated market universe instruments."""
     results = []
     total_count = 0
+    conn = None
     try:
         conn = get_connection()
         cursor = conn.cursor()
@@ -8302,16 +8350,21 @@ def get_market_universe(
             d["strategy_enabled"] = bool(d.get("strategy_enabled", 0))
             d["live_enabled"] = bool(d.get("live_enabled", 0))
             results.append(d)
-
-        conn.close()
     except Exception as exc:
         logger.error(f"Error querying market universe: {exc}")
+    finally:
+        if conn:
+            try:
+                conn.close()
+            except Exception:
+                pass
 
     return {"instruments": results, "total_count": total_count, "limit": limit, "offset": offset}
 
 
 def get_market_instrument(identifier: str) -> Optional[Dict[str, Any]]:
     """Retrieve a single instrument by instrument_id, symbol, or canonical_symbol."""
+    conn = None
     try:
         conn = get_connection()
         cursor = conn.cursor()
@@ -8320,7 +8373,6 @@ def get_market_instrument(identifier: str) -> Optional[Dict[str, Any]]:
             (identifier, identifier, identifier)
         )
         r = cursor.fetchone()
-        conn.close()
         if r:
             d = dict(r)
             d["data_available"] = bool(d.get("data_available", 1))
@@ -8332,6 +8384,12 @@ def get_market_instrument(identifier: str) -> Optional[Dict[str, Any]]:
             return d
     except Exception as exc:
         logger.error(f"Error fetching instrument {identifier}: {exc}")
+    finally:
+        if conn:
+            try:
+                conn.close()
+            except Exception:
+                pass
     return None
 
 
@@ -8348,27 +8406,34 @@ def update_instrument_controls(
         if not inst:
             return False, f"Instrument '{identifier}' not found."
 
-        conn = get_connection()
-        cursor = conn.cursor()
-        now_str = datetime.now(timezone.utc).isoformat()
+        conn = None
+        try:
+            conn = get_connection()
+            cursor = conn.cursor()
+            now_str = datetime.now(timezone.utc).isoformat()
 
-        w_val = (1 if watch else 0) if watch is not None else (1 if inst["watch_enabled"] else 0)
-        p_val = (1 if paper else 0) if paper is not None else (1 if inst["paper_enabled"] else 0)
-        s_val = (1 if strategy else 0) if strategy is not None else (1 if inst["strategy_enabled"] else 0)
-        l_val = (1 if live else 0) if live is not None else (1 if inst["live_enabled"] else 0)
+            w_val = (1 if watch else 0) if watch is not None else (1 if inst["watch_enabled"] else 0)
+            p_val = (1 if paper else 0) if paper is not None else (1 if inst["paper_enabled"] else 0)
+            s_val = (1 if strategy else 0) if strategy is not None else (1 if inst["strategy_enabled"] else 0)
+            l_val = (1 if live else 0) if live is not None else (1 if inst["live_enabled"] else 0)
 
-        cursor.execute(
-            """
-            UPDATE market_universe
-            SET watch_enabled = ?, paper_enabled = ?, strategy_enabled = ?, live_enabled = ?, last_updated = ?
-            WHERE instrument_id = ? OR symbol = ?
-            """,
-            (w_val, p_val, s_val, l_val, now_str, inst["instrument_id"], inst["symbol"])
-        )
-        conn.commit()
-        conn.close()
-        logger.info(f"Updated controls for {identifier}: Watch={bool(w_val)}, Paper={bool(p_val)}, Strategy={bool(s_val)}, Live={bool(l_val)}")
-        return True, inst["instrument_id"]
+            cursor.execute(
+                """
+                UPDATE market_universe
+                SET watch_enabled = ?, paper_enabled = ?, strategy_enabled = ?, live_enabled = ?, last_updated = ?
+                WHERE instrument_id = ? OR symbol = ?
+                """,
+                (w_val, p_val, s_val, l_val, now_str, inst["instrument_id"], inst["symbol"])
+            )
+            conn.commit()
+            logger.info(f"Updated controls for {identifier}: Watch={bool(w_val)}, Paper={bool(p_val)}, Strategy={bool(s_val)}, Live={bool(l_val)}")
+            return True, inst["instrument_id"]
+        finally:
+            if conn:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
     except Exception as exc:
         logger.error(f"Error updating instrument controls for {identifier}: {exc}")
         return False, str(exc)
@@ -8389,6 +8454,7 @@ def get_universe_summary_stats() -> Dict[str, Any]:
         "data_only_count": 0,
         "last_sync": "Never"
     }
+    conn = None
     try:
         conn = get_connection()
         cursor = conn.cursor()
@@ -8427,10 +8493,14 @@ def get_universe_summary_stats() -> Dict[str, Any]:
         row_mx = cursor.fetchone()
         if row_mx and row_mx["mx"]:
             stats["last_sync"] = row_mx["mx"]
-
-        conn.close()
     except Exception as exc:
         logger.error(f"Error fetching universe summary stats: {exc}")
+    finally:
+        if conn:
+            try:
+                conn.close()
+            except Exception:
+                pass
     return stats
 
 

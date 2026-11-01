@@ -321,9 +321,9 @@ async function handleProxy(req: NextRequest, ctx: { params?: { path: string[] } 
     : (isStatus || isIndicator)
     ? 4000
     : isAuth
-    ? 20000
+    ? (isProductionEnv ? 8500 : 15000)
     : isProductionEnv
-    ? 12000
+    ? 9000
     : isUniverse
     ? 25000
     : isHeavy
@@ -522,7 +522,9 @@ async function handleProxy(req: NextRequest, ctx: { params?: { path: string[] } 
   const statusCode = isTimeout ? 504 : 503;
   const errorCode = isTimeout ? "GATEWAY_TIMEOUT" : "BACKEND_UNAVAILABLE";
   const errorMessage = isTimeout
-    ? `Quant.OS cloud service is warming up. Please wait 10 seconds and try again.`
+    ? (isAuth
+        ? `Authentication request timed out. If you received a verification code in your email, you may enter it to log in.`
+        : `Quant.OS cloud service is warming up. Please wait 10 seconds and try again.`)
     : `Quant.OS Engine backend is unreachable at ${BACKEND_URL}. System is initializing or reconnecting.`;
 
   if (isStream) {

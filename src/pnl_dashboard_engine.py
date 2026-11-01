@@ -60,78 +60,85 @@ def get_pnl_dashboard_payload(
     spreadsheet specification.
     """
     conn = _get_connection()
-    cursor = conn.cursor()
+    try:
+        cursor = conn.cursor()
 
-    now = datetime.now(timezone.utc)
-    start_date: Optional[datetime] = None
+        now = datetime.now(timezone.utc)
+        start_date: Optional[datetime] = None
 
-    period_clean = period.upper()
-    if period_clean == "TODAY":
-        start_date = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    elif period_clean == "7D":
-        start_date = now - timedelta(days=7)
-    elif period_clean == "30D":
-        start_date = now - timedelta(days=30)
-    elif period_clean == "THIS_MONTH" or period_clean == "THIS MONTH":
-        start_date = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    elif period_clean == "LAST_MONTH" or period_clean == "LAST MONTH":
-        first_this_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        last_month_end = first_this_month - timedelta(days=1)
-        start_date = last_month_end.replace(day=1)
-    elif period_clean == "3M":
-        start_date = now - timedelta(days=90)
-    elif period_clean == "6M":
-        start_date = now - timedelta(days=180)
-    elif period_clean == "YTD":
-        start_date = now.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
-    elif period_clean == "1Y":
-        start_date = now - timedelta(days=365)
+        period_clean = period.upper()
+        if period_clean == "TODAY":
+            start_date = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        elif period_clean == "7D":
+            start_date = now - timedelta(days=7)
+        elif period_clean == "30D":
+            start_date = now - timedelta(days=30)
+        elif period_clean == "THIS_MONTH" or period_clean == "THIS MONTH":
+            start_date = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        elif period_clean == "LAST_MONTH" or period_clean == "LAST MONTH":
+            first_this_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            last_month_end = first_this_month - timedelta(days=1)
+            start_date = last_month_end.replace(day=1)
+        elif period_clean == "3M":
+            start_date = now - timedelta(days=90)
+        elif period_clean == "6M":
+            start_date = now - timedelta(days=180)
+        elif period_clean == "YTD":
+            start_date = now.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+        elif period_clean == "1Y":
+            start_date = now - timedelta(days=365)
 
-    # 1. Base Query on trades_log
-    query = "SELECT * FROM trades_log WHERE 1=1"
-    params: List[Any] = []
+        # 1. Base Query on trades_log
+        query = "SELECT * FROM trades_log WHERE 1=1"
+        params: List[Any] = []
 
-    # Filter by mode
-    if mode.upper() != "ALL":
-        query += " AND (UPPER(execution_mode) = ? OR UPPER(trade_status) = ?)"
-        params.extend([mode.upper(), mode.upper()])
+        # Filter by mode
+        if mode.upper() != "ALL":
+            query += " AND (UPPER(execution_mode) = ? OR UPPER(trade_status) = ?)"
+            params.extend([mode.upper(), mode.upper()])
 
-    # Filter by broker
-    if broker.upper() != "ALL":
-        b_up = broker.upper()
-        if b_up == "DHAN":
-            query += " AND (UPPER(exchange) LIKE '%DHAN%' OR UPPER(exchange) LIKE '%NSE%' OR UPPER(symbol) LIKE '%NIFTY%')"
-        elif b_up == "UPSTOX":
-            query += " AND (UPPER(exchange) LIKE '%UPSTOX%' OR UPPER(exchange) LIKE '%BSE%')"
-        elif b_up == "DELTA":
-            query += " AND (UPPER(exchange) LIKE '%DELTA%' OR UPPER(symbol) LIKE '%BTC-28AUG%')"
-        elif b_up == "BINANCE":
-            query += " AND (UPPER(exchange) LIKE '%BINANCE%' OR UPPER(symbol) LIKE '%USDT%')"
-        elif b_up == "PAPER":
-            query += " AND UPPER(execution_mode) = 'PAPER'"
+        # Filter by broker
+        if broker.upper() != "ALL":
+            b_up = broker.upper()
+            if b_up == "DHAN":
+                query += " AND (UPPER(exchange) LIKE '%DHAN%' OR UPPER(exchange) LIKE '%NSE%' OR UPPER(symbol) LIKE '%NIFTY%')"
+            elif b_up == "UPSTOX":
+                query += " AND (UPPER(exchange) LIKE '%UPSTOX%' OR UPPER(exchange) LIKE '%BSE%')"
+            elif b_up == "DELTA":
+                query += " AND (UPPER(exchange) LIKE '%DELTA%' OR UPPER(symbol) LIKE '%BTC-28AUG%')"
+            elif b_up == "BINANCE":
+                query += " AND (UPPER(exchange) LIKE '%BINANCE%' OR UPPER(symbol) LIKE '%USDT%')"
+            elif b_up == "PAPER":
+                query += " AND UPPER(execution_mode) = 'PAPER'"
 
-    # Filter by strategy
-    if strategy.upper() != "ALL":
-        query += " AND (strategy_name = ? OR strategy_id = ? OR strategy = ?)"
-        params.extend([strategy, strategy, strategy])
+        # Filter by strategy
+        if strategy.upper() != "ALL":
+            query += " AND (strategy_name = ? OR strategy_id = ? OR strategy = ?)"
+            params.extend([strategy, strategy, strategy])
 
-    # Filter by direction
-    if direction.upper() in ["LONG", "BUY"]:
-        query += " AND (UPPER(direction) IN ('LONG', 'BUY') OR UPPER(position_side) = 'LONG' OR UPPER(side) = 'BUY')"
-    elif direction.upper() in ["SHORT", "SELL"]:
-        query += " AND (UPPER(direction) IN ('SHORT', 'SELL') OR UPPER(position_side) = 'SHORT' OR UPPER(side) = 'SELL')"
+        # Filter by direction
+        if direction.upper() in ["LONG", "BUY"]:
+            query += " AND (UPPER(direction) IN ('LONG', 'BUY') OR UPPER(position_side) = 'LONG' OR UPPER(side) = 'BUY')"
+        elif direction.upper() in ["SHORT", "SELL"]:
+            query += " AND (UPPER(direction) IN ('SHORT', 'SELL') OR UPPER(position_side) = 'SHORT' OR UPPER(side) = 'SELL')"
 
-    # Filter by asset
-    if asset.upper() != "ALL":
-        query += " AND UPPER(asset_class) LIKE ?"
-        params.append(f"%{asset.upper()}%")
+        # Filter by asset
+        if asset.upper() != "ALL":
+            query += " AND UPPER(asset_class) LIKE ?"
+            params.append(f"%{asset.upper()}%")
 
-    # Order by ID descending
-    query += " ORDER BY id DESC"
+        # Order by ID descending
+        query += " ORDER BY id DESC"
 
-    cursor.execute(query, tuple(params))
-    raw_rows = cursor.fetchall()
-    all_trades: List[Dict[str, Any]] = [dict(row) for row in raw_rows]
+        cursor.execute(query, tuple(params))
+        raw_rows = cursor.fetchall()
+        all_trades: List[Dict[str, Any]] = [dict(row) for row in raw_rows]
+    finally:
+        if conn:
+            try:
+                conn.close()
+            except Exception:
+                pass
 
     # Filter by time in Python if start_date is set
     filtered_trades: List[Dict[str, Any]] = []

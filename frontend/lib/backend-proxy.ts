@@ -210,10 +210,13 @@ export async function proxyToBackend(
   // Handle final failure
   const latencyMs = Math.round(performance.now() - startTime);
   const isTimeout = lastError?.name === "AbortError" || lastStatus === 504;
+  const isAuthRoute = cleanSubPath.includes("auth");
   const statusCode = isTimeout ? 504 : 503;
   const errorCode = isTimeout ? "GATEWAY_TIMEOUT" : "BACKEND_UNAVAILABLE";
   const errorMessage = isTimeout
-    ? `Backend request to ${prefix}/${cleanSubPath} timed out after ${timeoutMs}ms`
+    ? (isAuthRoute
+        ? `Authentication request timed out after ${timeoutMs}ms. If you received an email verification code, you may enter it to log in.`
+        : `Backend request to ${prefix}/${cleanSubPath} timed out after ${timeoutMs}ms`)
     : `Quant.OS Engine backend is unreachable at ${backendBase}.`;
 
   console.error(

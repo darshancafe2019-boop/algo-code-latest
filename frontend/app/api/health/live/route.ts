@@ -42,17 +42,18 @@ export async function GET(req: Request) {
   };
 
   // Probe Flask backend (probe /health/live first, fallback to /api/health/live)
+  const probeTimeout = isProduction() ? 8000 : 4000;
   try {
     let liveRes = await fetch(`${effectiveBackendUrl}/health/live`, {
       cache: "no-store",
-      signal: AbortSignal.timeout(4000),
+      signal: AbortSignal.timeout(probeTimeout),
       headers: probeHeaders,
     }).catch(() => null);
 
     if (!liveRes || !liveRes.ok) {
       liveRes = await fetch(`${effectiveBackendUrl}/api/health/live`, {
         cache: "no-store",
-        signal: AbortSignal.timeout(4000),
+        signal: AbortSignal.timeout(probeTimeout),
         headers: probeHeaders,
       }).catch(() => null);
     }

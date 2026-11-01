@@ -738,6 +738,20 @@ class ServiceSupervisor:
         print("=" * 64 + "\n")
         print("Press Ctrl+C to stop all services.\n")
 
+        # Start background cloud Render keepalive thread to prevent free-tier spin-down
+        def _render_keepalive_worker():
+            while not GLOBAL_SHUTDOWN_EVENT.is_set():
+                try:
+                    req = urllib.request.Request("https://algo-code-latest.onrender.com/health/live", headers={"User-Agent": "QuantOS-Supervisor-KeepAlive/1.0"})
+                    with urllib.request.urlopen(req, timeout=12) as _:
+                        pass
+                except Exception:
+                    pass
+                GLOBAL_SHUTDOWN_EVENT.wait(240.0)
+
+        t_keepalive = threading.Thread(target=_render_keepalive_worker, name="RenderKeepAlive", daemon=True)
+        t_keepalive.start()
+
         return True
 
     def run_supervision_loop(self):

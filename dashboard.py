@@ -149,6 +149,7 @@ def is_origin_allowed(origin: str) -> bool:
         "http://127.0.0.1:3100",
         "http://localhost:3000",
         "http://127.0.0.1:3000",
+        "https://prismatic-crisp-399e2a.netlify.app",
         "https://algo-code-latest.vercel.app",
     ]
     frontend_url = os.environ.get("FRONTEND_URL") or os.environ.get("APP_PUBLIC_URL") or getattr(config, "APP_PUBLIC_URL", "")
@@ -166,6 +167,7 @@ def is_origin_allowed(origin: str) -> bool:
     return (
         origin in allowed_origins
         or (frontend_url and origin == frontend_url.rstrip("/"))
+        or origin.endswith(".netlify.app")
         or origin.endswith(".vercel.app")
         or origin.endswith(".onrender.com")
     )
@@ -518,7 +520,7 @@ def enforce_server_side_security():
                     clean_host = host.split("/")[0]
                     frontend_clean = os.environ.get("FRONTEND_URL", "").replace("http://", "").replace("https://", "").split("/")[0]
                     is_local = clean_origin.startswith("127.0.0.1") or clean_origin.startswith("localhost")
-                    is_trusted_app = clean_origin.endswith(".vercel.app") or clean_origin.endswith(".onrender.com")
+                    is_trusted_app = clean_origin.endswith(".netlify.app") or clean_origin.endswith(".vercel.app") or clean_origin.endswith(".onrender.com")
                     matches_host = clean_origin == clean_host or (frontend_clean and clean_origin == frontend_clean) or is_trusted_app
                     if not (is_local or matches_host or csrf_header):
                         return jsonify({

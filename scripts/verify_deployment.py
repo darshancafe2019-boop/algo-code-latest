@@ -2,22 +2,25 @@ import urllib.request
 import urllib.error
 import time
 import sys
+import os
+
+frontend_base = os.getenv("FRONTEND_URL", "https://prismatic-crisp-399e2a.netlify.app").rstrip("/")
 
 endpoints = [
     ('Backend /api/health/live', 'https://algo-code-latest.onrender.com/api/health/live', False),
     ('Backend /api/health/ready', 'https://algo-code-latest.onrender.com/api/health/ready', False),
     ('Backend /api/market/providers/health', 'https://algo-code-latest.onrender.com/api/market/providers/health', False),
-    ('Frontend /api/health/live', 'https://algo-code-latest.vercel.app/api/health/live', False),
-    ('Frontend /api/health/ready', 'https://algo-code-latest.vercel.app/api/health/ready', False),
-    ('Frontend /api/v2/system/health', 'https://algo-code-latest.vercel.app/api/v2/system/health', False),
-    ('Frontend /api/v2/portfolio', 'https://algo-code-latest.vercel.app/api/v2/portfolio?environment=PAPER', False),
-    ('Frontend /api/v2/positions', 'https://algo-code-latest.vercel.app/api/v2/positions?environment=PAPER', False),
-    ('Frontend /api/v2/orders', 'https://algo-code-latest.vercel.app/api/v2/orders?environment=PAPER', False),
-    ('Frontend /api/v2/capital/ledger', 'https://algo-code-latest.vercel.app/api/v2/capital/ledger?environment=PAPER', False),
-    ('Frontend /api/market/providers', 'https://algo-code-latest.vercel.app/api/market/providers', False),
-    ('Frontend /api/market/health', 'https://algo-code-latest.vercel.app/api/market/health', False),
-    ('Frontend /api/market-data/stream', 'https://algo-code-latest.vercel.app/api/market-data/stream?symbols=NSE:NIFTY50', True),
-    ('Frontend /api/stream/portfolio', 'https://algo-code-latest.vercel.app/api/stream/portfolio?mode=PAPER', True),
+    ('Frontend /api/health/live', f'{frontend_base}/api/health/live', False),
+    ('Frontend /api/health/ready', f'{frontend_base}/api/health/ready', False),
+    ('Frontend /api/v2/system/health', f'{frontend_base}/api/v2/system/health', False),
+    ('Frontend /api/v2/portfolio', f'{frontend_base}/api/v2/portfolio?environment=PAPER', False),
+    ('Frontend /api/v2/positions', f'{frontend_base}/api/v2/positions?environment=PAPER', False),
+    ('Frontend /api/v2/orders', f'{frontend_base}/api/v2/orders?environment=PAPER', False),
+    ('Frontend /api/v2/capital/ledger', f'{frontend_base}/api/v2/capital/ledger?environment=PAPER', False),
+    ('Frontend /api/market/providers', f'{frontend_base}/api/market/providers', False),
+    ('Frontend /api/market/health', f'{frontend_base}/api/market/health', False),
+    ('Frontend /api/market-data/stream', f'{frontend_base}/api/market-data/stream?symbols=NSE:NIFTY50', True),
+    ('Frontend /api/stream/portfolio', f'{frontend_base}/api/stream/portfolio?mode=PAPER', True),
 ]
 
 print("Starting deployed endpoint verification...\n", flush=True)

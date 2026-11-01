@@ -13,10 +13,10 @@ The repository's Render blueprint intends to use PostgreSQL, but a blueprint is 
 
 ```
 +---------------------------------------------------------------------------------------+
-|                                    VERCEL EDGE NETWORK                                |
+|                              NETLIFY / VERCEL EDGE NETWORK                            |
 |                                                                                       |
-|   Next.js frontend (Vercel deployment)                                                 |
-|   Domain: https://algo-code-latest.vercel.app                                         |
+|   Next.js frontend (Netlify deployment)                                               |
+|   Domain: https://prismatic-crisp-399e2a.netlify.app                                  |
 |   Static Assets + SSR + Server-Side Streaming Proxies                                 |
 +---------------------------------------------------------------------------------------+
                 |                                               |
@@ -99,7 +99,7 @@ python scripts/migrate_sqlite_to_postgres.py --sqlite-path="data/trading_bot.db"
 | `RESEND_API_KEY` | Resend API key | Secret | Sends production login and password-reset OTP messages |
 | `AUTH_EMAIL_FROM` | Verified sender address | Config | Must be an allowed sender in the Resend account |
 | `GATEWAY_SECRET` | High-entropy secret | Secret | Shared HMAC secret for Backend-to-Gateway internal auth |
-| `FRONTEND_URL` / `APP_PUBLIC_URL` | `https://algo-code-latest.vercel.app` | Config | Frontend origin and public URL |
+| `FRONTEND_URL` / `APP_PUBLIC_URL` | `https://prismatic-crisp-399e2a.netlify.app` | Config | Frontend origin and public URL |
 | `TRADING_MODE` | `PAPER` | Fail-Closed | Enforces zero real-money order routing |
 | `LIVE_TRADING_ENABLED` | `false` | Fail-Closed | Master live trading gate; strictly disabled |
 | `PORT` | `5050` | Render managed | Backend HTTP WSGI port |

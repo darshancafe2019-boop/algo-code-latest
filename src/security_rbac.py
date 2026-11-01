@@ -261,7 +261,7 @@ def require_csrf(fn):
                     clean_origin = origin.replace("http://", "").replace("https://", "").split("/")[0]
                     clean_host = host.split("/")[0]
                     is_local = clean_origin.startswith("127.0.0.1") or clean_origin.startswith("localhost")
-                    is_trusted = clean_origin.endswith(".vercel.app") or clean_origin.endswith(".onrender.com")
+                    is_trusted = clean_origin.endswith(".netlify.app") or clean_origin.endswith(".vercel.app") or clean_origin.endswith(".onrender.com")
                     if not (is_local or clean_origin == clean_host or is_trusted):
                         return jsonify({
                             "status": "error",

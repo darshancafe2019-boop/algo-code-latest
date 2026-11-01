@@ -216,7 +216,15 @@ def test_csrf_allows_trusted_vercel_origin(client):
     raw_token, _ = SessionManager.create_session(user_id=admin["id"])
     client.set_cookie("quantos_session_token", raw_token)
 
-    # Call a mutating endpoint with trusted vercel origin
+    # Call a mutating endpoint with trusted netlify and vercel origins
+    res_netlify = client.post(
+        "/api/auth/logout",
+        headers={"Origin": "https://prismatic-crisp-399e2a.netlify.app"}
+    )
+    assert res_netlify.status_code == 200
+
+    raw_token_2, _ = SessionManager.create_session(user_id=admin["id"])
+    client.set_cookie("quantos_session_token", raw_token_2)
     res = client.post(
         "/api/auth/logout",
         headers={"Origin": "https://algo-code-latest.vercel.app"}

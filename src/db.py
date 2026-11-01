@@ -254,6 +254,9 @@ class PostgresConnectionAdapter:
         except Exception:
             pass
 
+    def __del__(self):
+        self.close()
+
     def __enter__(self):
         return self
 
@@ -413,6 +416,9 @@ class BoundedDirectPgConnection:
                 self._released = True
                 self._sem.release()
 
+    def __del__(self):
+        self.close()
+
     def __enter__(self):
         return self
 
@@ -520,11 +526,21 @@ def _robust_check_connection(conn) -> None:
 
 def _get_pg_clean_url() -> Optional[str]:
     """Returns the sanitized PostgreSQL database URL or None if not configured/SQLite."""
-    raw = getattr(config, "DATABASE_URL", None) or os.getenv("DATABASE_URL")
+    raw = (
+        getattr(config, "DATABASE_URL", None)
+        or os.getenv("DATABASE_URL")
+        or getattr(config, "DIRECT_URL", None)
+        or os.getenv("DIRECT_URL")
+    )
     if not raw:
         return None
-    url = str(raw).strip().strip("'\"")
-    if url.startswith(("postgres://", "postgresql://")):
+    url = str(raw).strip().strip("'").strip('"')
+    if url.startswith("postgres://"):
+        url = "postgresql://" + url[len("postgres://"):]
+    if url.startswith("postgresql://"):
+        if "sslmode=" not in url and any(h in url for h in ("supabase.com", "neon.tech", "aws", ".com")):
+            sep = "&" if "?" in url else "?"
+            url = f"{url}{sep}sslmode=require"
         return url
     return None
 
@@ -543,9 +559,9 @@ def get_db_pool():
             if _pg_pool is None and (getattr(config, "IS_PRODUCTION", False) or time.time() >= _pg_circuit_broken_until):
                 try:
                     from psycopg_pool import ConnectionPool
-                    min_conns = int(os.getenv("PG_POOL_MIN", "5"))
-                    max_conns = int(os.getenv("PG_POOL_MAX", "25"))
-                    pool_timeout = float(os.getenv("PG_POOL_CHECKOUT_TIMEOUT", "1.5"))
+                    min_conns = int(os.getenv("PG_POOL_MIN", "2"))
+                    max_conns = int(os.getenv("PG_POOL_MAX", "10"))
+                    pool_timeout = float(os.getenv("PG_POOL_CHECKOUT_TIMEOUT", "2.5"))
                     _pg_pool = ConnectionPool(
                         conninfo=clean_conninfo,
                         min_size=min_conns,
@@ -1341,6 +1357,11 @@ def init_db(force: bool = False) -> None:
                                 'CREATE INDEX IF NOT EXISTS "idx_pg_orders_status" ON "orders"("status");',
                                 'CREATE INDEX IF NOT EXISTS "idx_pg_trades_bot_id" ON "trades"("bot_id");',
                                 'CREATE INDEX IF NOT EXISTS "idx_pg_cap_ledger_cust_ts" ON "capital_ledger"("customer_id", "timestamp" DESC);',
+                                'CREATE INDEX IF NOT EXISTS "idx_pg_positions_status_qty_updated" ON "positions"("status", "quantity", "updated_at" DESC);',
+                                'CREATE INDEX IF NOT EXISTS "idx_pg_positions_bot_status" ON "positions"("bot_id", "status");',
+                                'CREATE INDEX IF NOT EXISTS "idx_pg_trades_log_exec_id" ON "trades_log"("execution_mode", "id" DESC);',
+                                'CREATE INDEX IF NOT EXISTS "idx_pg_auth_otp_lookup" ON "auth_otp_challenges"("recipient_email", "purpose", "expires_at" DESC);',
+                                'CREATE INDEX IF NOT EXISTS "idx_pg_sys_errors_status_fp" ON "system_errors"("status", "fingerprint");',
                             ]
                             for idx_sql in pg_indexes:
                                 try:
@@ -1536,6 +1557,11 @@ def init_db(force: bool = False) -> None:
                     "CREATE INDEX IF NOT EXISTS idx_trades_bot_id ON trades(bot_id)",
                     "CREATE INDEX IF NOT EXISTS idx_trades_timestamp ON trades(timestamp DESC)",
                     "CREATE INDEX IF NOT EXISTS idx_positions_bot_id ON positions(bot_id)",
+                    "CREATE INDEX IF NOT EXISTS idx_positions_status_qty_updated ON positions(status, quantity, updated_at DESC)",
+                    "CREATE INDEX IF NOT EXISTS idx_positions_bot_status ON positions(bot_id, status)",
+                    "CREATE INDEX IF NOT EXISTS idx_trades_log_exec_id ON trades_log(execution_mode, id DESC)",
+                    "CREATE INDEX IF NOT EXISTS idx_auth_otp_lookup ON auth_otp_challenges(recipient_email, purpose, expires_at DESC)",
+                    "CREATE INDEX IF NOT EXISTS idx_sys_errors_status_fp ON system_errors(status, fingerprint)",
                     "CREATE INDEX IF NOT EXISTS idx_capital_ledger_customer_timestamp ON capital_ledger(customer_id, timestamp DESC)",
                 ]:
                     try:

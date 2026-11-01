@@ -123,8 +123,7 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 # Database Configuration (PostgreSQL / SQLite)
-_CANONICAL_NEON_PG = "postgresql://neondb_owner:npg_RJxOkyXs28YE@ep-purple-smoke-azg3l6pu-pooler.c-3.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
-_raw_env_url = _clean_env_val(os.getenv("DATABASE_URL", ""))
+_raw_env_url = _clean_env_val(os.getenv("DATABASE_URL", "")) or _clean_env_val(os.getenv("DIRECT_URL", ""))
 _is_render = os.getenv("RENDER", "").lower() == "true" or bool(os.getenv("RENDER_SERVICE_ID"))
 IS_PRODUCTION = (
     os.getenv("APP_ENV", "").lower() == "production"
@@ -133,17 +132,9 @@ IS_PRODUCTION = (
     or _is_render
 )
 _is_production = IS_PRODUCTION
+_raw_db_url = _raw_env_url
 
-if _raw_env_url:
-    _raw_db_url = _raw_env_url
-elif _is_render:
-    _raw_db_url = _CANONICAL_NEON_PG
-elif not IS_PRODUCTION:
-    _raw_db_url = _CANONICAL_NEON_PG
-else:
-    _raw_db_url = ""
-
-DATABASE_MIGRATION_URL = _clean_env_val(os.getenv("DATABASE_MIGRATION_URL", "")) or _raw_db_url
+DATABASE_MIGRATION_URL = _clean_env_val(os.getenv("DATABASE_MIGRATION_URL", "")) or _clean_env_val(os.getenv("DIRECT_URL", "")) or _raw_db_url
 try:
     _parsed_db_url = urlsplit(_raw_db_url)
     _has_pg_url = (

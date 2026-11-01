@@ -524,7 +524,7 @@ async function handleProxy(req: NextRequest, ctx: { params?: { path: string[] } 
   const errorMessage = isTimeout
     ? (isAuth
         ? `Authentication request timed out. If you received a verification code in your email, you may enter it to log in.`
-        : `Quant.OS cloud service is warming up. Please wait 10 seconds and try again.`)
+        : `Request timed out while waiting for backend response. Please retry.`)
     : `Quant.OS Engine backend is unreachable at ${BACKEND_URL}. System is initializing or reconnecting.`;
 
   if (isStream) {

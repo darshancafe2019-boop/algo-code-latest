@@ -121,6 +121,21 @@ from src.email_service import global_email_service
 # Initialize Flask App
 app = Flask(__name__, template_folder="templates", static_folder="static")
 
+@app.teardown_appcontext
+def cleanup_request_db_connection(exception=None):
+    """Guarantees any request-scoped database connection is safely returned to pool or closed."""
+    try:
+        from flask import g
+        conn = getattr(g, "_db_conn", None)
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass
+            g._db_conn = None
+    except Exception:
+        pass
+
 try:
     from flask_sock import Sock
     sock = Sock(app)
@@ -6156,11 +6171,13 @@ def api_orders():
                 params.append(symbol)
 
             conn = db.get_connection()
-            cursor = conn.cursor()
-            cursor.execute(sql, tuple(params))
-            cancelled_count = cursor.rowcount
-            conn.commit()
-            conn.close()
+            try:
+                cursor = conn.cursor()
+                cursor.execute(sql, tuple(params))
+                cancelled_count = cursor.rowcount
+                conn.commit()
+            finally:
+                conn.close()
 
             return jsonify({
                 "success": True,
@@ -6202,11 +6219,13 @@ def api_order_by_id(order_id):
     elif request.method == "DELETE":
         now_str = datetime.now(timezone.utc).isoformat()
         conn = db.get_connection()
-        cursor = conn.cursor()
-        cursor.execute("UPDATE trades_log SET status = 'CANCELLED', exit_timestamp = ?, exit_reason = 'USER_CANCELLED' WHERE (id = ? OR trade_id = ? OR broker_order_id = ?) AND status = 'OPEN'", (now_str, order_id, str(order_id), str(order_id)))
-        affected = cursor.rowcount
-        conn.commit()
-        conn.close()
+        try:
+            cursor = conn.cursor()
+            cursor.execute("UPDATE trades_log SET status = 'CANCELLED', exit_timestamp = ?, exit_reason = 'USER_CANCELLED' WHERE (id = ? OR trade_id = ? OR broker_order_id = ?) AND status = 'OPEN'", (now_str, order_id, str(order_id), str(order_id)))
+            affected = cursor.rowcount
+            conn.commit()
+        finally:
+            conn.close()
 
         if affected == 0:
             return jsonify({
@@ -6853,26 +6872,27 @@ def api_signals_approve(signal_id=None):
 
     # IDEMPOTENCY LOCK: Atomically update status to EXECUTING to prevent double-click duplicate orders
     conn = db.get_connection()
-    c = conn.cursor()
-    c.execute(
-        """
-        UPDATE pending_signal_approvals
-        SET status = 'EXECUTING'
-        WHERE id = ? AND status IN ('WAITING_APPROVAL', 'PENDING')
-        """,
-        (target_sig_id,)
-    )
-    if c.rowcount == 0:
-        c.execute("SELECT status FROM pending_signal_approvals WHERE id = ?", (target_sig_id,))
-        row = c.fetchone()
-        conn.close()
-        st = row["status"] if row else "NOT_FOUND"
-        return jsonify({"status": "error", "message": f"Signal #{target_sig_id} cannot be executed. Current status: {st}"}), 409
+    try:
+        c = conn.cursor()
+        c.execute(
+            """
+            UPDATE pending_signal_approvals
+            SET status = 'EXECUTING'
+            WHERE id = ? AND status IN ('WAITING_APPROVAL', 'PENDING')
+            """,
+            (target_sig_id,)
+        )
+        if c.rowcount == 0:
+            c.execute("SELECT status FROM pending_signal_approvals WHERE id = ?", (target_sig_id,))
+            row = c.fetchone()
+            st = row["status"] if row else "NOT_FOUND"
+            return jsonify({"status": "error", "message": f"Signal #{target_sig_id} cannot be executed. Current status: {st}"}), 409
 
-    # Retrieve pending signal details
-    c.execute("SELECT * FROM pending_signal_approvals WHERE id = ?", (target_sig_id,))
-    sig = dict(c.fetchone())
-    conn.close()
+        # Retrieve pending signal details
+        c.execute("SELECT * FROM pending_signal_approvals WHERE id = ?", (target_sig_id,))
+        sig = dict(c.fetchone())
+    finally:
+        conn.close()
 
     bot_id = sig.get("bot_id", "bot-1")
     symbol = sig.get("symbol", config.SYMBOL)
@@ -6932,19 +6952,21 @@ def api_signals_approve(signal_id=None):
 
     elif action == "SQUARE_OFF":
         conn = db.get_connection()
-        c = conn.cursor()
-        c.execute("SELECT id, entry_price, position_size, direction FROM trades_log WHERE status = 'OPEN' AND bot_id = ?", (bot_id,))
-        open_trades = c.fetchall()
-        closed_cnt = 0
-        for t in open_trades:
-            tid = t["id"]
-            entry_p = float(t["entry_price"])
-            sz = float(t["position_size"])
-            d = t["direction"]
-            pnl = (price - entry_p) * sz if d == "LONG" else (entry_p - price) * sz
-            db.log_trade_exit(tid, price, pnl, reason=f"User Square Off ({source})")
-            closed_cnt += 1
-        conn.close()
+        try:
+            c = conn.cursor()
+            c.execute("SELECT id, entry_price, position_size, direction FROM trades_log WHERE status = 'OPEN' AND bot_id = ?", (bot_id,))
+            open_trades = c.fetchall()
+            closed_cnt = 0
+            for t in open_trades:
+                tid = t["id"]
+                entry_p = float(t["entry_price"])
+                sz = float(t["position_size"])
+                d = t["direction"]
+                pnl = (price - entry_p) * sz if d == "LONG" else (entry_p - price) * sz
+                db.log_trade_exit(tid, price, pnl, reason=f"User Square Off ({source})")
+                closed_cnt += 1
+        finally:
+            conn.close()
         db.resolve_pending_signal_approval(target_sig_id, action, decision_source=source, new_status="APPROVED")
         res_msg = f"🔴 SQUARE OFF executed {mode_tag}: Closed {closed_cnt} position(s) for {symbol}."
         telegram.send_message(f"✅ <b>POSITION SQUARED OFF ({source}) {mode_tag}</b>\nClosed {closed_cnt} active position(s) @ ${price:,.2f}.")
@@ -6996,13 +7018,15 @@ def api_positions_square_off_rest(position_id=None):
     mode_tag = "[PAPER TRADE]" if config.PAPER_TRADING else "[LIVE TRADE]"
 
     conn = db.get_connection()
-    c = conn.cursor()
-    if target_pos_id:
-        c.execute("SELECT * FROM trades_log WHERE id = ? AND status = 'OPEN'", (target_pos_id,))
-    else:
-        c.execute("SELECT * FROM trades_log WHERE status = 'OPEN' AND bot_id = ?", (bot_id,))
-    open_trades = [dict(r) for r in c.fetchall()]
-    conn.close()
+    try:
+        c = conn.cursor()
+        if target_pos_id:
+            c.execute("SELECT * FROM trades_log WHERE id = ? AND status = 'OPEN'", (target_pos_id,))
+        else:
+            c.execute("SELECT * FROM trades_log WHERE status = 'OPEN' AND bot_id = ?", (bot_id,))
+        open_trades = [dict(r) for r in c.fetchall()]
+    finally:
+        conn.close()
 
     if not open_trades:
         return jsonify({"status": "error", "message": "No active open position found to square off."}), 404
@@ -7039,10 +7063,12 @@ def api_positions_modify_protection_rest(position_id=None):
         return jsonify({"status": "error", "message": "position_id is required."}), 400
 
     conn = db.get_connection()
-    c = conn.cursor()
-    c.execute("SELECT * FROM trades_log WHERE id = ? AND status = 'OPEN'", (target_pos_id,))
-    row = c.fetchone()
-    conn.close()
+    try:
+        c = conn.cursor()
+        c.execute("SELECT * FROM trades_log WHERE id = ? AND status = 'OPEN'", (target_pos_id,))
+        row = c.fetchone()
+    finally:
+        conn.close()
 
     if not row:
         return jsonify({"status": "error", "message": f"Active position #{target_pos_id} not found."}), 404
@@ -7122,10 +7148,12 @@ def api_positions_partial_close_rest(position_id=None):
         return jsonify({"status": "error", "message": "position_id is required."}), 400
 
     conn = db.get_connection()
-    c = conn.cursor()
-    c.execute("SELECT * FROM trades_log WHERE id = ? AND status = 'OPEN'", (target_pos_id,))
-    row = c.fetchone()
-    conn.close()
+    try:
+        c = conn.cursor()
+        c.execute("SELECT * FROM trades_log WHERE id = ? AND status = 'OPEN'", (target_pos_id,))
+        row = c.fetchone()
+    finally:
+        conn.close()
 
     if not row:
         return jsonify({"status": "error", "message": f"Active position #{target_pos_id} not found."}), 404
@@ -7207,14 +7235,16 @@ def api_positions_bulk_action_rest():
     gde = GlobalDataEngine.get_instance()
 
     conn = db.get_connection()
-    c = conn.cursor()
-    if target_ids:
-        placeholders = ",".join("?" for _ in target_ids)
-        c.execute(f"SELECT * FROM trades_log WHERE status IN ('OPEN', 'RUNNING', 'PARTIAL') AND execution_mode = ? AND id IN ({placeholders})", [mode, *target_ids])
-    else:
-        c.execute("SELECT * FROM trades_log WHERE status IN ('OPEN', 'RUNNING', 'PARTIAL') AND execution_mode = ?", (mode,))
-    open_trades = [dict(r) for r in c.fetchall()]
-    conn.close()
+    try:
+        c = conn.cursor()
+        if target_ids:
+            placeholders = ",".join("?" for _ in target_ids)
+            c.execute(f"SELECT * FROM trades_log WHERE status IN ('OPEN', 'RUNNING', 'PARTIAL') AND execution_mode = ? AND id IN ({placeholders})", [mode, *target_ids])
+        else:
+            c.execute("SELECT * FROM trades_log WHERE status IN ('OPEN', 'RUNNING', 'PARTIAL') AND execution_mode = ?", (mode,))
+        open_trades = [dict(r) for r in c.fetchall()]
+    finally:
+        conn.close()
 
     if not open_trades:
         return jsonify({"status": "error", "message": "No matching active positions found for bulk execution."}), 404
@@ -11024,17 +11054,19 @@ def api_bot_force_test_trade(bot_id):
             exec_price = live_price
 
         conn = db.get_connection()
-        c = conn.cursor()
-        c.execute(
-            """INSERT INTO trades_log 
-               (timestamp, symbol, direction, entry_price, stop_loss, take_profit, position_size, status, metadata, bot_id, strategy, fees, emotion_tag, remarks)
-               VALUES (?, ?, ?, ?, ?, ?, ?, 'OPEN', ?, ?, ?, 1.50, '🧪 Manual Test', ?)""",
-            (now_iso, symbol, direction, exec_price, sl_price, tp_price, pos_size,
-             json.dumps({"order_id": order_id, "is_test_trade": True}), bot_id, bot_name, "[TEST TRADE]")
-        )
-        trade_id = c.lastrowid
-        conn.commit()
-        conn.close()
+        try:
+            c = conn.cursor()
+            c.execute(
+                """INSERT INTO trades_log 
+                   (timestamp, symbol, direction, entry_price, stop_loss, take_profit, position_size, status, metadata, bot_id, strategy, fees, emotion_tag, remarks)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, 'OPEN', ?, ?, ?, 1.50, '🧪 Manual Test', ?)""",
+                (now_iso, symbol, direction, exec_price, sl_price, tp_price, pos_size,
+                 json.dumps({"order_id": order_id, "is_test_trade": True}), bot_id, bot_name, "[TEST TRADE]")
+            )
+            trade_id = c.lastrowid
+            conn.commit()
+        finally:
+            conn.close()
 
         # Send Telegram alert
         tg_text = f"🧪 <b>PAPER TRADING MANUAL TEST ({direction} ENTRY)</b>\n" \
@@ -11071,17 +11103,19 @@ def api_bot_force_test_trade(bot_id):
             entry_p = live_price
             size = pos_size
             conn = db.get_connection()
-            c = conn.cursor()
-            c.execute(
-                """INSERT INTO trades_log 
-                   (timestamp, symbol, direction, entry_price, stop_loss, take_profit, position_size, status, metadata, bot_id, strategy, fees, emotion_tag, remarks)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, 'OPEN', ?, ?, ?, 1.50, '🧪 Manual Test', ?)""",
-                (now_iso, symbol, direction, entry_p, entry_p * 0.98, entry_p * 1.05, size,
-                 json.dumps({"order_id": f"TEST_INIT_{int(datetime.now(timezone.utc).timestamp())}", "is_test_trade": True}), bot_id, bot_name, "[TEST TRADE]")
-            )
-            trade_id = c.lastrowid
-            conn.commit()
-            conn.close()
+            try:
+                c = conn.cursor()
+                c.execute(
+                    """INSERT INTO trades_log 
+                       (timestamp, symbol, direction, entry_price, stop_loss, take_profit, position_size, status, metadata, bot_id, strategy, fees, emotion_tag, remarks)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, 'OPEN', ?, ?, ?, 1.50, '🧪 Manual Test', ?)""",
+                    (now_iso, symbol, direction, entry_p, entry_p * 0.98, entry_p * 1.05, size,
+                     json.dumps({"order_id": f"TEST_INIT_{int(datetime.now(timezone.utc).timestamp())}", "is_test_trade": True}), bot_id, bot_name, "[TEST TRADE]")
+                )
+                trade_id = c.lastrowid
+                conn.commit()
+            finally:
+                conn.close()
 
         is_win = (trade_type == "WIN_TP")
         if direction == "LONG":
@@ -11103,15 +11137,17 @@ def api_bot_force_test_trade(bot_id):
             exit_order_id = f"TEST_EXIT_{int(datetime.now(timezone.utc).timestamp())}"
 
         conn = db.get_connection()
-        c = conn.cursor()
-        c.execute(
-            """UPDATE trades_log 
-               SET status = 'CLOSED', exit_price = ?, exit_timestamp = ?, result_pnl = ?, remarks = ?
-               WHERE id = ?""",
-            (exit_p, now_iso, result_pnl, remarks_txt, trade_id)
-        )
-        conn.commit()
-        conn.close()
+        try:
+            c = conn.cursor()
+            c.execute(
+                """UPDATE trades_log 
+                   SET status = 'CLOSED', exit_price = ?, exit_timestamp = ?, result_pnl = ?, remarks = ?
+                   WHERE id = ?""",
+                (exit_p, now_iso, result_pnl, remarks_txt, trade_id)
+            )
+            conn.commit()
+        finally:
+            conn.close()
 
         # Send Telegram alert
         tg_text = f"🧪 <b>PAPER TRADING MANUAL TEST ({outcome_label})</b>\n" \
@@ -13339,14 +13375,15 @@ def api_trade_observation(trade_id):
     emotion_tag = data.get("emotion_tag", "🎯 Disciplined")
     remarks = data.get("remarks", "")
 
+    conn = db.get_connection()
     try:
-        conn = db.get_connection()
         conn.execute("UPDATE trades_log SET emotion_tag = ?, remarks = ? WHERE id = ?", (emotion_tag, remarks, trade_id))
         conn.commit()
-        conn.close()
         return jsonify({"status": "success", "message": "Trade observations updated."})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
+    finally:
+        conn.close()
 
 
 
@@ -17007,13 +17044,13 @@ def api_logs():
                 logger.debug(f"Note reading log file {fpath}: {e}")
 
     # 2. Ingest DB Activity Logs to guarantee zero-empty log loss
+    conn = None
     try:
         conn = db.get_connection()
         conn.row_factory = sqlite3.Row
         c = conn.cursor()
         c.execute("SELECT * FROM bot_activity_logs ORDER BY id DESC LIMIT ?", (limit,))
         act_rows = [dict(r) for r in c.fetchall()]
-        conn.close()
 
         for r in act_rows:
             ts = r.get("timestamp") or datetime.now(timezone.utc).isoformat()
@@ -17039,6 +17076,9 @@ def api_logs():
             })
     except Exception as act_err:
         logger.debug(f"Note querying bot activity logs: {act_err}")
+    finally:
+        if conn:
+            conn.close()
 
     # Deduplicate & Sort Recent Lines
     unique_lines = list(dict.fromkeys(lines))
@@ -19654,13 +19694,15 @@ def api_markets_candles():
 
     # Crypto / CCXT fallback
     conn = get_db_conn()
-    cursor = conn.cursor()
-    cursor.execute(
-        "SELECT timestamp, open, high, low, close, volume FROM candles_cache WHERE symbol = ? ORDER BY timestamp DESC LIMIT ?",
-        (symbol, limit)
-    )
-    rows = [dict(r) for r in cursor.fetchall()]
-    conn.close()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT timestamp, open, high, low, close, volume FROM candles_cache WHERE symbol = ? ORDER BY timestamp DESC LIMIT ?",
+            (symbol, limit)
+        )
+        rows = [dict(r) for r in cursor.fetchall()]
+    finally:
+        conn.close()
 
     return jsonify({
         "status": "success",

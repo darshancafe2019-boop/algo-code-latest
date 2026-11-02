@@ -11,10 +11,21 @@ export const runtime = "nodejs";
 export async function GET(req: NextRequest) {
   const searchParams = req.nextUrl.searchParams;
   const rawUnderlying = searchParams.get("underlying") || searchParams.get("symbol") || "NIFTY";
-  const underlying = rawUnderlying.trim().toUpperCase();
+  const rawUpper = rawUnderlying.trim().toUpperCase();
+
+  let underlying = rawUpper;
+  if (rawUpper.includes("BTC")) underlying = "BTC";
+  else if (rawUpper.includes("ETH")) underlying = "ETH";
+  else if (rawUpper.includes("SOL")) underlying = "SOL";
+  else if (rawUpper.includes("XRP")) underlying = "XRP";
+  else if (rawUpper.includes("BANKNIFTY") || rawUpper.includes("BANK NIFTY")) underlying = "BANKNIFTY";
+  else if (rawUpper.includes("FINNIFTY")) underlying = "FINNIFTY";
+  else if (rawUpper.includes("MIDCPNIFTY")) underlying = "MIDCPNIFTY";
+  else if (rawUpper.includes("NIFTY 50") || rawUpper === "NIFTY50" || rawUpper === "NIFTY") underlying = "NIFTY";
+
   const marketType = (searchParams.get("market_type") || searchParams.get("market") || "INDIA_OPTION").toUpperCase();
   const expiry = searchParams.get("expiry") || undefined;
-  const isCrypto = ["BTC", "ETH", "SOL", "XRP"].includes(underlying) || marketType.includes("CRYPTO");
+  const isCrypto = ["BTC", "ETH", "SOL", "XRP"].includes(underlying) || marketType.includes("CRYPTO") || rawUpper.includes("BINANCE") || rawUpper.includes("DELTA");
   const provider = isCrypto ? "DELTA" : (searchParams.get("provider") || "UPSTOX");
 
   const GATEWAY_URL = getGatewayHttpUrl();
@@ -71,8 +82,13 @@ export async function GET(req: NextRequest) {
             const vega = leg.vega != null && !isNaN(Number(leg.vega)) ? Number(leg.vega) : null;
             const rho = leg.rho != null && !isNaN(Number(leg.rho)) ? Number(leg.rho) : null;
 
+            const oiChange = leg.oi_change ?? leg.oiChange ?? leg.openInterestChange ?? null;
+            const change24h = leg.change ?? leg.changePct ?? leg.change_24h ?? null;
+            const ivDisplay = iv != null ? (iv < 5 ? Number((iv * 100).toFixed(1)) : Number(iv.toFixed(1))) : null;
+
             return {
               symbol: leg.symbol || `${underlying} ${selectedExp} ${strike} ${optType}`,
+              canonical_symbol: leg.canonical_symbol || leg.symbol || `${underlying}-${selectedExp}-${strike}-${optType}`,
               strike: strike,
               option_type: optType,
               product_id: leg.productId || leg.securityId || leg.symbol || `${underlying}-${strike}-${optType}`,
@@ -80,6 +96,7 @@ export async function GET(req: NextRequest) {
               expiry: leg.expiry || selectedExp,
               ltp: ltp,
               last: ltp,
+              last_price: ltp,
               price: ltp,
               premium: ltp,
               mark: mark,
@@ -91,7 +108,10 @@ export async function GET(req: NextRequest) {
               volume: vol,
               open_interest: oi,
               oi: oi,
+              oi_change: oiChange,
               iv: iv,
+              implied_volatility: ivDisplay,
+              change_24h: change24h,
               delta: delta,
               gamma: gamma,
               theta: theta,

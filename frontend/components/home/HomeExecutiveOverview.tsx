@@ -222,7 +222,6 @@ export function HomeExecutiveOverview() {
   // State for tabs across all sections
   const [cryptoTab, setCryptoTab] = useState<"coins" | "futures" | "funding">("coins");
   const [indicesTab, setIndicesTab] = useState<"indices" | "movers">("indices");
-  const [stocksTab, setStocksTab] = useState<"gainers" | "losers">("gainers");
   const [mcxTab, setMcxTab] = useState<"contracts" | "futures" | "movers">("contracts");
   const [commoditiesTab, setCommoditiesTab] = useState<"all" | "energy" | "metals">("all");
   const [positionsTab, setPositionsTab] = useState<"ALL" | "CRYPTO" | "NSE" | "MCX">("ALL");
@@ -341,53 +340,6 @@ export function HomeExecutiveOverview() {
   const winRate = Number(portfolioSnapshot?.winRate ?? snapshotData?.performance?.winRate ?? 68.4);
   const winningTrades = Number(portfolioSnapshot?.winningTradesCount ?? snapshotData?.performance?.winningTradesCount ?? 38);
   const totalTrades = Number(portfolioSnapshot?.totalTradesCount ?? snapshotData?.performance?.totalTradesCount ?? 55);
-
-  // ── Dynamic ±3% Filter for Indian Stocks ───────────────────────────────────
-  const { dynamicGainers, dynamicLosers } = useMemo(() => {
-    // Gather all raw stock candidates from moversData or snapshot with full array validation
-    const candidateGainers = ensureArray(moversData?.gainers).length > 0
-      ? ensureArray(moversData?.gainers)
-      : (ensureArray(snapshotData?.movers?.gainers).length > 0
-          ? ensureArray(snapshotData?.movers?.gainers)
-          : [
-              { symbol: "TATASTEEL", ltp: 164.20, pct: 4.85, volume: "42.8M", signal: "BUY" },
-              { symbol: "HDFCBANK", ltp: 1745.50, pct: 3.90, volume: "18.2M", signal: "BUY" },
-              { symbol: "INFY", ltp: 1912.00, pct: 3.45, volume: "12.6M", signal: "BUY" },
-              { symbol: "RELIANCE", ltp: 2840.00, pct: 3.15, volume: "9.4M", signal: "BUY" },
-              { symbol: "WIPRO", ltp: 542.80, pct: 3.05, volume: "24.1M", signal: "BUY" },
-            ]);
-
-    const candidateLosers = ensureArray(moversData?.losers).length > 0
-      ? ensureArray(moversData?.losers)
-      : (ensureArray(snapshotData?.movers?.losers).length > 0
-          ? ensureArray(snapshotData?.movers?.losers)
-          : [
-              { symbol: "TITAN", ltp: 3240.00, pct: -4.65, volume: "3.8M", signal: "SELL" },
-              { symbol: "ADANIENT", ltp: 2980.00, pct: -3.85, volume: "7.1M", signal: "SELL" },
-              { symbol: "BAJFINANCE", ltp: 6850.00, pct: -3.40, volume: "2.4M", signal: "SELL" },
-              { symbol: "SBIN", ltp: 812.50, pct: -3.15, volume: "31.2M", signal: "SELL" },
-              { symbol: "AXISBANK", ltp: 1180.00, pct: -3.05, volume: "14.5M", signal: "SELL" },
-            ]);
-
-    const threshold = Math.max(3.0, filterMinPctMove || 3.0);
-
-    // Filter strictly: Gainers >= +threshold%, Losers <= -threshold%
-    let filteredGainers = candidateGainers
-      .filter((s: any) => s && typeof s === "object" && Number(s.pct ?? s.changePercent ?? s.change_pct ?? s.pChange ?? 0) >= threshold)
-      .sort((a: any, b: any) => Number(b.pct ?? b.changePercent ?? b.pChange ?? 0) - Number(a.pct ?? a.changePercent ?? a.pChange ?? 0));
-
-    let filteredLosers = candidateLosers
-      .filter((s: any) => s && typeof s === "object" && Number(s.pct ?? s.changePercent ?? s.change_pct ?? s.pChange ?? 0) <= -threshold)
-      .sort((a: any, b: any) => Number(a.pct ?? a.changePercent ?? a.pChange ?? 0) - Number(b.pct ?? b.changePercent ?? b.pChange ?? 0));
-
-    if (globalSearchQuery.trim()) {
-      const q = globalSearchQuery.toLowerCase();
-      filteredGainers = filteredGainers.filter((s: any) => safeString(s?.symbol).toLowerCase().includes(q));
-      filteredLosers = filteredLosers.filter((s: any) => safeString(s?.symbol).toLowerCase().includes(q));
-    }
-
-    return { dynamicGainers: filteredGainers, dynamicLosers: filteredLosers };
-  }, [moversData, snapshotData?.movers, filterMinPctMove, globalSearchQuery]);
 
   // ── Open Positions Filtering ──────────────────────────────────────────────
   const openPositionsList = useMemo(() => {
@@ -567,9 +519,9 @@ export function HomeExecutiveOverview() {
       </div>
 
       {/* ══════════════════════════════════════════════════════════════════════ */}
-      {/* 4. MAIN MARKET DASHBOARD (EXACT 5 PANELS HORIZONTAL SEQUENCE)           */}
+      {/* 4. MAIN MARKET DASHBOARD (EXACT 4 PANELS HORIZONTAL SEQUENCE)           */}
       {/* ══════════════════════════════════════════════════════════════════════ */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4 gap-3">
         {/* ── PANEL 01 — CRYPTO ────────────────────────────────────────────── */}
         <div className="rounded-[8px] bg-[#0A1422] border border-[#122A42] p-3 flex flex-col justify-between min-h-[360px]">
           <div>
@@ -781,114 +733,7 @@ export function HomeExecutiveOverview() {
           </div>
         </div>
 
-        {/* ── PANEL 03 — INDIAN STOCKS (DYNAMIC ±3% FILTER) ─────────────────── */}
-        <div className="rounded-[8px] bg-[#0A1422] border border-[#122A42] p-3 flex flex-col justify-between min-h-[360px]">
-          <div>
-            <div className="flex items-center justify-between pb-2 mb-2 border-b border-[#10263A]">
-              <div className="flex items-center gap-1.5">
-                <span className="text-[12px] font-bold text-[#F8FAFC] uppercase tracking-wider">INDIAN STOCKS</span>
-                <span className="text-[9px] font-mono px-1 py-0.2 rounded bg-amber-500/10 text-amber-400 border border-amber-500/30">±3% DYNAMIC</span>
-              </div>
-              <div className="flex items-center gap-1 bg-[#06101B] p-0.5 rounded border border-[#10263A]">
-                <button
-                  type="button"
-                  onClick={() => setStocksTab("gainers")}
-                  className={cn(
-                    "px-1.5 py-0.5 text-[9px] font-semibold rounded capitalize transition-colors",
-                    stocksTab === "gainers" ? "bg-[#00E89A] text-[#06101B]" : "text-[#7D8EA5] hover:text-[#F8FAFC]"
-                  )}
-                >
-                  Gainers (≥+3%)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setStocksTab("losers")}
-                  className={cn(
-                    "px-1.5 py-0.5 text-[9px] font-semibold rounded capitalize transition-colors",
-                    stocksTab === "losers" ? "bg-[#FF3B5C] text-white" : "text-[#7D8EA5] hover:text-[#F8FAFC]"
-                  )}
-                >
-                  Losers (≤-3%)
-                </button>
-              </div>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-[11px]">
-                <thead>
-                  <tr className="text-[9px] uppercase font-semibold text-[#7D8EA5] border-b border-[#10263A] h-[26px]">
-                    <th className="pb-1">Symbol</th>
-                    <th className="pb-1 text-right">LTP (₹)</th>
-                    <th className="pb-1 text-right">Change %</th>
-                    <th className="pb-1 text-right">Volume</th>
-                    <th className="pb-1 text-center">Signal</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#10263A]/60">
-                  {stocksTab === "gainers" ? (
-                    dynamicGainers.length === 0 ? (
-                      <tr>
-                        <td colSpan={5} className="text-center py-8 text-xs text-[#7D8EA5]">
-                          No stocks moved ≥ +3.00% today
-                        </td>
-                      </tr>
-                    ) : (
-                      dynamicGainers.map((item: any, idx: number) => {
-                        const sym = safeString(item?.symbol, `Gainer ${idx + 1}`);
-                        const ltpVal = Number(item?.ltp ?? item?.price ?? item?.last_price ?? 0);
-                        const pctVal = Number(item?.pct ?? item?.changePercent ?? item?.change_pct ?? item?.pChange ?? 0);
-                        const volStr = safeString(item?.volume, "—");
-                        return (
-                          <tr key={`${sym}-${idx}`} className="h-[28px] hover:bg-[#0E1E34] transition-colors cursor-pointer">
-                            <td className="font-semibold text-[#F8FAFC]">{sym}</td>
-                            <td className="text-right text-[#F8FAFC] tabular-nums font-mono font-medium">{formatCurrency(ltpVal, "", 2)}</td>
-                            <td className="text-right tabular-nums font-mono font-bold text-[#00E89A]">+{formatPercent(pctVal, 2)}</td>
-                            <td className="text-right text-[#7D8EA5] tabular-nums font-mono text-[10px]">{volStr}</td>
-                            <td className="text-center">
-                              <span className="px-1 py-0.2 rounded text-[9px] font-mono font-bold bg-[#00E89A]/15 text-[#00E89A] border border-[#00E89A]/30">BUY</span>
-                            </td>
-                          </tr>
-                        );
-                      })
-                    )
-                  ) : (
-                    dynamicLosers.length === 0 ? (
-                      <tr>
-                        <td colSpan={5} className="text-center py-8 text-xs text-[#7D8EA5]">
-                          No stocks moved ≤ -3.00% today
-                        </td>
-                      </tr>
-                    ) : (
-                      dynamicLosers.map((item: any, idx: number) => {
-                        const sym = safeString(item?.symbol, `Loser ${idx + 1}`);
-                        const ltpVal = Number(item?.ltp ?? item?.price ?? item?.last_price ?? 0);
-                        const pctVal = Number(item?.pct ?? item?.changePercent ?? item?.change_pct ?? item?.pChange ?? 0);
-                        const volStr = safeString(item?.volume, "—");
-                        return (
-                          <tr key={`${sym}-${idx}`} className="h-[28px] hover:bg-[#0E1E34] transition-colors cursor-pointer">
-                            <td className="font-semibold text-[#F8FAFC]">{sym}</td>
-                            <td className="text-right text-[#F8FAFC] tabular-nums font-mono font-medium">{formatCurrency(ltpVal, "", 2)}</td>
-                            <td className="text-right tabular-nums font-mono font-bold text-[#FF3B5C]">{formatPercent(pctVal, 2)}</td>
-                            <td className="text-right text-[#7D8EA5] tabular-nums font-mono text-[10px]">{volStr}</td>
-                            <td className="text-center">
-                              <span className="px-1 py-0.2 rounded text-[9px] font-mono font-bold bg-[#FF3B5C]/15 text-[#FF3B5C] border border-[#FF3B5C]/30">SELL</span>
-                            </td>
-                          </tr>
-                        );
-                      })
-                    )
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-          <div className="pt-2 border-t border-[#10263A] flex items-center justify-between text-[9px] text-[#7D8EA5]">
-            <span>Filter: <span className="text-[#00F0FF]">|Δ| ≥ 3.00% Only</span></span>
-            <span>Refreshed: <span className="text-[#F8FAFC]">{formatISTTime(new Date())}</span></span>
-          </div>
-        </div>
-
-        {/* ── PANEL 04 — MCX ──────────────────────────────────────────────── */}
+        {/* ── PANEL 03 — MCX ──────────────────────────────────────────────── */}
         <div className="rounded-[8px] bg-[#0A1422] border border-[#122A42] p-3 flex flex-col justify-between min-h-[360px]">
           <div>
             <div className="flex items-center justify-between pb-2 mb-2 border-b border-[#10263A]">
@@ -959,7 +804,7 @@ export function HomeExecutiveOverview() {
           </div>
         </div>
 
-        {/* ── PANEL 05 — COMMODITIES (INTERNATIONAL) ───────────────────────── */}
+        {/* ── PANEL 04 — COMMODITIES (INTERNATIONAL) ───────────────────────── */}
         <div className="rounded-[8px] bg-[#0A1422] border border-[#122A42] p-3 flex flex-col justify-between min-h-[360px]">
           <div>
             <div className="flex items-center justify-between pb-2 mb-2 border-b border-[#10263A]">

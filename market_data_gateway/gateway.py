@@ -1375,9 +1375,31 @@ class MarketDataGateway:
         Canonical Option Chain HTTP Snapshot Endpoint across all supported providers.
         Centralized server-side cache keyed by PROVIDER:UNDERLYING:EXPIRY.
         """
-        und = (request.rel_url.query.get("underlying") or request.rel_url.query.get("symbol") or "NIFTY").upper().strip()
-        raw_prov = (request.rel_url.query.get("provider") or request.rel_url.query.get("source") or ("DELTA_INDIA" if und in ["BTC", "ETH", "SOL", "XRP"] else "UPSTOX")).upper().strip()
-        provider = "UPSTOX" if raw_prov == "DHAN" else raw_prov
+        und_raw = (request.rel_url.query.get("underlying") or request.rel_url.query.get("symbol") or "NIFTY").upper().strip()
+        
+        # Canonical underlying normalization
+        if "BTC" in und_raw:
+            und = "BTC"
+        elif "ETH" in und_raw:
+            und = "ETH"
+        elif "SOL" in und_raw:
+            und = "SOL"
+        elif "XRP" in und_raw:
+            und = "XRP"
+        elif "BANKNIFTY" in und_raw or "BANK NIFTY" in und_raw:
+            und = "BANKNIFTY"
+        elif "FINNIFTY" in und_raw:
+            und = "FINNIFTY"
+        elif "MIDCPNIFTY" in und_raw:
+            und = "MIDCPNIFTY"
+        elif und_raw in ("NIFTY 50", "NIFTY50", "NIFTY"):
+            und = "NIFTY"
+        else:
+            und = und_raw
+
+        is_crypto = und in ["BTC", "ETH", "SOL", "XRP"]
+        raw_prov = (request.rel_url.query.get("provider") or request.rel_url.query.get("source") or ("DELTA_INDIA" if is_crypto else "UPSTOX")).upper().strip()
+        provider = "DELTA_INDIA" if is_crypto else ("UPSTOX" if raw_prov == "DHAN" else raw_prov)
         expiry = request.rel_url.query.get("expiry") or None
         strike_count_str = request.rel_url.query.get("strike_count") or "40"
         strike_count = int(strike_count_str) if strike_count_str.isdigit() else 40
@@ -1389,7 +1411,7 @@ class MarketDataGateway:
             return web.json_response(cached)
 
         # Delta Exchange / Crypto Options
-        if provider in ("DELTA", "DELTA_INDIA") or und in ["BTC", "ETH", "SOL", "XRP"]:
+        if provider in ("DELTA", "DELTA_INDIA") or is_crypto:
             delta_adapter = self.adapters.get("delta_options_ws")
             if delta_adapter and hasattr(delta_adapter, "get_normalized_option_chain"):
                 try:

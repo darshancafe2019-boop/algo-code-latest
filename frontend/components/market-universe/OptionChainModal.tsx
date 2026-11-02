@@ -1,10 +1,10 @@
 "use client";
 
-import { formatNumber, formatPrice, formatMoney, formatQuantity, formatVolume } from "@/lib/formatters";
-import React, { useState } from "react";
+import { formatNumber, formatMoney } from "@/lib/formatters";
+import React, { useState, useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { OptionChainData, OptionStrike } from "@/types/market-universe";
-import { X, Layers, Activity, TrendingUp, TrendingDown, RefreshCw, ShieldAlert, Zap } from "lucide-react";
+import { OptionChainData } from "@/types/market-universe";
+import { X, Layers, RefreshCw, ShieldAlert } from "lucide-react";
 import { normalizeExpiriesList } from "@/lib/expiry-utils";
 
 interface OptionChainModalProps {
@@ -18,6 +18,20 @@ export function OptionChainModal({ underlying, isOpen, onClose, onSelectContract
   const [selectedUnderlying, setSelectedUnderlying] = useState(underlying || "NIFTY50");
   const [selectedExpiry, setSelectedExpiry] = useState<string>("");
 
+  useEffect(() => {
+    if (underlying) {
+      setSelectedUnderlying(underlying);
+      setSelectedExpiry("");
+    }
+  }, [underlying]);
+
+  const isCrypto = useMemo(() => {
+    const u = (selectedUnderlying || "").toUpperCase();
+    return u.includes("BTC") || u.includes("ETH") || u.includes("SOL") || u.includes("XRP") || u.includes("BINANCE") || u.includes("DELTA");
+  }, [selectedUnderlying]);
+
+  const currencySymbol = isCrypto ? "$" : "₹";
+
   const { data, isLoading, refetch, isFetching } = useQuery<{ status: string; data: OptionChainData }>({
     queryKey: ["optionChain", selectedUnderlying, selectedExpiry],
     queryFn: async () => {
@@ -30,13 +44,13 @@ export function OptionChainModal({ underlying, isOpen, onClose, onSelectContract
   });
 
   const chain = data?.data || (data as any);
-  const spotPrice = chain?.spot_price || chain?.spot || 0.0;
-  const strikes = chain?.strikes || [];
-  const normalizedExpiries = React.useMemo(() => {
-    const rawExpiries = chain?.available_expiries || [];
+  const spotPrice = Number(chain?.spot_price || chain?.spot || 0.0);
+  const strikes: any[] = chain?.strikes || chain?.chain || chain?.rows || [];
+  const normalizedExpiries = useMemo(() => {
+    const rawExpiries = chain?.available_expiries || chain?.availableExpiries || [];
     return normalizeExpiriesList(rawExpiries, selectedUnderlying);
-  }, [chain?.available_expiries, selectedUnderlying]);
-  const activeExpiry = selectedExpiry || chain?.selected_expiry || normalizedExpiries[0]?.value || "";
+  }, [chain?.available_expiries, chain?.availableExpiries, selectedUnderlying]);
+  const activeExpiry = selectedExpiry || chain?.selected_expiry || chain?.selectedExpiry || normalizedExpiries[0]?.value || "";
 
   if (!isOpen) return null;
 
@@ -58,7 +72,7 @@ export function OptionChainModal({ underlying, isOpen, onClose, onSelectContract
                   {selectedUnderlying}
                 </span>
                 <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[11px] font-mono font-bold">
-                  Spot: {formatMoney(spotPrice, "₹")}
+                  Spot: {isCrypto ? `$${spotPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : formatMoney(spotPrice, "₹")}
                 </span>
               </div>
               <p className="text-[11px] text-slate-400">
@@ -71,14 +85,30 @@ export function OptionChainModal({ underlying, isOpen, onClose, onSelectContract
             {/* Underlying Switcher */}
             <select
               value={selectedUnderlying}
-              onChange={(e) => setSelectedUnderlying(e.target.value)}
+              onChange={(e) => {
+                setSelectedUnderlying(e.target.value);
+                setSelectedExpiry("");
+              }}
               className="px-3 py-1.5 rounded-lg bg-[#0F141F] border border-[#1A2A3F] text-xs font-semibold text-white focus:outline-none focus:border-cyan-500"
             >
-              <option value="NIFTY50">NIFTY 50</option>
-              <option value="BANKNIFTY">BANK NIFTY</option>
-              <option value="RELIANCE">RELIANCE</option>
-              <option value="TCS">TCS</option>
-              <option value="HDFCBANK">HDFC BANK</option>
+              {!["BTC", "ETH", "SOL", "NIFTY50", "BANKNIFTY", "FINNIFTY", "RELIANCE", "TCS", "HDFCBANK"].includes(selectedUnderlying) && (
+                <option value={selectedUnderlying}>{selectedUnderlying}</option>
+              )}
+              <optgroup label="Crypto (Delta)">
+                <option value="BTC">BTC (Bitcoin)</option>
+                <option value="ETH">ETH (Ethereum)</option>
+                <option value="SOL">SOL (Solana)</option>
+              </optgroup>
+              <optgroup label="Indian Indices (NSE)">
+                <option value="NIFTY50">NIFTY 50</option>
+                <option value="BANKNIFTY">BANK NIFTY</option>
+                <option value="FINNIFTY">FIN NIFTY</option>
+              </optgroup>
+              <optgroup label="Indian Equities (NSE)">
+                <option value="RELIANCE">RELIANCE</option>
+                <option value="TCS">TCS</option>
+                <option value="HDFCBANK">HDFC BANK</option>
+              </optgroup>
             </select>
 
             {/* Expiry Selector */}
@@ -146,7 +176,7 @@ export function OptionChainModal({ underlying, isOpen, onClose, onSelectContract
                   <th className="py-2 px-2 text-right">OI Chg</th>
                   <th className="py-2 px-2 text-right">IV%</th>
                   <th className="py-2 px-2 text-right">Delta</th>
-                  <th className="py-2 px-2 text-right">LTP (₹)</th>
+                  <th className="py-2 px-2 text-right">LTP ({currencySymbol})</th>
                   <th className="py-2 px-2 text-right">Chg%</th>
                   <th className="py-2 px-2 text-center border-r border-[#1A2A3F]">Action</th>
 
@@ -156,7 +186,7 @@ export function OptionChainModal({ underlying, isOpen, onClose, onSelectContract
                   {/* Put Columns */}
                   <th className="py-2 px-2 text-center border-l border-[#1A2A3F]">Action</th>
                   <th className="py-2 px-2 text-left">Chg%</th>
-                  <th className="py-2 px-2 text-left">LTP (₹)</th>
+                  <th className="py-2 px-2 text-left">LTP ({currencySymbol})</th>
                   <th className="py-2 px-2 text-left">Delta</th>
                   <th className="py-2 px-2 text-left">IV%</th>
                   <th className="py-2 px-2 text-left">OI Chg</th>
@@ -164,28 +194,49 @@ export function OptionChainModal({ underlying, isOpen, onClose, onSelectContract
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#161F30]">
-                {strikes.map((s) => {
-                  const isAtm = Math.abs(s.strike - spotPrice) < 60;
-                  const isCallItm = s.strike < spotPrice;
-                  const isPutItm = s.strike > spotPrice;
+                {strikes.map((s: any) => {
+                  const strikeNum = Number(s.strike ?? s.strikePrice ?? 0);
+                  const isAtm = Boolean(s.isATM || s.is_atm) || (spotPrice > 0 && Math.abs(strikeNum - spotPrice) <= (isCrypto ? (spotPrice * 0.005) : 35));
+                  const isCallItm = strikeNum < spotPrice;
+                  const isPutItm = strikeNum > spotPrice;
+
+                  // Call leg properties
+                  const callObj = s.call || s.ce;
+                  const callLtp = callObj?.last_price ?? callObj?.ltp ?? callObj?.price ?? callObj?.last;
+                  const callIv = callObj?.implied_volatility ?? callObj?.iv ?? callObj?.greeks?.iv;
+                  const callDelta = callObj?.delta ?? callObj?.greeks?.delta;
+                  const callOi = callObj?.open_interest ?? callObj?.oi ?? callObj?.openInterest;
+                  const callOiChg = callObj?.oi_change ?? callObj?.oiChange;
+                  const callChg = callObj?.change_24h ?? callObj?.change ?? callObj?.change_pct ?? callObj?.changePct;
+
+                  // Put leg properties
+                  const putObj = s.put || s.pe;
+                  const putLtp = putObj?.last_price ?? putObj?.ltp ?? putObj?.price ?? putObj?.last;
+                  const putIv = putObj?.implied_volatility ?? putObj?.iv ?? putObj?.greeks?.iv;
+                  const putDelta = putObj?.delta ?? putObj?.greeks?.delta;
+                  const putOi = putObj?.open_interest ?? putObj?.oi ?? putObj?.openInterest;
+                  const putOiChg = putObj?.oi_change ?? putObj?.oiChange;
+                  const putChg = putObj?.change_24h ?? putObj?.change ?? putObj?.change_pct ?? putObj?.changePct;
 
                   return (
                     <tr
-                      key={s.strike}
+                      key={strikeNum}
                       className={`hover:bg-slate-800/40 transition-colors ${
                         isAtm ? "bg-cyan-500/10 font-bold ring-1 ring-cyan-500/30" : ""
                       }`}
                     >
                       {/* Call OI */}
                       <td className={`py-2 px-2 text-right ${isCallItm ? "bg-emerald-950/10 text-slate-300" : "text-slate-400"}`}>
-                        {s.call?.open_interest ? (s.call.open_interest / 1000).toFixed(0) + "k" : "—"}
+                        {callOi != null && Number(callOi) > 0
+                          ? (isCrypto ? Number(callOi).toFixed(2) : (Number(callOi) >= 1000 ? `${(Number(callOi) / 1000).toFixed(0)}k` : String(callOi)))
+                          : "—"}
                       </td>
                       {/* Call OI Chg */}
                       <td className="py-2 px-2 text-right text-[10px]">
-                        {s.call?.oi_change != null ? (
-                          <span className={s.call.oi_change >= 0 ? "text-emerald-400" : "text-rose-400"}>
-                            {s.call.oi_change > 0 ? "+" : ""}
-                            {(Number(s.call.oi_change) / 1000).toFixed(1)}k
+                        {callOiChg != null ? (
+                          <span className={Number(callOiChg) >= 0 ? "text-emerald-400" : "text-rose-400"}>
+                            {Number(callOiChg) > 0 ? "+" : ""}
+                            {Math.abs(Number(callOiChg)) >= 1000 ? `${(Number(callOiChg) / 1000).toFixed(1)}k` : Number(callOiChg).toFixed(0)}
                           </span>
                         ) : (
                           "—"
@@ -193,22 +244,22 @@ export function OptionChainModal({ underlying, isOpen, onClose, onSelectContract
                       </td>
                       {/* Call IV */}
                       <td className="py-2 px-2 text-right text-slate-400 text-[10px]">
-                        {s.call?.implied_volatility ? `${s.call.implied_volatility}%` : "—"}
+                        {callIv != null ? `${Number(callIv).toFixed(1)}%` : "—"}
                       </td>
                       {/* Call Delta */}
                       <td className="py-2 px-2 text-right text-cyan-300 text-[10px]">
-                        {s.call?.delta != null ? Number(s.call.delta).toFixed(2) : "—"}
+                        {callDelta != null ? Number(callDelta).toFixed(2) : "—"}
                       </td>
                       {/* Call LTP */}
                       <td className={`py-2 px-2 text-right font-bold ${isCallItm ? "text-emerald-300" : "text-white"}`}>
-                        {s.call?.last_price != null ? `₹${Number(s.call.last_price).toFixed(2)}` : "—"}
+                        {callLtp != null ? `${currencySymbol}${Number(callLtp).toFixed(2)}` : "—"}
                       </td>
                       {/* Call Chg% */}
                       <td className="py-2 px-2 text-right text-[10px]">
-                        {s.call?.change_24h != null ? (
-                          <span className={s.call.change_24h >= 0 ? "text-emerald-400" : "text-rose-400"}>
-                            {s.call.change_24h > 0 ? "+" : ""}
-                            {Number(s.call.change_24h).toFixed(1)}%
+                        {callChg != null ? (
+                          <span className={Number(callChg) >= 0 ? "text-emerald-400" : "text-rose-400"}>
+                            {Number(callChg) > 0 ? "+" : ""}
+                            {Number(callChg).toFixed(1)}%
                           </span>
                         ) : (
                           "—"
@@ -216,14 +267,14 @@ export function OptionChainModal({ underlying, isOpen, onClose, onSelectContract
                       </td>
                       {/* Call Quick Buy */}
                       <td className="py-1 px-2 text-center border-r border-[#1A2A3F]">
-                        {s.call && (
+                        {callObj && (
                           <button
                             onClick={() =>
                               onSelectContract?.(
-                                s.call!.canonical_symbol,
+                                callObj.canonical_symbol || callObj.symbol || `${selectedUnderlying}-${activeExpiry}-${strikeNum}-CE`,
                                 "CE",
-                                s.strike,
-                                s.call!.last_price
+                                strikeNum,
+                                Number(callLtp || 0)
                               )
                             }
                             className="px-2 py-0.5 rounded bg-emerald-500/20 hover:bg-emerald-500/40 text-emerald-300 text-[10px] font-bold border border-emerald-500/30 transition-colors"
@@ -235,20 +286,20 @@ export function OptionChainModal({ underlying, isOpen, onClose, onSelectContract
 
                       {/* Strike Price (Center) */}
                       <td className={`py-2 px-3 text-center bg-[#0F141F] font-bold ${isAtm ? "text-cyan-300 ring-1 ring-cyan-500/40" : "text-white"}`}>
-                        {formatNumber(s.strike)}
+                        {formatNumber(strikeNum)}
                         {isAtm && <span className="ml-1 text-[9px] text-cyan-400 uppercase tracking-tighter">(ATM)</span>}
                       </td>
 
                       {/* Put Quick Buy */}
                       <td className="py-1 px-2 text-center border-l border-[#1A2A3F]">
-                        {s.put && (
+                        {putObj && (
                           <button
                             onClick={() =>
                               onSelectContract?.(
-                                s.put!.canonical_symbol,
+                                putObj.canonical_symbol || putObj.symbol || `${selectedUnderlying}-${activeExpiry}-${strikeNum}-PE`,
                                 "PE",
-                                s.strike,
-                                s.put!.last_price
+                                strikeNum,
+                                Number(putLtp || 0)
                               )
                             }
                             className="px-2 py-0.5 rounded bg-rose-500/20 hover:bg-rose-500/40 text-rose-300 text-[10px] font-bold border border-rose-500/30 transition-colors"
@@ -259,10 +310,10 @@ export function OptionChainModal({ underlying, isOpen, onClose, onSelectContract
                       </td>
                       {/* Put Chg% */}
                       <td className="py-2 px-2 text-left text-[10px]">
-                        {s.put?.change_24h != null ? (
-                          <span className={s.put.change_24h >= 0 ? "text-emerald-400" : "text-rose-400"}>
-                            {s.put.change_24h > 0 ? "+" : ""}
-                            {Number(s.put.change_24h).toFixed(1)}%
+                        {putChg != null ? (
+                          <span className={Number(putChg) >= 0 ? "text-emerald-400" : "text-rose-400"}>
+                            {Number(putChg) > 0 ? "+" : ""}
+                            {Number(putChg).toFixed(1)}%
                           </span>
                         ) : (
                           "—"
@@ -270,22 +321,22 @@ export function OptionChainModal({ underlying, isOpen, onClose, onSelectContract
                       </td>
                       {/* Put LTP */}
                       <td className={`py-2 px-2 text-left font-bold ${isPutItm ? "text-rose-300" : "text-white"}`}>
-                        {s.put?.last_price != null ? `₹${Number(s.put.last_price).toFixed(2)}` : "—"}
+                        {putLtp != null ? `${currencySymbol}${Number(putLtp).toFixed(2)}` : "—"}
                       </td>
                       {/* Put Delta */}
                       <td className="py-2 px-2 text-left text-cyan-300 text-[10px]">
-                        {s.put?.delta != null ? Number(s.put.delta).toFixed(2) : "—"}
+                        {putDelta != null ? Number(putDelta).toFixed(2) : "—"}
                       </td>
                       {/* Put IV */}
                       <td className="py-2 px-2 text-left text-slate-400 text-[10px]">
-                        {s.put?.implied_volatility ? `${s.put.implied_volatility}%` : "—"}
+                        {putIv != null ? `${Number(putIv).toFixed(1)}%` : "—"}
                       </td>
                       {/* Put OI Chg */}
                       <td className="py-2 px-2 text-left text-[10px]">
-                        {s.put?.oi_change != null ? (
-                          <span className={s.put.oi_change >= 0 ? "text-emerald-400" : "text-rose-400"}>
-                            {s.put.oi_change > 0 ? "+" : ""}
-                            {(Number(s.put.oi_change) / 1000).toFixed(1)}k
+                        {putOiChg != null ? (
+                          <span className={Number(putOiChg) >= 0 ? "text-emerald-400" : "text-rose-400"}>
+                            {Number(putOiChg) > 0 ? "+" : ""}
+                            {Math.abs(Number(putOiChg)) >= 1000 ? `${(Number(putOiChg) / 1000).toFixed(1)}k` : Number(putOiChg).toFixed(0)}
                           </span>
                         ) : (
                           "—"
@@ -293,7 +344,9 @@ export function OptionChainModal({ underlying, isOpen, onClose, onSelectContract
                       </td>
                       {/* Put OI */}
                       <td className={`py-2 px-2 text-left ${isPutItm ? "bg-rose-950/10 text-slate-300" : "text-slate-400"}`}>
-                        {s.put?.open_interest ? (s.put.open_interest / 1000).toFixed(0) + "k" : "—"}
+                        {putOi != null && Number(putOi) > 0
+                          ? (isCrypto ? Number(putOi).toFixed(2) : (Number(putOi) >= 1000 ? `${(Number(putOi) / 1000).toFixed(0)}k` : String(putOi)))
+                          : "—"}
                       </td>
                     </tr>
                   );

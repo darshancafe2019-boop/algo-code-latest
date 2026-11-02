@@ -37,9 +37,6 @@ import {
 } from "@/lib/strategies/crypto30Strategies";
 import { useStrategyStore, StrategyViewTab } from "@/lib/strategies/strategyStore";
 import { StrategyDetailModal } from "./StrategyDetailModal";
-import { StrategyBacktestView } from "./StrategyBacktestView";
-import { StrategyPaperTradingView } from "./StrategyPaperTradingView";
-import { StrategyClustersView } from "./StrategyClustersView";
 import { StrategyRegimeView } from "./StrategyRegimeView";
 import { StrategyTradeJournalView } from "./StrategyTradeJournalView";
 import { SourceStrategyCreationView } from "./SourceStrategyCreationView";
@@ -141,7 +138,7 @@ export function StrategyCenter() {
     const strat = strategies.find((s) => s.number === strategyNumber);
     if (strat) {
       setSelectedStrategyId(strat.id);
-      setActiveViewTab("BACKTEST");
+      setIsDetailModalOpen(true);
     }
   };
 
@@ -152,7 +149,7 @@ export function StrategyCenter() {
       const isCrypto = strat.market.toLowerCase().includes("btc") || strat.market.toLowerCase().includes("eth");
       const targetUnderlying = isOptions ? (isCrypto ? "BTC" : "NIFTY") : "BTC/USDT";
       activatePaperStrategy(strategyNumber, targetUnderlying, strat.primaryTimeframe, 0.5);
-      setActiveViewTab("PAPER");
+      setIsDetailModalOpen(true);
     }
   };
 
@@ -226,9 +223,6 @@ export function StrategyCenter() {
       <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1 border-b border-[#1A253A]">
         {[
           { id: "CREATION", label: "Strategy Creation & Validation", icon: Sparkles },
-          { id: "BACKTEST", label: "Backtest Lab", icon: FlaskConical },
-          { id: "PAPER", label: "Paper Trading Fleet", icon: Radio },
-          { id: "CLUSTERS", label: "Exposure Clusters", icon: Layers },
           { id: "REGIME", label: "Regime Engine", icon: Activity },
           { id: "JOURNAL", label: "Trade Journal & Audits", icon: BookOpen },
         ].map((tab) => {
@@ -257,9 +251,6 @@ export function StrategyCenter() {
           <SourceStrategyCreationView />
         </div>
       )}
-      {activeViewTab === "BACKTEST" && <StrategyBacktestView />}
-      {activeViewTab === "PAPER" && <StrategyPaperTradingView />}
-      {activeViewTab === "CLUSTERS" && <StrategyClustersView />}
       {activeViewTab === "REGIME" && <StrategyRegimeView />}
       {activeViewTab === "JOURNAL" && <StrategyTradeJournalView />}
 

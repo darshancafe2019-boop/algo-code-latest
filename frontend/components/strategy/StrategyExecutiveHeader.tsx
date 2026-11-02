@@ -101,9 +101,8 @@ export function StrategyExecutiveHeader({
 
           {/* Card 2: Signal Clusters */}
           <div
-            onClick={() => onSelectTab("CLUSTERS")}
-            className="p-2 rounded-lg bg-[#0B1728] border border-[#1A2B43] hover:border-[#A78BFA]/50 transition-colors cursor-pointer flex flex-col justify-between"
-            title="Inspect Signal Confluence Clusters"
+            className="p-2 rounded-lg bg-[#0B1728] border border-[#1A2B43] flex flex-col justify-between"
+            title="Signal Confluence Clusters"
           >
             <div className="flex items-center justify-between text-[9px] text-[#91A7C1] mb-1">
               <span>SIGNAL CLUSTERS</span>
@@ -121,9 +120,8 @@ export function StrategyExecutiveHeader({
 
           {/* Card 3: Paper Fleet */}
           <div
-            onClick={() => onSelectTab("PAPER")}
-            className="p-2 rounded-lg bg-[#0B1728] border border-[#1A2B43] hover:border-[#00D6A0]/50 transition-colors cursor-pointer flex flex-col justify-between"
-            title="Inspect Paper Trading Fleet"
+            className="p-2 rounded-lg bg-[#0B1728] border border-[#1A2B43] flex flex-col justify-between"
+            title="Paper Trading Fleet Overview"
           >
             <div className="flex items-center justify-between text-[9px] text-[#91A7C1] mb-1">
               <span>PAPER FLEET</span>

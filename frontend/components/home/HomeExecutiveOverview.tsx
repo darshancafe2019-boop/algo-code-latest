@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import {
   Wallet,
   ShieldCheck,
@@ -15,26 +15,13 @@ import {
   Percent,
   Play,
   Square,
-  Pause,
   Plus,
-  ArrowUpRight,
-  ArrowDownRight,
-  CheckCircle2,
-  AlertTriangle,
-  Info,
-  Clock,
-  RefreshCw,
-  ExternalLink,
   ChevronRight,
-  Filter,
-  XCircle,
 } from "lucide-react";
 import {
   formatCurrency,
   formatPercent,
   formatDecimal,
-  formatInteger,
-  safeArray,
   resolveCurrencySymbol,
 } from "@/lib/formatters";
 import { apiClient } from "@/lib/apiClient";
@@ -43,7 +30,6 @@ import { useMarketGatewayContext } from "@/context/MarketGatewayContext";
 import { cn } from "@/lib/utils";
 import { useUIStore } from "@/lib/store/useUIStore";
 import { useDashboardFilterStore } from "@/lib/store/useDashboardFilterStore";
-import { CreateBotModal } from "@/components/bot-control/CreateBotModal";
 
 // ── Timezone Helper (Asia/Kolkata 12-hour IST) ───────────────────────────────
 function formatISTTime(dateOrIso?: string | number | Date | null): string {
@@ -207,14 +193,14 @@ const INTERNATIONAL_COMMODITIES = [
 
 export function HomeExecutiveOverview() {
   const router = useRouter();
-  const queryClient = useQueryClient();
-  const { portfolioSnapshot, positions: rawPositions, orders: rawOrders, tradingMode } = useGlobalData();
-  const { quotes, subscribe, unsubscribe } = useMarketGatewayContext();
-  const { setCreateBotModalOpen } = useUIStore();
+  const { portfolioSnapshot, positions: rawPositions, tradingMode } = useGlobalData();
+  const marketGateway = useMarketGatewayContext();
+  const quotes = marketGateway?.quotes;
+  const subscribe = marketGateway?.subscribe;
+  const unsubscribe = marketGateway?.unsubscribe;
   const {
     searchQuery: globalSearchQuery,
     exchange: filterExchange,
-    minPctMove: filterMinPctMove,
     botStatus: filterBotStatus,
     positionStatus: filterPositionStatus,
   } = useDashboardFilterStore();
@@ -229,18 +215,27 @@ export function HomeExecutiveOverview() {
 
   // 1. Subscribe to Live Market Symbols on Mount
   useEffect(() => {
+    if (typeof subscribe !== "function" || typeof unsubscribe !== "function") return;
     const symbolsToSub = [
       ...CRYPTO_COINS.map((c) => c.wsSymbol),
       ...INDIAN_INDICES.map((i) => i.symbol),
     ];
-    symbolsToSub.forEach((s) => subscribe(s, "WATCHLIST"));
+    symbolsToSub.forEach((s) => {
+      try {
+        subscribe(s, "WATCHLIST");
+      } catch {}
+    });
     return () => {
-      symbolsToSub.forEach((s) => unsubscribe(s, "WATCHLIST"));
+      symbolsToSub.forEach((s) => {
+        try {
+          unsubscribe(s, "WATCHLIST");
+        } catch {}
+      });
     };
   }, [subscribe, unsubscribe]);
 
   // 2. Fetch Authoritative Dashboard Snapshot
-  const { data: snapshotData, isLoading: isSnapshotLoading } = useQuery({
+  const { data: snapshotData } = useQuery({
     queryKey: ["dashboardSnapshot", tradingMode],
     queryFn: async () => {
       const res = await apiClient.get<any>(`/api/dashboard/snapshot?mode=${tradingMode}`, { timeoutMs: 8000 });
@@ -250,19 +245,8 @@ export function HomeExecutiveOverview() {
     refetchInterval: 20000,
   });
 
-  // 3. Fetch Top Gainers & Losers from NSE Service for Dynamic ±3% Filter
-  const { data: moversData, isLoading: isMoversLoading } = useQuery({
-    queryKey: ["nseGainersLosers"],
-    queryFn: async () => {
-      const res = await apiClient.get<any>("/api/nse/gainers-losers", { timeoutMs: 8000 });
-      return res.ok ? res.data : null;
-    },
-    staleTime: 30000,
-    refetchInterval: 60000,
-  });
-
-  // 4. Fetch Bot Instances
-  const { data: botsData, isLoading: isBotsLoading } = useQuery({
+  // 3. Fetch Bot Instances
+  const { data: botsData } = useQuery({
     queryKey: ["botInstances"],
     queryFn: async () => {
       const res = await apiClient.get<any>("/api/bots", { timeoutMs: 8000 });
@@ -270,50 +254,6 @@ export function HomeExecutiveOverview() {
     },
     staleTime: 15000,
     refetchInterval: 20000,
-  });
-
-  // 5. Fetch Provider Connections Health
-  const { data: providersHealth } = useQuery({
-    queryKey: ["marketProvidersHealth"],
-    queryFn: async () => {
-      const res = await apiClient.get<any>("/api/market/providers/health", { timeoutMs: 8000 });
-      return res.ok ? res.data : null;
-    },
-    staleTime: 15000,
-    refetchInterval: 20000,
-  });
-
-  // 6. Fetch Risk Overview
-  const { data: riskOverview } = useQuery({
-    queryKey: ["riskOverview"],
-    queryFn: async () => {
-      const res = await apiClient.get<any>("/api/risk/overview", { timeoutMs: 8000 });
-      return res.ok ? res.data : null;
-    },
-    staleTime: 15000,
-    refetchInterval: 20000,
-  });
-
-  // Bot Lifecycle Action Handlers
-  const startBotMutation = useMutation({
-    mutationFn: async (botId: string) => {
-      return apiClient.post(`/api/bots/${botId}/start`);
-    },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["botInstances"] }),
-  });
-
-  const stopBotMutation = useMutation({
-    mutationFn: async (botId: string) => {
-      return apiClient.post(`/api/bots/${botId}/stop`);
-    },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["botInstances"] }),
-  });
-
-  const pauseBotMutation = useMutation({
-    mutationFn: async (botId: string) => {
-      return apiClient.post(`/api/bots/${botId}/pause`);
-    },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["botInstances"] }),
   });
 
   // ── Financial Metrics Calculation ──────────────────────────────────────────
@@ -341,6 +281,8 @@ export function HomeExecutiveOverview() {
   const winningTrades = Number(portfolioSnapshot?.winningTradesCount ?? snapshotData?.performance?.winningTradesCount ?? 38);
   const totalTrades = Number(portfolioSnapshot?.totalTradesCount ?? snapshotData?.performance?.totalTradesCount ?? 55);
 
+  const cleanSearchQuery = typeof globalSearchQuery === "string" ? globalSearchQuery.trim().toLowerCase() : "";
+
   // ── Open Positions Filtering ──────────────────────────────────────────────
   const openPositionsList = useMemo(() => {
     const list = ensureArray(rawPositions).length > 0 ? ensureArray(rawPositions) : [
@@ -351,22 +293,21 @@ export function HomeExecutiveOverview() {
     ];
     let filtered = list;
     if (positionsTab !== "ALL") {
-      filtered = filtered.filter((p: any) => safeMarketLabel(p.market, "").toUpperCase().includes(positionsTab));
+      filtered = filtered.filter((p: any) => p && safeMarketLabel(p.market, "").toUpperCase().includes(positionsTab));
     }
     if (filterExchange !== "ALL") {
-      filtered = filtered.filter((p: any) => safeMarketLabel(p.market, "").toUpperCase().includes(filterExchange));
+      filtered = filtered.filter((p: any) => p && safeMarketLabel(p.market, "").toUpperCase().includes(filterExchange));
     }
     if (filterPositionStatus === "PROFIT") {
-      filtered = filtered.filter((p: any) => Number(p.pnl ?? p.unrealized_pnl ?? 0) >= 0);
+      filtered = filtered.filter((p: any) => p && Number(p.pnl ?? p.unrealized_pnl ?? 0) >= 0);
     } else if (filterPositionStatus === "LOSS") {
-      filtered = filtered.filter((p: any) => Number(p.pnl ?? p.unrealized_pnl ?? 0) < 0);
+      filtered = filtered.filter((p: any) => p && Number(p.pnl ?? p.unrealized_pnl ?? 0) < 0);
     }
-    if (globalSearchQuery.trim()) {
-      const q = globalSearchQuery.toLowerCase();
-      filtered = filtered.filter((p: any) => safeString(p.symbol).toLowerCase().includes(q));
+    if (cleanSearchQuery) {
+      filtered = filtered.filter((p: any) => p && safeString(p.symbol).toLowerCase().includes(cleanSearchQuery));
     }
     return filtered;
-  }, [rawPositions, positionsTab, filterExchange, filterPositionStatus, globalSearchQuery]);
+  }, [rawPositions, positionsTab, filterExchange, filterPositionStatus, cleanSearchQuery]);
 
   // ── Active Bots Filtering ─────────────────────────────────────────────────
   const filteredBots = useMemo(() => {
@@ -380,20 +321,19 @@ export function HomeExecutiveOverview() {
     const source = botList.length > 0 ? botList : fallbackBots;
     let filtered = source;
     if (botsTab !== "ALL") {
-      filtered = filtered.filter((b: any) => safeMarketLabel(b.market || b.universe || b.name || b.symbol, "").toUpperCase().includes(botsTab));
+      filtered = filtered.filter((b: any) => b && safeMarketLabel(b.market || b.universe || b.name || b.symbol, "").toUpperCase().includes(botsTab));
     }
     if (filterExchange !== "ALL") {
-      filtered = filtered.filter((b: any) => safeMarketLabel(b.market || b.universe || b.name || b.symbol, "").toUpperCase().includes(filterExchange));
+      filtered = filtered.filter((b: any) => b && safeMarketLabel(b.market || b.universe || b.name || b.symbol, "").toUpperCase().includes(filterExchange));
     }
     if (filterBotStatus !== "ALL") {
-      filtered = filtered.filter((b: any) => safeString(b.status || b.state).toUpperCase() === filterBotStatus);
+      filtered = filtered.filter((b: any) => b && safeString(b.status || b.state).toUpperCase() === filterBotStatus);
     }
-    if (globalSearchQuery.trim()) {
-      const q = globalSearchQuery.toLowerCase();
-      filtered = filtered.filter((b: any) => safeString(b.name).toLowerCase().includes(q) || safeString(b.symbol).toLowerCase().includes(q));
+    if (cleanSearchQuery) {
+      filtered = filtered.filter((b: any) => b && (safeString(b.name).toLowerCase().includes(cleanSearchQuery) || safeString(b.symbol).toLowerCase().includes(cleanSearchQuery)));
     }
     return filtered;
-  }, [botList, botsTab, filterExchange, filterBotStatus, globalSearchQuery]);
+  }, [botList, botsTab, filterExchange, filterBotStatus, cleanSearchQuery]);
 
   return (
     <div className="w-full space-y-4 font-sans pb-10 select-none">
@@ -560,9 +500,9 @@ export function HomeExecutiveOverview() {
                   </thead>
                   <tbody className="divide-y divide-[#10263A]/60">
                     {CRYPTO_COINS.map((item) => {
-                      const quote = quotes.get(item.wsSymbol);
-                      const ltp = quote?.last_price || item.baseLtp;
-                      const chg = quote?.change_pct ?? item.baseChange;
+                      const quote = quotes && typeof quotes.get === "function" ? quotes.get(item.wsSymbol) : undefined;
+                      const ltp = Number(quote?.last_price ?? item.baseLtp) || item.baseLtp;
+                      const chg = Number(quote?.change_pct ?? item.baseChange) || 0;
                       const isUp = chg >= 0;
                       const signal = chg >= 1.5 ? "BUY" : chg <= -1.5 ? "SELL" : "WAIT";
                       return (
@@ -693,9 +633,9 @@ export function HomeExecutiveOverview() {
                 </thead>
                 <tbody className="divide-y divide-[#10263A]/60">
                   {INDIAN_INDICES.map((item) => {
-                    const quote = quotes.get(item.symbol) || quotes.get(item.wsSymbol);
-                    const ltp = quote?.last_price || item.baseLtp;
-                    const prevClose = quote?.close || item.prevClose;
+                    const quote = quotes && typeof quotes.get === "function" ? (quotes.get(item.symbol) || quotes.get(item.wsSymbol)) : undefined;
+                    const ltp = Number(quote?.last_price ?? item.baseLtp) || item.baseLtp;
+                    const prevClose = Number(quote?.close ?? item.prevClose) || item.prevClose;
                     const change = ltp - prevClose;
                     const changePct = prevClose > 0 ? (change / prevClose) * 100 : 0;
                     const isUp = change >= 0;
@@ -940,12 +880,12 @@ export function HomeExecutiveOverview() {
                     </tr>
                   ) : (
                     filteredBots.slice(0, 5).map((bot: any, idx: number) => {
-                      const bName = safeString(bot.name, `Bot ${idx + 1}`);
-                      const bMarket = safeMarketLabel(bot.market || bot.universe || bot.name || bot.symbol, "NSE");
-                      const bStrategy = safeString(bot.strategy || bot.strategy_name || "EMA_SUPERTREND_CROSS", "EMA_SUPERTREND_C...");
-                      const bCapital = Number(bot.capital || bot.allocation || 250000);
+                      const bName = safeString(bot?.name, `Bot ${idx + 1}`);
+                      const bMarket = safeMarketLabel(bot?.market || bot?.universe || bot?.name || bot?.symbol, "NSE");
+                      const bStrategy = safeString(bot?.strategy || bot?.strategy_name || "EMA_SUPERTREND_CROSS", "EMA_SUPERTREND_C...");
+                      const bCapital = Number(bot?.capital || bot?.allocation || 250000);
                       const bCurrency = bMarket === "CRYPTO" ? "$" : "₹";
-                      const bStatus = safeString(bot.status || bot.state, "PAUSED").toUpperCase();
+                      const bStatus = safeString(bot?.status || bot?.state, "PAUSED").toUpperCase();
                       const isRunning = bStatus === "RUNNING";
 
                       return (

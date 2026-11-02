@@ -16,11 +16,6 @@ import { MarketProviderBar, ProviderFilterId } from "./MarketProviderBar";
 import { MarketCategoryCards, MarketCategory } from "./MarketCategoryCards";
 import { MarketWorkspaceTabs, MarketWorkspaceTab } from "./MarketWorkspaceTabs";
 import { MarketCategoryFilterPills } from "./MarketCategoryFilterPills";
-import {
-  MarketAdvancedFiltersPanel,
-  AdvancedFilterState,
-  INITIAL_ADVANCED_FILTERS,
-} from "./MarketAdvancedFiltersPanel";
 import { MarketDataTable } from "./MarketDataTable";
 import { MarketInstrumentDetailsPanel } from "./MarketInstrumentDetailsPanel";
 
@@ -321,8 +316,6 @@ export function MarketUniverse() {
   const [activeWorkspaceTab, setActiveWorkspaceTab] = useState<MarketWorkspaceTab>("TABLE");
   const [selectedProvider, setSelectedProvider] = useState<ProviderFilterId>("ALL");
   const [searchQuery, setSearchQuery] = useState<string>(initialSearch);
-  const [isFiltersVisible, setIsFiltersVisible] = useState<boolean>(true);
-  const [advancedFilters, setAdvancedFilters] = useState<AdvancedFilterState>(INITIAL_ADVANCED_FILTERS);
 
   // Selected Instrument for Right Panel
   const [selectedInstrument, setSelectedInstrument] = useState<MarketInstrument | null>(null);
@@ -535,62 +528,8 @@ export function MarketUniverse() {
       });
     }
 
-    // 3. Advanced Filter Search Query
-    if (advancedFilters.searchQuery.trim()) {
-      const q = advancedFilters.searchQuery.toLowerCase();
-      result = result.filter(
-        (i) =>
-          (i.symbol || "").toLowerCase().includes(q) ||
-          (i.canonical_symbol || "").toLowerCase().includes(q) ||
-          (i.company_name || "").toLowerCase().includes(q)
-      );
-    }
-
-    // 4. Exchange Filter
-    if (advancedFilters.selectedExchanges.length > 0) {
-      result = result.filter((i) =>
-        advancedFilters.selectedExchanges.some((ex) => (i.exchange || "").toUpperCase().includes(ex.toUpperCase()))
-      );
-    }
-
-    // 5. Instrument Type Filter
-    if (advancedFilters.selectedTypes.length > 0) {
-      result = result.filter((i) =>
-        advancedFilters.selectedTypes.some((t) => {
-          const typeStr = (i.instrument_type || i.segment || i.asset_class || "").toUpperCase();
-          return typeStr.includes(t.toUpperCase());
-        })
-      );
-    }
-
-    // 6. Price Range
-    if (advancedFilters.minPrice) {
-      const minP = Number(advancedFilters.minPrice);
-      result = result.filter((i) => Number(i.last_price ?? 0) >= minP);
-    }
-    if (advancedFilters.maxPrice) {
-      const maxP = Number(advancedFilters.maxPrice);
-      result = result.filter((i) => Number(i.last_price ?? 0) <= maxP);
-    }
-
-    // 7. Change %
-    if (advancedFilters.minChangePct) {
-      const minC = Number(advancedFilters.minChangePct);
-      result = result.filter((i) => Number(i.change_pct_24h ?? i.change_24h ?? 0) >= minC);
-    }
-    if (advancedFilters.maxChangePct) {
-      const maxC = Number(advancedFilters.maxChangePct);
-      result = result.filter((i) => Number(i.change_pct_24h ?? i.change_24h ?? 0) <= maxC);
-    }
-
-    // 8. Volume
-    if (advancedFilters.minVolume) {
-      const minV = Number(advancedFilters.minVolume);
-      result = result.filter((i) => Number(i.volume_24h ?? 0) >= minV);
-    }
-
     return result;
-  }, [liveEnrichedInstruments, activeCategory, selectedProvider, advancedFilters, watchlistSymbols]);
+  }, [liveEnrichedInstruments, activeCategory, selectedProvider, watchlistSymbols]);
 
   // Set default selected instrument
   useEffect(() => {
@@ -623,7 +562,6 @@ export function MarketUniverse() {
     setSearchQuery("");
     setSelectedProvider("ALL");
     setActiveCategory("ALL");
-    setAdvancedFilters(INITIAL_ADVANCED_FILTERS);
   }, []);
 
   // Telemetry values
@@ -644,8 +582,6 @@ export function MarketUniverse() {
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
           onOpenDiagnostics={() => setIsDiagnosticsModalOpen(true)}
-          onToggleFilters={() => setIsFiltersVisible(!isFiltersVisible)}
-          isFiltersVisible={isFiltersVisible}
           onSyncUniverse={() => syncMutation.mutate()}
           isSyncing={syncMutation.isPending}
           onResetFilters={handleResetFilters}
@@ -690,24 +626,9 @@ export function MarketUniverse() {
       {/* ── 6. Main Workspace Content Area ─────────────────────────────────── */}
       <ErrorBoundary title="Market Workspace Content Error">
         {activeWorkspaceTab === "TABLE" && (
-          <div className="w-full grid grid-cols-1 md:grid-cols-[225px_1fr] lg:grid-cols-[225px_1fr_240px] gap-2.5 items-start">
-            {/* Left Column: Advanced Filters */}
-            {isFiltersVisible && (
-              <div className="w-full">
-                <ErrorBoundary title="Filters Panel Error">
-                  <MarketAdvancedFiltersPanel
-                    filters={advancedFilters}
-                    onFilterChange={setAdvancedFilters}
-                    onApplyFilters={() => {}}
-                    onResetFilters={() => setAdvancedFilters(INITIAL_ADVANCED_FILTERS)}
-                    exchangeCounts={exchangeCounts}
-                  />
-                </ErrorBoundary>
-              </div>
-            )}
-
+          <div className="w-full grid grid-cols-1 lg:grid-cols-[1fr_260px] gap-2.5 items-start">
             {/* Center Column: Market Data Table */}
-            <div className={!isFiltersVisible ? "w-full min-w-0 col-span-2" : "w-full min-w-0"}>
+            <div className="w-full min-w-0">
               <ErrorBoundary title="Market Table Error">
                 <MarketDataTable
                   instruments={filteredInstruments}

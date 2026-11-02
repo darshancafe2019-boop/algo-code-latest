@@ -3,7 +3,6 @@
 import React, { useState } from "react";
 import {
   Search,
-  SlidersHorizontal,
   ChevronDown,
   RefreshCw,
   Activity,
@@ -13,6 +12,7 @@ import {
   FileSpreadsheet,
   X,
   CheckCircle2,
+  RotateCcw,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -25,8 +25,6 @@ interface MarketCommandHeaderProps {
   searchQuery: string;
   onSearchChange: (query: string) => void;
   onOpenDiagnostics: () => void;
-  onToggleFilters: () => void;
-  isFiltersVisible: boolean;
   onSyncUniverse: () => void;
   isSyncing: boolean;
   onResetFilters: () => void;
@@ -41,8 +39,6 @@ export function MarketCommandHeader({
   searchQuery,
   onSearchChange,
   onOpenDiagnostics,
-  onToggleFilters,
-  isFiltersVisible,
   onSyncUniverse,
   isSyncing,
   onResetFilters,
@@ -133,21 +129,6 @@ export function MarketCommandHeader({
           )}
         </div>
 
-        {/* Filters Toggle Button */}
-        <button
-          type="button"
-          onClick={onToggleFilters}
-          className={cn(
-            "flex items-center gap-1.5 px-3 py-1 rounded text-[11px] font-medium border transition-colors",
-            isFiltersVisible
-              ? "bg-[#00C9E8]/15 border-[#00C9E8]/40 text-[#00C9E8]"
-              : "bg-[#09182B] border-[#15304A] text-[#91A7C1] hover:text-[#EAF3FF] hover:bg-[#15304A]"
-          )}
-        >
-          <SlidersHorizontal className="h-3 w-3" />
-          <span>Filters</span>
-        </button>
-
         {/* More Actions Dropdown */}
         <div className="relative">
           <button
@@ -182,7 +163,7 @@ export function MarketCommandHeader({
                 }}
                 className="w-full px-3 py-1.5 text-left text-[#EAF3FF] hover:bg-[#09182B] flex items-center gap-2"
               >
-                <SlidersHorizontal className="h-3 w-3 text-[#F5B942]" />
+                <RotateCcw className="h-3 w-3 text-[#F5B942]" />
                 <span>Reset All Filters</span>
               </button>
 

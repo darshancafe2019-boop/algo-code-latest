@@ -321,14 +321,14 @@ async function handleProxy(req: NextRequest, ctx: { params?: { path: string[] } 
     : (isStatus || isIndicator)
     ? 4000
     : isAuth
-    ? (isProductionEnv ? 8500 : 15000)
+    ? (isProductionEnv ? 24000 : 15000)
     : isProductionEnv
-    ? 9000
+    ? 20000
     : isUniverse
     ? 25000
     : isHeavy
-    ? 15000
-    : 10000;
+    ? 25000
+    : 15000;
 
   let bodyData: BodyInit | null = null;
   if (["POST", "PUT", "PATCH", "DELETE"].includes(req.method)) {

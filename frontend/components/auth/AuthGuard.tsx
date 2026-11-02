@@ -12,10 +12,15 @@ interface AuthGuardProps {
 }
 
 export function AuthGuard({ children }: AuthGuardProps) {
+  const [mounted, setMounted] = React.useState(false);
   const { isAuthenticated, isLoading, isLocked, mustChangePassword } = useAuth();
 
-  // 1. Initial Session Check Splash
-  if (isLoading) {
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // 1. Initial Session Check Splash (Rendered during SSR and until mounted & session check complete)
+  if (!mounted || isLoading) {
     return (
       <div className="min-h-screen w-full flex flex-col items-center justify-center bg-[var(--theme-pageBg)] text-[var(--theme-text-primary)] font-mono p-4 select-none">
         <div className="relative mb-4">

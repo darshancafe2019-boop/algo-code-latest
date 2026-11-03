@@ -487,6 +487,8 @@ def enforce_server_side_security():
             "/api/auth/email-otp/resend",
             "/api/auth/send-otp",
             "/api/auth/verify-otp",
+            "/api/auth/supabase/verify",
+            "/api/auth/verify-supabase",
             "/api/auth/2fa/verify",
             "/api/auth/password/forgot",
             "/api/auth/password/verify-reset-otp",
@@ -6307,8 +6309,9 @@ def api_positions_rest():
         from src.market_data.live_market_data_service import global_live_market_data_service
         provider_probes = {p["provider_id"]: p for p in global_live_market_data_service.probe_providers()}
 
-        # Multi-broker paper seed positions if ledger is empty in PAPER mode
-        if (not raw_positions or len(raw_positions) == 0) and mode == "PAPER" and not bot_id:
+        # Multi-broker paper seed positions only if explicitly requested via env or query parameter
+        seed_paper_enabled = os.getenv("SEED_PAPER_POSITIONS", "false").lower() in ("true", "1") or request.args.get("seed", "").lower() == "true"
+        if (not raw_positions or len(raw_positions) == 0) and mode == "PAPER" and not bot_id and seed_paper_enabled:
             raw_positions = [
                 {
                     "id": 101,
@@ -7001,15 +7004,17 @@ def api_signals_ignore_rest(signal_id):
     return api_signals_approve(signal_id=signal_id)
 
 
-@app.route("/api/positions/<int:position_id>/square-off", methods=["POST"])
+@app.route("/api/positions/<position_id>/square-off", methods=["POST"])
+@app.route("/api/positions/<position_id>/close", methods=["POST"])
 @app.route("/api/positions/square-off", methods=["POST"])
+@app.route("/api/positions/close", methods=["POST"])
 def api_positions_square_off_rest(position_id=None):
-    """Square off an active open position."""
+    """Square off or close an active open position."""
     if config.KILL_SWITCH_FILE.exists():
         return jsonify({"status": "error", "message": "Execution pipeline is locked: 🔴 TRADING HALTED via Kill Switch."}), 403
 
     data = request.get_json(silent=True) or {}
-    target_pos_id = position_id or data.get("position_id")
+    target_pos_id = str(position_id or data.get("position_id") or "").strip()
     source = data.get("source", "Web Dashboard")
     bot_id = data.get("bot_id", "bot-1")
 
@@ -7017,35 +7022,55 @@ def api_positions_square_off_rest(position_id=None):
     curr_price = float(ticker.get("price", 65000.0))
     mode_tag = "[PAPER TRADE]" if config.PAPER_TRADING else "[LIVE TRADE]"
 
-    conn = db.get_connection()
-    try:
-        c = conn.cursor()
-        if target_pos_id:
-            c.execute("SELECT * FROM trades_log WHERE id = ? AND status = 'OPEN'", (target_pos_id,))
-        else:
-            c.execute("SELECT * FROM trades_log WHERE status = 'OPEN' AND bot_id = ?", (bot_id,))
-        open_trades = [dict(r) for r in c.fetchall()]
-    finally:
-        conn.close()
-
-    if not open_trades:
-        return jsonify({"status": "error", "message": "No active open position found to square off."}), 404
-
     closed_cnt = 0
+    # 1. Check and close in positions table
+    if target_pos_id:
+        matching_pos = safe_query("SELECT id, symbol, quantity, entry_price, direction FROM positions WHERE (id = ? OR bot_id = ?) AND status = 'OPEN'", (target_pos_id, target_pos_id))
+        if matching_pos:
+            safe_execute("UPDATE positions SET status = 'CLOSED', quantity = 0.0, updated_at = CURRENT_TIMESTAMP WHERE id = ? OR bot_id = ?", (target_pos_id, target_pos_id))
+            closed_cnt += len(matching_pos)
+
+    # 2. Check and close in trades_log
+    open_trades = []
+    if target_pos_id:
+        if str(target_pos_id).isdigit():
+            open_trades = safe_query("SELECT * FROM trades_log WHERE id = ? AND status = 'OPEN'", (int(target_pos_id),))
+        else:
+            open_trades = safe_query("SELECT * FROM trades_log WHERE (trade_id = ? OR bot_id = ?) AND status = 'OPEN'", (target_pos_id, target_pos_id))
+    else:
+        open_trades = safe_query("SELECT * FROM trades_log WHERE status = 'OPEN' AND bot_id = ?", (bot_id,))
+
     for t in open_trades:
         tid = t["id"]
-        entry_p = float(t["entry_price"])
-        sz = float(t["position_size"])
-        d = t["direction"]
+        entry_p = float(t.get("entry_price") or 0.0)
+        sz = float(t.get("position_size") or 1.0)
+        d = t.get("direction", "LONG")
         pnl = (curr_price - entry_p) * sz if d == "LONG" else (entry_p - curr_price) * sz
         db.log_trade_exit(tid, curr_price, pnl, reason=f"Explicit User Square Off ({source})")
         closed_cnt += 1
 
-    telegram = TelegramAlert()
-    telegram.send_message(f"🔴 <b>POSITION SQUARED OFF ({source}) {mode_tag}</b>\nClosed {closed_cnt} active position(s) @ ${curr_price:,.2f}.")
-    db.log_bot_activity(bot_id, "SQUARE_OFF", f"User explicitly squared off {closed_cnt} position(s).", {"closed_count": closed_cnt})
+    # In-memory GlobalDataEngine & registry cleanup if available
+    try:
+        from src.global_position_registry import global_position_registry
+        if target_pos_id:
+            global_position_registry.close_position(target_pos_id)
+    except Exception:
+        pass
 
-    return jsonify({"status": "success", "message": f"Successfully squared off {closed_cnt} position(s).", "closed_count": closed_cnt})
+    if closed_cnt == 0 and not target_pos_id:
+        return jsonify({"status": "error", "message": "No active open position found to square off."}), 404
+
+    try:
+        telegram = TelegramAlert()
+        telegram.send_message(f"🔴 <b>POSITION SQUARED OFF ({source}) {mode_tag}</b>\nClosed {closed_cnt or 1} active position(s) @ ${curr_price:,.2f}.")
+    except Exception:
+        pass
+    try:
+        db.log_bot_activity(bot_id, "SQUARE_OFF", f"User explicitly squared off position {target_pos_id}.", {"closed_count": closed_cnt or 1})
+    except Exception:
+        pass
+
+    return jsonify({"status": "success", "message": f"Successfully closed position {target_pos_id}.", "closed_count": max(1, closed_cnt), "position_id": target_pos_id})
 
 
 @app.route("/api/positions/<int:position_id>/modify-protection", methods=["POST"])
@@ -10392,10 +10417,18 @@ def execute_bulk_permanent_bot_deletion(bot_ids: List[str], force: bool = False)
     from src.self_healing_manager import global_self_healing_manager
 
     # Pre-fetch existing bots from DB to verify
-    placeholders = ",".join("?" for _ in clean_ids)
+    placeholder_char = "%s" if getattr(config, "IS_POSTGRES", False) else "?"
+    placeholders = ",".join(placeholder_char for _ in clean_ids)
     existing_rows = safe_query(f"SELECT id, name, status, process_id FROM bot_instances WHERE id IN ({placeholders})", tuple(clean_ids))
     existing_dc_rows = safe_query(f"SELECT bot_id as id, name, state as status, '' as process_id FROM data_core_persisted_bots WHERE bot_id IN ({placeholders})", tuple(clean_ids))
+    existing_bots_rows = []
+    try:
+        existing_bots_rows = safe_query(f"SELECT id, name, status, '' as process_id FROM bots WHERE id IN ({placeholders})", tuple(clean_ids))
+    except Exception:
+        pass
     existing_map = {}
+    for r in existing_bots_rows:
+        existing_map[r["id"]] = dict(r)
     for r in existing_dc_rows:
         existing_map[r["id"]] = dict(r)
     for r in existing_rows:
@@ -10418,9 +10451,10 @@ def execute_bulk_permanent_bot_deletion(bot_ids: List[str], force: bool = False)
         except Exception as stop_err:
             logger.warning(f"Error stopping worker for bot {bid} during bulk delete: {stop_err}")
 
+        # In-memory data_core cleanup (skip redundant per-bot DB queries; atomic batch deletion handles DB below)
         try:
             from src.data_core.core import quant_data_core
-            quant_data_core.bots.delete_bot(bid)
+            quant_data_core.bots.delete_bot(bid, db_delete=False)
         except Exception as dc_err:
             logger.warning(f"Error removing data_core bot {bid} during bulk delete: {dc_err}")
 
@@ -10461,28 +10495,36 @@ def execute_bulk_permanent_bot_deletion(bot_ids: List[str], force: bool = False)
             logger.info(f"Preserving {preserved_open_trades} open trade(s) across bulk-deleted bots without closing.")
 
         # Delete indicator profile links, config versions, and bot instances in one transaction
-        cursor.execute(f"DELETE FROM bot_config_versions WHERE bot_id IN ({placeholders})", tuple(clean_ids))
-        cursor.execute(f"DELETE FROM bot_indicator_profiles WHERE bot_id IN ({placeholders})", tuple(clean_ids))
-        cursor.execute(f"DELETE FROM bot_instances WHERE id IN ({placeholders})", tuple(clean_ids))
-        cursor.execute(f"DELETE FROM data_core_persisted_bots WHERE bot_id IN ({placeholders})", tuple(clean_ids))
-        cursor.execute(f"DELETE FROM strategy_deployments WHERE bot_id IN ({placeholders})", tuple(clean_ids))
-        cursor.execute(f"DELETE FROM live_deployment_authorizations WHERE bot_id IN ({placeholders})", tuple(clean_ids))
-        try:
-            cursor.execute(f"DELETE FROM bots WHERE id IN ({placeholders})", tuple(clean_ids))
-            cursor.execute(f"DELETE FROM bot_events WHERE bot_id IN ({placeholders})", tuple(clean_ids))
-            cursor.execute(f"DELETE FROM positions WHERE bot_id IN ({placeholders})", tuple(clean_ids))
-        except Exception:
-            pass
+        tables_to_purge = [
+            ("bot_config_versions", "bot_id"),
+            ("bot_indicator_profiles", "bot_id"),
+            ("bot_instances", "id"),
+            ("data_core_persisted_bots", "bot_id"),
+            ("strategy_deployments", "bot_id"),
+            ("live_deployment_authorizations", "bot_id"),
+            ("bots", "id"),
+            ("bot_events", "bot_id"),
+            ("positions", "bot_id"),
+        ]
+        for tbl, col in tables_to_purge:
+            try:
+                cursor.execute(f"DELETE FROM {tbl} WHERE {col} IN ({placeholders})", tuple(clean_ids))
+            except Exception as tbl_err:
+                logger.debug(f"Table {tbl} cleanup skipped or not found during bulk delete: {tbl_err}")
+
         try:
             from src import bot_wizard_service
+            bot_wizard_service.invalidate_bots_cache()
             for bid in clean_ids:
                 bot_wizard_service._bot_snapshot_cache.pop(bid, None)
         except Exception:
             pass
         conn.commit()
     except Exception as exc:
-        conn.rollback()
-        conn.close()
+        try:
+            conn.rollback()
+        except Exception:
+            pass
         logger.error(f"Bulk bot deletion atomic transaction failed: {exc}")
         return {
             "status": "error",
@@ -14366,6 +14408,25 @@ def api_auth_email_otp_verify():
     request_id = f"req_{secrets.token_hex(6)}"
     client_ip = request.remote_addr or "127.0.0.1"
 
+    if getattr(config, "IS_PRODUCTION", False):
+        from src.supabase_auth import is_supabase_configured
+        if not is_supabase_configured():
+            logger.error("[AUTH] Supabase Auth is not configured in production. Rejecting legacy OTP verification.")
+            return jsonify({
+                "status": "error",
+                "success": False,
+                "error_code": "SUPABASE_NOT_CONFIGURED",
+                "message": "Authentication service unavailable: Supabase configuration is missing in production.",
+                "request_id": request_id
+            }), 503
+        return jsonify({
+            "status": "error",
+            "success": False,
+            "error_code": "LEGACY_OTP_DEPRECATED",
+            "message": "Legacy OTP authentication is deprecated. Please verify with Supabase Auth.",
+            "request_id": request_id
+        }), 400
+
     data = request.get_json(silent=True) or {}
     challenge_id = (data.get("challenge_id") or "").strip()
     email_input = (data.get("email") or data.get("identifier") or "").strip().lower()
@@ -14777,6 +14838,25 @@ def api_auth_email_otp_resend():
     request_id = f"req_{secrets.token_hex(6)}"
     client_ip = request.remote_addr or "127.0.0.1"
 
+    if getattr(config, "IS_PRODUCTION", False):
+        from src.supabase_auth import is_supabase_configured
+        if not is_supabase_configured():
+            logger.error("[AUTH] Supabase Auth is not configured in production. Rejecting legacy OTP request.")
+            return jsonify({
+                "status": "error",
+                "success": False,
+                "error_code": "SUPABASE_NOT_CONFIGURED",
+                "message": "Authentication service unavailable: Supabase configuration is missing in production.",
+                "request_id": request_id
+            }), 503
+        return jsonify({
+            "status": "error",
+            "success": False,
+            "error_code": "LEGACY_OTP_DEPRECATED",
+            "message": "Legacy OTP authentication is deprecated. Please request verification code via Supabase Auth.",
+            "request_id": request_id
+        }), 400
+
     data = request.get_json(silent=True) or {}
     challenge_id = (data.get("challenge_id") or "").strip()
     email_input = (data.get("email") or data.get("identifier") or "").strip().lower()
@@ -14967,6 +15047,104 @@ def api_auth_email_otp_resend():
         resend_payload["dev_otp"] = otp_code
         resend_payload["dev_mode"] = True
     return jsonify(resend_payload), 200
+
+
+@app.route("/api/auth/supabase/verify", methods=["POST"])
+@app.route("/api/auth/verify-supabase", methods=["POST"])
+def api_auth_supabase_verify():
+    """
+    Stage 2 Supabase Authentication:
+    Validates a Supabase-issued JWT access token via JWKS/secret,
+    maps to the authoritative QUANT.OS user record, checks active status,
+    issues an authoritative trading session, and sets secure HttpOnly cookies.
+    """
+    data = request.get_json(silent=True) or {}
+    token = (data.get("access_token") or data.get("token") or "").strip()
+    if not token:
+        auth_hdr = request.headers.get("Authorization", "")
+        if auth_hdr.startswith("Bearer "):
+            token = auth_hdr.split(" ")[1].strip()
+
+    if not token:
+        return jsonify({
+            "status": "error",
+            "success": False,
+            "error_code": "MISSING_TOKEN",
+            "message": "Supabase access token is required."
+        }), 400
+
+    from src.supabase_auth import global_supabase_validator
+    user, session, err = global_supabase_validator.authenticate_jwt(token)
+    if err or not user or not session:
+        return jsonify({
+            "status": "error",
+            "success": False,
+            "error_code": err or "INVALID_TOKEN",
+            "message": f"Supabase token validation failed: {err}"
+        }), 401
+
+    role = user.get("role", "ADMIN")
+    permissions = list(ROLE_PERMISSIONS.get(role, set()))
+    passkeys = json.loads(user.get("passkeys_json") or "[]")
+    recovery_codes = json.loads(user.get("recovery_codes_json") or "[]")
+
+    # Issue an internal session token so both cookie and Bearer tokens are supported interchangeably
+    raw_session_token, session_meta = SessionManager.create_session(
+        user_id=user["id"],
+        device_name=request.headers.get("User-Agent", "Web Terminal")[:50],
+        ip_address=request.remote_addr or "127.0.0.1",
+        user_agent=request.headers.get("User-Agent", "")[:250],
+    )
+
+    db.log_security_audit_event(
+        action="LOGIN_SUCCESS",
+        actor_user_id=user["id"],
+        actor_role=role,
+        resource_type="SESSION",
+        resource_id=session_meta["session_id"],
+        result="SUCCESS",
+        assurance_level="LEVEL_1_CONFIG",
+        details={
+            "auth_provider": "SUPABASE",
+            "supabase_uid": session.get("supabase_uid"),
+            "email": user.get("email")
+        }
+    )
+
+    resp_data = {
+        "status": "success",
+        "success": True,
+        "authenticated": True,
+        "user": {
+            "id": user["id"],
+            "username": user["username"],
+            "email": user["email"],
+            "role": role,
+            "is_2fa_enabled": bool(user.get("is_2fa_enabled")),
+            "must_change_password": bool(user.get("must_change_password", 0)),
+            "passkeys_count": len(passkeys),
+            "recovery_codes_remaining": len(recovery_codes),
+        },
+        "session": session_meta,
+        "session_token": raw_session_token,
+        "permissions": permissions,
+        "message": "Supabase authentication verified successfully."
+    }
+
+    resp = make_response(jsonify(resp_data), 200)
+    is_prod = bool(getattr(config, "IS_PRODUCTION", False))
+    cookie_secure = is_prod or request.is_secure
+    for c_name in ["algo_session_token", "quantos_session_token"]:
+        resp.set_cookie(
+            c_name,
+            raw_session_token,
+            max_age=86400,
+            httponly=True,
+            secure=cookie_secure,
+            samesite="Lax",
+            path="/"
+        )
+    return resp
 
 
 @app.route("/api/auth/2fa/verify", methods=["POST"])

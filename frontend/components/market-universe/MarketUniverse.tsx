@@ -534,9 +534,18 @@ export function MarketUniverse() {
   // Set default selected instrument
   useEffect(() => {
     if (!selectedInstrument && filteredInstruments.length > 0) {
-      setSelectedInstrument(filteredInstruments[0]);
+      const urlSymbol = searchParams.get("symbol");
+      const matched = urlSymbol
+        ? filteredInstruments.find(
+            (i) =>
+              i.symbol === urlSymbol ||
+              i.canonical_symbol === urlSymbol ||
+              i.provider_symbol === urlSymbol
+          )
+        : null;
+      setSelectedInstrument(matched || filteredInstruments[0]);
     }
-  }, [filteredInstruments, selectedInstrument]);
+  }, [filteredInstruments, selectedInstrument, searchParams]);
 
   // Action Handlers
   const handleOpenChain = useCallback((inst: MarketInstrument) => {

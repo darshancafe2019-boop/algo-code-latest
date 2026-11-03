@@ -1,6 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { getSupabase, isSupabaseConfigured } from "@/lib/supabase/client";
 
 
 export interface AuthUser {
@@ -148,9 +149,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       sessionStorage.removeItem(LOCK_STORAGE_KEY);
       localStorage.removeItem("quantos_session_token");
+      localStorage.removeItem("quantos_supabase_access_token");
       localStorage.removeItem("quantos_session_date");
       sessionStorage.removeItem("quantos_session_token");
-    } catch {}
+      sessionStorage.removeItem("quantos_pending_email");
+    } catch { }
   }, []);
 
   // Check active session against authoritative backend HttpOnly cookie or Bearer token
@@ -159,11 +162,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const todayStr = getLocalCalendarDate();
       const headers: Record<string, string> = { Accept: "application/json" };
       try {
-        const storedToken = localStorage.getItem("quantos_session_token") || sessionStorage.getItem("quantos_session_token");
+        const storedToken = localStorage.getItem("quantos_session_token") || sessionStorage.getItem("quantos_session_token") || localStorage.getItem("quantos_supabase_access_token");
         if (storedToken) {
           headers["Authorization"] = `Bearer ${storedToken}`;
         }
-      } catch {}
+      } catch { }
+
+      if (isSupabaseConfigured()) {
+        try {
+          const sb = getSupabase();
+          if (sb) {
+            const { data: sbData } = await sb.auth.getSession();
+            if (sbData?.session?.access_token) {
+              headers["Authorization"] = `Bearer ${sbData.session.access_token}`;
+              try {
+                localStorage.setItem("quantos_supabase_access_token", sbData.session.access_token);
+              } catch { }
+            }
+          }
+        } catch { }
+      }
 
 
       const res = await fetch("/api/auth/me", {
@@ -183,14 +201,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             try {
               localStorage.setItem("quantos_session_token", data.session_token);
               localStorage.setItem("quantos_session_date", todayStr);
-            } catch {}
+            } catch { }
           }
 
           // Restore terminal lock state if it was actively locked in this tab
           try {
             const wasLocked = sessionStorage.getItem(LOCK_STORAGE_KEY) === "true";
             if (wasLocked) setIsLocked(true);
-          } catch {}
+          } catch { }
 
           return true;
         }
@@ -226,7 +244,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (storedAttempts) {
         setFailedAttempts(parseInt(storedAttempts, 10));
       }
-    } catch {}
+    } catch { }
 
     const handleAuthRestored = (e: any) => {
       const detail = e?.detail || {};
@@ -260,9 +278,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (storedDate && storedDate !== todayStr) {
           checkSession();
         }
-      } catch {}
+      } catch { }
     };
 
+
+    // Supabase Auth State Change Listener (synchronizes tokens & handles sign-outs)
+    let sbSubscription: { unsubscribe: () => void } | null = null;
+    if (isSupabaseConfigured()) {
+      try {
+        const sb = getSupabase();
+        if (sb) {
+          const { data } = sb.auth.onAuthStateChange(async (event, session) => {
+            if (event === "SIGNED_OUT") {
+              clearSessionState();
+            } else if (event === "TOKEN_REFRESHED" && session?.access_token) {
+              try {
+                localStorage.setItem("quantos_supabase_access_token", session.access_token);
+              } catch { }
+            }
+          });
+          sbSubscription = data?.subscription || null;
+        }
+      } catch { }
+    }
 
     const intervalId = setInterval(verifyDailySessionStatus, 30000);
     const handleVisibilityChange = () => {
@@ -279,6 +317,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       window.removeEventListener("quantos:auth_required", handleAuthRequired);
       clearInterval(intervalId);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
+      if (sbSubscription) {
+        sbSubscription.unsubscribe();
+      }
     };
   }, [checkSession, clearSessionState]);
 
@@ -293,7 +334,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         try {
           sessionStorage.removeItem(LOCKOUT_UNTIL_KEY);
           sessionStorage.removeItem(FAILED_ATTEMPTS_KEY);
-        } catch {}
+        } catch { }
       }
     }, 1000);
 
@@ -336,7 +377,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setLockoutUntil(until);
         try {
           sessionStorage.setItem(LOCKOUT_UNTIL_KEY, until.toString());
-        } catch {}
+        } catch { }
         return {
           success: false,
           error: data.message || "Too many failed attempts. Rate limit enforced.",
@@ -385,13 +426,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const todayStr = getLocalCalendarDate();
             localStorage.setItem("quantos_session_token", data.session_token);
             localStorage.setItem("quantos_session_date", todayStr);
-          } catch {}
+          } catch { }
         }
         try {
           sessionStorage.removeItem(LOCK_STORAGE_KEY);
           sessionStorage.removeItem(FAILED_ATTEMPTS_KEY);
           sessionStorage.removeItem(LOCKOUT_UNTIL_KEY);
-        } catch {}
+        } catch { }
 
         return {
           success: true,
@@ -405,14 +446,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setFailedAttempts(newAttempts);
         try {
           sessionStorage.setItem(FAILED_ATTEMPTS_KEY, newAttempts.toString());
-        } catch {}
+        } catch { }
 
         if (newAttempts >= MAX_FAILED_ATTEMPTS) {
           const until = Date.now() + LOCKOUT_DURATION_MS;
           setLockoutUntil(until);
           try {
             sessionStorage.setItem(LOCKOUT_UNTIL_KEY, until.toString());
-          } catch {}
+          } catch { }
           return {
             success: false,
             error: `Maximum failed attempts reached (${MAX_FAILED_ATTEMPTS}/${MAX_FAILED_ATTEMPTS}). Terminal locked for 30s.`,
@@ -460,6 +501,114 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     email?: string,
     isRecovery: boolean = false
   ): Promise<LoginResult> => {
+    // 1. Supabase Auth Verification (if Supabase is configured)
+    if (isSupabaseConfigured()) {
+      try {
+        const sb = getSupabase();
+        if (sb) {
+          let targetEmail = email?.trim();
+          if (!targetEmail) {
+            try {
+              targetEmail = sessionStorage.getItem("quantos_otp_destination_email") || sessionStorage.getItem("quantos_pending_email") || "";
+            } catch { }
+          }
+
+          if (!targetEmail) {
+            return {
+              success: false,
+              error: "Missing verification email address. Please request a new code.",
+              errorCode: "MISSING_EMAIL",
+              statusCode: 400,
+            };
+          }
+
+          const { data: sbAuthData, error: sbError } = await sb.auth.verifyOtp({
+            email: targetEmail,
+            token: otp.trim(),
+            type: "email",
+          });
+
+          if (sbError || !sbAuthData?.session?.access_token) {
+            return {
+              success: false,
+              error: sbError?.message || "Invalid or expired verification code.",
+              errorCode: "INVALID_OTP",
+              statusCode: 401,
+            };
+          }
+
+          const sbAccessToken = sbAuthData.session.access_token;
+
+          // Exchange Supabase token with Flask backend to obtain authoritative QUANT.OS session
+          const res = await fetch("/api/auth/supabase/verify", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${sbAccessToken}`,
+            },
+            credentials: "include",
+            body: JSON.stringify({ access_token: sbAccessToken }),
+          });
+
+          const { ok, data } = await safeParseAuthResponse(res);
+          if (res.ok && data.status === "success") {
+            setUser(data.user);
+            setSession(data.session || null);
+            setIsAuthenticated(true);
+            setIsLocked(false);
+            setFailedAttempts(0);
+            setLockoutUntil(null);
+            loginTimestampRef.current = Date.now();
+
+            try {
+              const todayStr = getLocalCalendarDate();
+              if (data.session_token) {
+                localStorage.setItem("quantos_session_token", data.session_token);
+              }
+              localStorage.setItem("quantos_supabase_access_token", sbAccessToken);
+              localStorage.setItem("quantos_session_date", todayStr);
+              sessionStorage.removeItem("quantos_otp_challenge_id");
+              sessionStorage.removeItem("quantos_otp_destination_email");
+              sessionStorage.removeItem("quantos_pending_email");
+              sessionStorage.removeItem(LOCK_STORAGE_KEY);
+              sessionStorage.removeItem(FAILED_ATTEMPTS_KEY);
+              sessionStorage.removeItem(LOCKOUT_UNTIL_KEY);
+            } catch { }
+
+            return {
+              success: true,
+              message: data.message || "Supabase authentication verified successfully.",
+            };
+          }
+
+          return {
+            success: false,
+            error: data.message || "Backend verification failed for Supabase token.",
+            errorCode: data.error_code || "BACKEND_REJECTED",
+            statusCode: res.status,
+          };
+        }
+      } catch (sbEx: any) {
+        return {
+          success: false,
+          error: sbEx?.message || "Failed to complete Supabase OTP verification.",
+          errorCode: "SUPABASE_ERROR",
+          statusCode: 0,
+        };
+      }
+    }
+
+    // 2. Production fail-closed: Never fall back to legacy OTP in production
+    if (process.env.NODE_ENV === "production") {
+      return {
+        success: false,
+        error: "Supabase Authentication is required in production. Legacy OTP verification is disabled.",
+        errorCode: "SUPABASE_REQUIRED",
+        statusCode: 403,
+      };
+    }
+
+    // 3. Fallback to existing native Flask Email OTP verification (development/local only)
     try {
       const res = await fetch("/api/auth/email-otp/verify", {
         method: "POST",
@@ -492,13 +641,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const todayStr = getLocalCalendarDate();
             localStorage.setItem("quantos_session_token", data.session_token);
             localStorage.setItem("quantos_session_date", todayStr);
-          } catch {}
+          } catch { }
         }
         try {
           sessionStorage.removeItem(LOCK_STORAGE_KEY);
           sessionStorage.removeItem(FAILED_ATTEMPTS_KEY);
           sessionStorage.removeItem(LOCKOUT_UNTIL_KEY);
-        } catch {}
+        } catch { }
 
         return {
           success: true,
@@ -555,6 +704,70 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const resendEmailOTP = async (
     challengeId: string
   ): Promise<{ success: boolean; message: string; challengeId?: string; destination?: string; cooldown_seconds?: number; error?: string; devOtp?: string; devMode?: boolean }> => {
+    // 1. Supabase Auth Resend (if Supabase is configured)
+    if (isSupabaseConfigured()) {
+      try {
+        const sb = getSupabase();
+        if (sb) {
+          let targetEmail = "";
+          try {
+            targetEmail = sessionStorage.getItem("quantos_otp_destination_email") || sessionStorage.getItem("quantos_pending_email") || "";
+          } catch { }
+
+          if (!targetEmail) {
+            return {
+              success: false,
+              message: "No email address found for resending code. Please restart login.",
+              error: "NO_EMAIL",
+              cooldown_seconds: 60,
+            };
+          }
+
+          const { error } = await sb.auth.signInWithOtp({
+            email: targetEmail,
+            options: {
+              shouldCreateUser: false,
+            },
+          });
+
+          if (error) {
+            return {
+              success: false,
+              message: error.message || "Failed to resend verification code.",
+              error: error.message,
+              cooldown_seconds: 60,
+            };
+          }
+
+          return {
+            success: true,
+            message: `Verification code resent to ${targetEmail} via Supabase Auth.`,
+            challengeId,
+            destination: targetEmail,
+            cooldown_seconds: 60,
+          };
+        }
+      } catch (sbEx: any) {
+        return {
+          success: false,
+          message: "Failed to resend Supabase verification code.",
+          error: sbEx?.message,
+          cooldown_seconds: 60,
+        };
+      }
+    }
+
+    // 2. Production fail-closed: Never fall back to legacy OTP in production
+    if (process.env.NODE_ENV === "production") {
+      return {
+        success: false,
+        message: "Supabase Authentication is required in production.",
+        error: "Legacy OTP resend is disabled in production.",
+        cooldown_seconds: 60,
+      };
+    }
+
+    // 3. Fallback to existing native Flask Resend (development/local only)
     try {
       const res = await fetch("/api/auth/email-otp/resend", {
         method: "POST",
@@ -602,6 +815,67 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     devOtp?: string;
     devMode?: boolean;
   }> => {
+    // 1. Supabase Auth Email OTP (if Supabase is configured)
+    if (isSupabaseConfigured()) {
+      try {
+        const sb = getSupabase();
+        if (sb) {
+          const email = emailOrUsername.trim();
+          try {
+            sessionStorage.setItem("quantos_otp_destination_email", email);
+            sessionStorage.setItem("quantos_pending_email", email);
+          } catch { }
+
+          const { error } = await sb.auth.signInWithOtp({
+            email,
+            options: {
+              shouldCreateUser: false,
+            },
+          });
+
+          if (error) {
+            return {
+              success: false,
+              message: error.message || "Failed to dispatch Supabase verification code.",
+              error: error.message,
+              cooldown_seconds: 60,
+            };
+          }
+
+          const challengeId = `sb_${Date.now()}`;
+          try {
+            sessionStorage.setItem("quantos_otp_challenge_id", challengeId);
+          } catch { }
+
+          return {
+            success: true,
+            message: `A 6-digit verification code was dispatched to ${email} via Supabase Auth.`,
+            challengeId,
+            destination: email,
+            cooldown_seconds: 60,
+          };
+        }
+      } catch (sbEx: any) {
+        return {
+          success: false,
+          message: "Failed to dispatch Supabase verification code.",
+          error: sbEx?.message,
+          cooldown_seconds: 60,
+        };
+      }
+    }
+
+    // 2. Production fail-closed: Never fall back to legacy OTP in production
+    if (process.env.NODE_ENV === "production") {
+      return {
+        success: false,
+        message: "Supabase Authentication is required in production.",
+        error: "Supabase Authentication is not configured or failed to initialize.",
+        cooldown_seconds: 60,
+      };
+    }
+
+    // 3. Fallback to existing native Flask Send OTP (development/local only)
     try {
       const res = await fetch("/api/auth/send-otp", {
         method: "POST",
@@ -681,13 +955,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const todayStr = getLocalCalendarDate();
             localStorage.setItem("quantos_session_token", data.session_token);
             localStorage.setItem("quantos_session_date", todayStr);
-          } catch {}
+          } catch { }
         }
         try {
           sessionStorage.removeItem(LOCK_STORAGE_KEY);
           sessionStorage.removeItem(FAILED_ATTEMPTS_KEY);
           sessionStorage.removeItem(LOCKOUT_UNTIL_KEY);
-        } catch {}
+        } catch { }
 
         return {
           success: true,
@@ -843,11 +1117,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Handle Logout
   const logout = async (): Promise<void> => {
     try {
+      if (isSupabaseConfigured()) {
+        try {
+          const sb = getSupabase();
+          if (sb) await sb.auth.signOut();
+        } catch { }
+      }
       try {
         localStorage.removeItem("quantos_session_token");
+        localStorage.removeItem("quantos_supabase_access_token");
         localStorage.removeItem("quantos_session_date");
         sessionStorage.removeItem("quantos_session_token");
-      } catch {}
+        sessionStorage.removeItem("quantos_pending_email");
+      } catch { }
       await fetch("/api/auth/logout", {
         method: "POST",
         headers: { Accept: "application/json", "X-Unauthenticated": "true" },
@@ -863,11 +1145,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Revoke All Sessions
   const logoutAll = async (): Promise<void> => {
     try {
+      if (isSupabaseConfigured()) {
+        try {
+          const sb = getSupabase();
+          if (sb) await sb.auth.signOut();
+        } catch { }
+      }
       try {
         localStorage.removeItem("quantos_session_token");
+        localStorage.removeItem("quantos_supabase_access_token");
         localStorage.removeItem("quantos_session_date");
         sessionStorage.removeItem("quantos_session_token");
-      } catch {}
+        sessionStorage.removeItem("quantos_pending_email");
+      } catch { }
       await fetch("/api/auth/logout-all", {
         method: "POST",
         headers: { Accept: "application/json", "X-Unauthenticated": "true" },
@@ -885,7 +1175,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsLocked(true);
     try {
       sessionStorage.setItem(LOCK_STORAGE_KEY, "true");
-    } catch {}
+    } catch { }
   };
 
   // Unlock Terminal with Password
@@ -907,7 +1197,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setIsLocked(false);
         try {
           sessionStorage.removeItem(LOCK_STORAGE_KEY);
-        } catch {}
+        } catch { }
         return { success: true };
       }
 
@@ -992,3 +1282,4 @@ export function useAuth(): AuthContextType {
   }
   return context;
 }
+

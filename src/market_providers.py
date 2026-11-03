@@ -36,8 +36,6 @@ NORMALIZED_DISPLAY_NAMES: Dict[str, Tuple[str, str]] = {
     "DOTUSDT": ("Polkadot / USDT", "Web3 Foundation"),
     "MATIC/USDT": ("Polygon / USDT", "Polygon Labs"),
     "MATICUSDT": ("Polygon / USDT", "Polygon Labs"),
-    "SHIB/USDT": ("Shiba Inu / USDT", "Shiba Inu Token"),
-    "SHIBUSDT": ("Shiba Inu / USDT", "Shiba Inu Token"),
     "LTC/USDT": ("Litecoin / USDT", "Litecoin Core"),
     "LTCUSDT": ("Litecoin / USDT", "Litecoin Core"),
     "NEAR/USDT": ("NEAR Protocol / USDT", "NEAR Foundation"),
@@ -46,8 +44,6 @@ NORMALIZED_DISPLAY_NAMES: Dict[str, Tuple[str, str]] = {
     "APTUSDT": ("Aptos / USDT", "Aptos Labs"),
     "SUI/USDT": ("Sui / USDT", "Mysten Labs"),
     "SUIUSDT": ("Sui / USDT", "Mysten Labs"),
-    "PEPE/USDT": ("Pepe / USDT", "Pepe Project"),
-    "PEPEUSDT": ("Pepe / USDT", "Pepe Project"),
 
     # Indian Equities
     "RELIANCE": ("Reliance Industries", "Reliance Industries Limited"),

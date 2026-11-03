@@ -10,7 +10,6 @@ import {
   Zap,
   Lock,
   Flame,
-  ArrowRight,
 } from "lucide-react";
 
 interface Step6Props {
@@ -37,51 +36,6 @@ export default function Step6RiskManagement({ draft, updateDraft, onNext, onPrev
 
   return (
     <div className="space-y-6 animate-fadeIn">
-      {/* Header Info Banner */}
-      <div className="rounded-2xl border border-slate-800/80 bg-gradient-to-r from-[#0B1528] via-[#09101F] to-[#0D182E] p-6 shadow-xl flex items-start gap-4">
-        <div className="h-12 w-12 rounded-xl bg-blue-600/10 border border-blue-500/30 flex items-center justify-center text-cyan-400 flex-shrink-0 shadow-sm">
-          <ShieldAlert className="h-6 w-6" />
-        </div>
-        <div>
-          <div className="flex items-center gap-3">
-            <h3 className="text-base sm:text-lg font-black text-white font-mono uppercase tracking-wide">
-              Step 6 — Multi-Layered Risk Management Engine
-            </h3>
-            <span className="text-xs font-mono font-bold px-2.5 py-1 rounded-full bg-cyan-500/10 text-cyan-300 border border-cyan-500/30">
-              DETERMINISTIC GUARDS
-            </span>
-          </div>
-          <p className="text-xs sm:text-sm text-slate-300 mt-1.5 leading-relaxed">
-            Every order intent evaluated by the strategy engine MUST pass strict risk gates, slippage limits, and portfolio circuit breakers before reaching the exchange.
-          </p>
-        </div>
-      </div>
-
-      {/* Risk Engine Pipeline Visualizer */}
-      <div className="rounded-2xl border border-slate-800/80 bg-[#0B1426]/90 p-5 shadow-lg backdrop-blur-md">
-        <div className="text-xs font-mono uppercase tracking-wider text-slate-300 mb-3 font-bold flex items-center gap-2">
-          <span className="h-2.5 w-2.5 rounded-full bg-cyan-400 animate-pulse" />
-          AUTHORITATIVE ORDER INTENT VALIDATION FLOW:
-        </div>
-        <div className="flex flex-wrap items-center justify-between gap-3 text-xs sm:text-sm font-mono">
-          <div className="px-4 py-2.5 rounded-xl bg-[#070D1A] border border-slate-800 text-slate-200 font-bold shadow-inner">
-            1. Strategy Signal
-          </div>
-          <ArrowRight className="h-5 w-5 text-cyan-400" />
-          <div className="px-4 py-2.5 rounded-xl bg-[#070D1A] border border-slate-800 text-slate-200 font-bold shadow-inner">
-            2. Fresh Market Quote
-          </div>
-          <ArrowRight className="h-5 w-5 text-cyan-400" />
-          <div className="px-4 py-2.5 rounded-xl bg-blue-600/20 border border-blue-500/50 text-cyan-300 font-bold shadow-md shadow-blue-950/40">
-            3. Risk Engine Validation
-          </div>
-          <ArrowRight className="h-5 w-5 text-cyan-400" />
-          <div className="px-4 py-2.5 rounded-xl bg-emerald-950/50 border border-emerald-500/40 text-emerald-300 font-bold shadow-inner">
-            4. Broker Order Route
-          </div>
-        </div>
-      </div>
-
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {/* Card 1: Stop Loss & Protection */}
         <div className="rounded-2xl border border-slate-800/80 bg-gradient-to-b from-[#0D182E] to-[#080E1B] p-6 shadow-xl space-y-4">

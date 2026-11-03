@@ -39,7 +39,7 @@ async function handleProxy(req: NextRequest, ctx: { params?: { path: string[] } 
         pathSegments = resolved.path;
       }
     }
-  } catch {}
+  } catch { }
 
   if (pathSegments.length === 0) {
     const urlObj = new URL(req.url);
@@ -319,16 +319,16 @@ async function handleProxy(req: NextRequest, ctx: { params?: { path: string[] } 
   const timeoutMs = isStream
     ? 5000
     : (isStatus || isIndicator)
-    ? 4000
-    : isAuth
-    ? (isProductionEnv ? 24000 : 15000)
-    : isProductionEnv
-    ? 20000
-    : isUniverse
-    ? 25000
-    : isHeavy
-    ? 25000
-    : 15000;
+      ? 4000
+      : isAuth
+        ? (isProductionEnv ? 24000 : 15000)
+        : isProductionEnv
+          ? 20000
+          : isUniverse
+            ? 25000
+            : isHeavy
+              ? 25000
+              : 15000;
 
   let bodyData: BodyInit | null = null;
   if (["POST", "PUT", "PATCH", "DELETE"].includes(req.method)) {
@@ -354,7 +354,7 @@ async function handleProxy(req: NextRequest, ctx: { params?: { path: string[] } 
       clearTimeout(timeoutTimer);
       try {
         controller.abort();
-      } catch {}
+      } catch { }
     });
   }
 
@@ -523,8 +523,8 @@ async function handleProxy(req: NextRequest, ctx: { params?: { path: string[] } 
   const errorCode = isTimeout ? "GATEWAY_TIMEOUT" : "BACKEND_UNAVAILABLE";
   const errorMessage = isTimeout
     ? (isAuth
-        ? `Authentication request timed out. If you received a verification code in your email, you may enter it to log in.`
-        : `Request timed out while waiting for backend response. Please retry.`)
+      ? `Authentication request timed out. If you received a verification code in your email, you may enter it to log in.`
+      : `Request timed out while waiting for backend response. Please retry.`)
     : `Quant.OS Engine backend is unreachable at ${BACKEND_URL}. System is initializing or reconnecting.`;
 
   if (isStream) {

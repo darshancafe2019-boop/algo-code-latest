@@ -378,6 +378,15 @@ DB_BACKUP_INTERVAL_HOURS = int(os.getenv("DB_BACKUP_INTERVAL_HOURS", "24"))
 DB_INTEGRITY_CHECK_ENABLED = os.getenv("DB_INTEGRITY_CHECK_ENABLED", "true").lower() == "true"
 
 # ==========================================
+# SUPABASE AUTHENTICATION
+# ==========================================
+SUPABASE_URL = os.getenv("SUPABASE_URL", "").strip()
+SUPABASE_JWKS_URL = os.getenv("SUPABASE_JWKS_URL", "").strip()
+SUPABASE_JWT_ISSUER = os.getenv("SUPABASE_JWT_ISSUER", "").strip()
+SUPABASE_JWT_AUDIENCE = os.getenv("SUPABASE_JWT_AUDIENCE", "authenticated").strip()
+SUPABASE_JWT_SECRET = os.getenv("SUPABASE_JWT_SECRET", "").strip()
+
+# ==========================================
 # DEBUG
 # ==========================================
 PRINT_INDICATORS = os.getenv("PRINT_INDICATORS", "true").lower() == "true"

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import {
   Search,
   LayoutGrid,
@@ -8,27 +8,20 @@ import {
   CheckSquare,
   Square,
   RotateCcw,
-  SlidersHorizontal,
-  Filter,
-  ChevronDown,
-  ChevronUp,
+  RefreshCw,
+  PlusCircle,
   X,
+  Filter,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export interface AdvancedBotFilters {
-  exchange: string;
-  strategy: string;
-  assetType: string;
-  tradingMode: string;
-  riskStatus: string;
-}
-
-interface FleetFilterBarProps {
+export interface FleetFilterBarProps {
   statusFilter: string;
   onStatusChange: (status: string) => void;
   currencyFilter: "ALL" | "INR" | "USD";
   onCurrencyChange: (c: "ALL" | "INR" | "USD") => void;
+  exchangeFilter: string;
+  onExchangeChange: (exchange: string) => void;
   searchQuery: string;
   onSearchChange: (q: string) => void;
   viewMode: "table" | "grid";
@@ -39,8 +32,9 @@ interface FleetFilterBarProps {
   onToggleSelectAll: () => void;
   onClearFilters: () => void;
   statusCounts: Record<string, number>;
-  advancedFilters: AdvancedBotFilters;
-  onAdvancedFilterChange: (filters: AdvancedBotFilters) => void;
+  onCreateBot: () => void;
+  onRefresh: () => void;
+  loading: boolean;
 }
 
 export function FleetFilterBar({
@@ -48,6 +42,8 @@ export function FleetFilterBar({
   onStatusChange,
   currencyFilter,
   onCurrencyChange,
+  exchangeFilter,
+  onExchangeChange,
   searchQuery,
   onSearchChange,
   viewMode,
@@ -58,268 +54,217 @@ export function FleetFilterBar({
   onToggleSelectAll,
   onClearFilters,
   statusCounts,
-  advancedFilters,
-  onAdvancedFilterChange,
+  onCreateBot,
+  onRefresh,
+  loading,
 }: FleetFilterBarProps) {
-  const [showAdvanced, setShowAdvanced] = useState(false);
   const isAllSelected = selectedCount > 0 && selectedCount === totalFiltered;
+  const isFiltered =
+    statusFilter !== "ALL" ||
+    currencyFilter !== "ALL" ||
+    exchangeFilter !== "ALL" ||
+    searchQuery.trim().length > 0;
 
-  const hasActiveAdvanced =
-    advancedFilters.exchange !== "ALL" ||
-    advancedFilters.strategy !== "ALL" ||
-    advancedFilters.assetType !== "ALL" ||
-    advancedFilters.tradingMode !== "ALL" ||
-    advancedFilters.riskStatus !== "ALL";
+  const STATUS_CONFIG: Array<{ key: string; label: string; activeColor: string }> = [
+    { key: "ALL", label: "ALL", activeColor: "bg-[#0878FF]/20 text-[#00C9E8] border-[#0878FF]/50" },
+    { key: "RUNNING", label: "RUNNING", activeColor: "bg-[#00D6A0]/15 text-[#00D6A0] border-[#00D6A0]/40" },
+    { key: "READY", label: "READY", activeColor: "bg-[#0878FF]/20 text-[#0878FF] border-[#0878FF]/40" },
+    { key: "PAUSED", label: "PAUSED", activeColor: "bg-[#FFB020]/15 text-[#FFB020] border-[#FFB020]/40" },
+    { key: "STOPPED", label: "STOPPED", activeColor: "bg-[#91A7C1]/20 text-[#EAF3FF] border-[#91A7C1]/40" },
+    { key: "ERROR", label: "ERROR", activeColor: "bg-[#FF5268]/20 text-[#FF5268] border-[#FF5268]/50" },
+  ];
 
   return (
-    <div className="rounded-[8px] bg-[#091426] border border-[#1A2B43] p-2.5 flex flex-col gap-2 select-none font-sans">
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-2.5">
-        {/* Left: Currency & Status Filter Pills */}
-        <div className="flex items-center gap-2 flex-wrap">
-          {/* Currency Filter */}
-          <div className="flex items-center gap-0.5 bg-[#050B16] p-0.5 rounded border border-[#1A2B43]">
+    <div className="rounded-[8px] bg-[#091426] border border-[#1A2B43] p-3 flex flex-col gap-3 select-none font-sans shadow-md">
+      {/* ── ROW 1: PRIMARY TOOLBAR ───────────────────────────────────────── */}
+      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3">
+        {/* Left Section: Search & Dropdowns */}
+        <div className="flex items-center gap-2.5 flex-wrap flex-1 min-w-0">
+          {/* Unified Search Input */}
+          <div className="relative min-w-[260px] flex-1 sm:max-w-md">
+            <Search className="h-4 w-4 text-[#91A7C1] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => onSearchChange(e.target.value)}
+              placeholder="Search bot name, symbol, strategy..."
+              className="w-full pl-9 pr-8 py-2 text-xs font-mono rounded-[6px] bg-[#050B16] border border-[#1A2B43] text-[#EAF3FF] placeholder-[#91A7C1]/60 focus:outline-none focus:border-[#00C9E8] transition-colors"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => onSearchChange("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#91A7C1] hover:text-[#EAF3FF] p-0.5"
+                title="Clear search"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+
+          {/* Exchange Filter Dropdown */}
+          <div className="flex items-center gap-1.5 bg-[#050B16] border border-[#1A2B43] rounded-[6px] px-2.5 py-1.5">
+            <span className="text-[10px] font-mono uppercase text-[#91A7C1] font-bold">Exchange:</span>
+            <select
+              value={exchangeFilter}
+              onChange={(e) => onExchangeChange(e.target.value)}
+              className="bg-transparent text-xs font-mono font-bold text-[#EAF3FF] focus:outline-none cursor-pointer"
+            >
+              <option value="ALL" className="bg-[#091426] text-white">ALL EXCHANGES</option>
+              <option value="NSE" className="bg-[#091426] text-white">NSE (India)</option>
+              <option value="DELTA" className="bg-[#091426] text-white">DELTA (Crypto)</option>
+              <option value="BINANCE" className="bg-[#091426] text-white">BINANCE (USD-M)</option>
+              <option value="MCX" className="bg-[#091426] text-white">MCX (Commodity)</option>
+              <option value="UPSTOX" className="bg-[#091426] text-white">UPSTOX</option>
+            </select>
+          </div>
+
+          {/* Currency Filter Dropdown/Pills */}
+          <div className="flex items-center gap-1 bg-[#050B16] p-1 rounded-[6px] border border-[#1A2B43]">
+            <span className="text-[10px] font-mono uppercase text-[#91A7C1] font-bold px-1.5">Currency:</span>
             {(["ALL", "INR", "USD"] as const).map((curr) => (
               <button
                 key={curr}
                 type="button"
                 onClick={() => onCurrencyChange(curr)}
                 className={cn(
-                  "px-2 py-0.5 rounded text-[10px] font-mono font-bold transition-colors",
+                  "px-2 py-0.5 rounded text-[11px] font-mono font-bold transition-colors cursor-pointer",
                   currencyFilter === curr
-                    ? "bg-[#0878FF] text-white"
+                    ? "bg-[#0878FF] text-white shadow-sm"
                     : "text-[#91A7C1] hover:text-[#EAF3FF]"
                 )}
               >
-                {curr === "ALL" ? "All Currencies" : curr === "INR" ? "INR (₹)" : "USD ($)"}
+                {curr === "ALL" ? "ALL" : curr === "INR" ? "₹ INR" : "$ USD"}
               </button>
             ))}
           </div>
 
-          {/* Status Filter Buttons */}
-          <div className="flex items-center gap-1 overflow-x-auto scrollbar-none">
-            {["ALL", "RUNNING", "READY", "PAUSED", "STOPPED", "ERROR"].map((status) => {
-              const count = statusCounts[status] || 0;
-              const active = statusFilter === status;
-              return (
-                <button
-                  key={status}
-                  type="button"
-                  onClick={() => onStatusChange(status)}
-                  className={cn(
-                    "flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-mono font-bold transition-colors border",
-                    active
-                      ? "bg-[#0878FF]/20 text-[#00C9E8] border-[#0878FF]/50"
-                      : "bg-[#050B16] text-[#91A7C1] border-[#1A2B43] hover:text-[#EAF3FF] hover:border-[#1A2B43]"
-                  )}
-                >
-                  <span>{status}</span>
-                  <span
-                    className={cn(
-                      "px-1 py-0.1 rounded-full text-[9px] font-mono font-bold",
-                      active ? "bg-[#0878FF] text-white" : "bg-[#0B1728] text-[#91A7C1]"
-                    )}
-                  >
-                    {count}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
+          {/* Reset Filters button if any filter active */}
+          {isFiltered && (
+            <button
+              type="button"
+              onClick={onClearFilters}
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-[6px] bg-[#050B16] border border-[#1A2B43] text-xs font-mono font-bold text-[#91A7C1] hover:text-[#FF5268] hover:border-[#FF5268]/40 transition-colors cursor-pointer"
+              title="Reset all search & filters"
+            >
+              <RotateCcw className="h-3 w-3" />
+              <span>Reset</span>
+            </button>
+          )}
         </div>
 
-        {/* Right: Search, Advanced Filters, View Modes & Multi-Select */}
-        <div className="flex items-center gap-2 flex-wrap justify-between lg:justify-end">
-          {/* Search Box */}
-          <div className="relative min-w-[200px] flex-1 sm:flex-initial">
-            <Search className="h-3.5 w-3.5 text-[#91A7C1] absolute left-2.5 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => onSearchChange(e.target.value)}
-              placeholder="Search bot, symbol, strategy..."
-              className="w-full pl-8 pr-7 py-1 text-[11px] font-mono rounded bg-[#050B16] border border-[#1A2B43] text-[#EAF3FF] placeholder-[#91A7C1]/60 focus:outline-none focus:border-[#00C9E8] transition-colors"
-            />
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={() => onSearchChange("")}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-[#91A7C1] hover:text-[#EAF3FF]"
-              >
-                <X className="h-3 w-3" />
-              </button>
-            )}
-          </div>
-
-          {/* Toggle Advanced Filters */}
+        {/* Right Section: Action Buttons */}
+        <div className="flex items-center gap-2 shrink-0">
+          {/* Refresh Data Button */}
           <button
             type="button"
-            onClick={() => setShowAdvanced(!showAdvanced)}
-            className={cn(
-              "flex items-center gap-1.5 px-2.5 py-1 rounded border text-[10px] font-mono font-bold transition-colors cursor-pointer",
-              showAdvanced || hasActiveAdvanced
-                ? "bg-[#00C9E8]/15 border-[#00C9E8]/40 text-[#00C9E8]"
-                : "bg-[#050B16] border-[#1A2B43] text-[#91A7C1] hover:text-[#EAF3FF]"
-            )}
+            onClick={onRefresh}
+            disabled={loading}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-[6px] bg-[#050B16] border border-[#1A2B43] hover:border-[#0878FF]/50 text-xs font-mono font-semibold text-[#91A7C1] hover:text-[#EAF3FF] transition-all cursor-pointer disabled:opacity-50"
+            title="Refresh fleet telemetry & status"
           >
-            <SlidersHorizontal className="h-3 w-3" />
-            <span>Filters</span>
-            {hasActiveAdvanced && <span className="h-1.5 w-1.5 rounded-full bg-[#00C9E8]" />}
-            {showAdvanced ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+            <RefreshCw className={cn("h-3.5 w-3.5", loading ? "animate-spin text-[#00C9E8]" : "text-[#91A7C1]")} />
+            <span className="hidden sm:inline">Refresh Data</span>
           </button>
 
-          {/* Select All Toggle */}
-          <button
-            type="button"
-            onClick={onToggleSelectAll}
-            className={cn(
-              "flex items-center gap-1 px-2 py-1 rounded border text-[10px] font-mono font-bold transition-colors cursor-pointer",
-              isAllSelected
-                ? "bg-[#0878FF]/20 border-[#0878FF]/50 text-[#00C9E8]"
-                : "bg-[#050B16] border-[#1A2B43] text-[#91A7C1] hover:text-[#EAF3FF]"
-            )}
-            title="Select all matching units"
-          >
-            {isAllSelected ? (
-              <CheckSquare className="h-3 w-3 text-[#00C9E8]" />
-            ) : (
-              <Square className="h-3 w-3 text-[#91A7C1]" />
-            )}
-            <span>All ({totalFiltered})</span>
-          </button>
-
-          {/* View Mode Toggle */}
-          <div className="flex items-center bg-[#050B16] p-0.5 rounded border border-[#1A2B43]">
+          {/* View Mode Toggle (Table / Grid) */}
+          <div className="flex items-center bg-[#050B16] p-0.5 rounded-[6px] border border-[#1A2B43]">
             <button
               type="button"
               onClick={() => onViewModeChange("table")}
               className={cn(
-                "p-1 rounded transition-colors",
-                viewMode === "table" ? "bg-[#0878FF] text-white" : "text-[#91A7C1] hover:text-[#EAF3FF]"
+                "p-1.5 rounded transition-colors cursor-pointer",
+                viewMode === "table" ? "bg-[#0878FF] text-white shadow-sm" : "text-[#91A7C1] hover:text-[#EAF3FF]"
               )}
-              title="List / Table View"
+              title="Table View"
             >
-              <List className="h-3.5 w-3.5" />
+              <List className="h-4 w-4" />
             </button>
             <button
               type="button"
               onClick={() => onViewModeChange("grid")}
               className={cn(
-                "p-1 rounded transition-colors",
-                viewMode === "grid" ? "bg-[#0878FF] text-white" : "text-[#91A7C1] hover:text-[#EAF3FF]"
+                "p-1.5 rounded transition-colors cursor-pointer",
+                viewMode === "grid" ? "bg-[#0878FF] text-white shadow-sm" : "text-[#91A7C1] hover:text-[#EAF3FF]"
               )}
               title="Grid View"
             >
-              <LayoutGrid className="h-3.5 w-3.5" />
+              <LayoutGrid className="h-4 w-4" />
             </button>
           </div>
 
-          {/* Reset Filters */}
-          {(statusFilter !== "ALL" || currencyFilter !== "ALL" || searchQuery || hasActiveAdvanced) && (
-            <button
-              type="button"
-              onClick={onClearFilters}
-              className="p-1 rounded bg-[#050B16] border border-[#1A2B43] text-[#91A7C1] hover:text-[#FF5268] hover:border-[#FF5268]/40 transition-colors"
-              title="Reset all filters"
-            >
-              <RotateCcw className="h-3.5 w-3.5" />
-            </button>
-          )}
+          {/* Create Bot Button */}
+          <button
+            type="button"
+            onClick={onCreateBot}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-[6px] bg-[#00C9E8] hover:bg-[#00B4D0] text-[#050B16] font-mono font-bold text-xs transition-all shadow-md cursor-pointer hover:shadow-[#00C9E8]/20"
+          >
+            <PlusCircle className="h-4 w-4" />
+            <span>Create Bot</span>
+          </button>
         </div>
       </div>
 
-      {/* Advanced Filters Drawer */}
-      {showAdvanced && (
-        <div className="pt-2 mt-1 border-t border-[#1A2B43]/80 grid grid-cols-2 sm:grid-cols-5 gap-2 text-[10px] font-mono">
-          {/* Exchange Filter */}
-          <div>
-            <label className="text-[#91A7C1] block mb-0.5 font-semibold">Exchange</label>
-            <select
-              value={advancedFilters.exchange}
-              onChange={(e) =>
-                onAdvancedFilterChange({ ...advancedFilters, exchange: e.target.value })
-              }
-              className="w-full bg-[#050B16] border border-[#1A2B43] rounded px-2 py-1 text-[#EAF3FF] focus:outline-none focus:border-[#00C9E8]"
-            >
-              <option value="ALL">All Exchanges</option>
-              <option value="NSE">NSE (India)</option>
-              <option value="DELTA">Delta Exchange</option>
-              <option value="BINANCE">Binance USD-M</option>
-              <option value="MCX">MCX Commodity</option>
-              <option value="UPSTOX">Upstox</option>
-            </select>
-          </div>
-
-          {/* Strategy Filter */}
-          <div>
-            <label className="text-[#91A7C1] block mb-0.5 font-semibold">Strategy Type</label>
-            <select
-              value={advancedFilters.strategy}
-              onChange={(e) =>
-                onAdvancedFilterChange({ ...advancedFilters, strategy: e.target.value })
-              }
-              className="w-full bg-[#050B16] border border-[#1A2B43] rounded px-2 py-1 text-[#EAF3FF] focus:outline-none focus:border-[#00C9E8]"
-            >
-              <option value="ALL">All Strategies</option>
-              <option value="TREND">Trend Following</option>
-              <option value="MOMENTUM">Momentum / Breakout</option>
-              <option value="MEAN_REVERSION">Mean Reversion</option>
-              <option value="STAT_ARB">Statistical Arbitrage</option>
-              <option value="GRID">Volatility Grid</option>
-            </select>
-          </div>
-
-          {/* Asset Type */}
-          <div>
-            <label className="text-[#91A7C1] block mb-0.5 font-semibold">Asset Category</label>
-            <select
-              value={advancedFilters.assetType}
-              onChange={(e) =>
-                onAdvancedFilterChange({ ...advancedFilters, assetType: e.target.value })
-              }
-              className="w-full bg-[#050B16] border border-[#1A2B43] rounded px-2 py-1 text-[#EAF3FF] focus:outline-none focus:border-[#00C9E8]"
-            >
-              <option value="ALL">All Asset Types</option>
-              <option value="OPTION">Options</option>
-              <option value="FUTURES">Futures</option>
-              <option value="PERPETUAL">Crypto Perpetuals</option>
-              <option value="EQUITY">Equities / Cash</option>
-            </select>
-          </div>
-
-          {/* Trading Mode */}
-          <div>
-            <label className="text-[#91A7C1] block mb-0.5 font-semibold">Execution Mode</label>
-            <select
-              value={advancedFilters.tradingMode}
-              onChange={(e) =>
-                onAdvancedFilterChange({ ...advancedFilters, tradingMode: e.target.value })
-              }
-              className="w-full bg-[#050B16] border border-[#1A2B43] rounded px-2 py-1 text-[#EAF3FF] focus:outline-none focus:border-[#00C9E8]"
-            >
-              <option value="ALL">All Modes</option>
-              <option value="PAPER">PAPER (Simulation)</option>
-              <option value="LIVE">LIVE (Execution)</option>
-            </select>
-          </div>
-
-          {/* Risk Status */}
-          <div>
-            <label className="text-[#91A7C1] block mb-0.5 font-semibold">Risk Gate Status</label>
-            <select
-              value={advancedFilters.riskStatus}
-              onChange={(e) =>
-                onAdvancedFilterChange({ ...advancedFilters, riskStatus: e.target.value })
-              }
-              className="w-full bg-[#050B16] border border-[#1A2B43] rounded px-2 py-1 text-[#EAF3FF] focus:outline-none focus:border-[#00C9E8]"
-            >
-              <option value="ALL">All Gates</option>
-              <option value="ARMED">Armed &amp; Safe</option>
-              <option value="WARNING">Exposure Warning</option>
-              <option value="BREACHED">Breached / Circuit Paused</option>
-            </select>
-          </div>
+      {/* ── ROW 2: STATUS FILTER PILLS & SELECTION COUNT ──────────────────── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2 border-t border-[#1A2B43]/60">
+        {/* Status Pills */}
+        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none py-0.5">
+          {STATUS_CONFIG.map(({ key, label, activeColor }) => {
+            const count = statusCounts[key] ?? 0;
+            const active = statusFilter === key;
+            return (
+              <button
+                key={key}
+                type="button"
+                onClick={() => onStatusChange(key)}
+                className={cn(
+                  "flex items-center gap-1.5 px-2.5 py-1 rounded-[6px] text-[11px] font-mono font-bold transition-all border cursor-pointer",
+                  active
+                    ? activeColor
+                    : "bg-[#050B16] text-[#91A7C1] border-[#1A2B43] hover:text-[#EAF3FF] hover:border-[#1A2B43]/80"
+                )}
+              >
+                <span>{label}</span>
+                <span
+                  className={cn(
+                    "px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold tabular-nums",
+                    active ? "bg-white/20 text-white" : "bg-[#0B1728] text-[#91A7C1]"
+                  )}
+                >
+                  {count}
+                </span>
+              </button>
+            );
+          })}
         </div>
-      )}
+
+        {/* Multi-Select Status & Counter */}
+        <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+          <button
+            type="button"
+            onClick={onToggleSelectAll}
+            className={cn(
+              "flex items-center gap-1.5 px-2.5 py-1 rounded-[6px] border text-xs font-mono font-bold transition-colors cursor-pointer",
+              isAllSelected
+                ? "bg-[#0878FF]/20 border-[#0878FF]/50 text-[#00C9E8]"
+                : "bg-[#050B16] border-[#1A2B43] text-[#91A7C1] hover:text-[#EAF3FF]"
+            )}
+            title="Select all currently visible bots"
+          >
+            {isAllSelected ? (
+              <CheckSquare className="h-3.5 w-3.5 text-[#00C9E8]" />
+            ) : (
+              <Square className="h-3.5 w-3.5 text-[#91A7C1]" />
+            )}
+            <span>Select All ({totalFiltered})</span>
+          </button>
+          {selectedCount > 0 && (
+            <span className="text-xs font-mono font-bold text-[#00C9E8] bg-[#0878FF]/15 px-2 py-0.5 rounded border border-[#0878FF]/30">
+              {selectedCount} Selected
+            </span>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

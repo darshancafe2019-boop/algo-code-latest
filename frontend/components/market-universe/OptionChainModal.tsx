@@ -4,8 +4,10 @@ import { formatNumber, formatMoney } from "@/lib/formatters";
 import React, { useState, useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { OptionChainData } from "@/types/market-universe";
-import { X, Layers, RefreshCw, ShieldAlert } from "lucide-react";
+import { X, Layers, RefreshCw, ShieldAlert, Bot } from "lucide-react";
 import { normalizeExpiriesList } from "@/lib/expiry-utils";
+import { useRouter } from "next/navigation";
+import { openBotCreator } from "@/lib/bot-creation-bridge";
 
 interface OptionChainModalProps {
   underlying: string;
@@ -51,6 +53,51 @@ export function OptionChainModal({ underlying, isOpen, onClose, onSelectContract
     return normalizeExpiriesList(rawExpiries, selectedUnderlying);
   }, [chain?.available_expiries, chain?.availableExpiries, selectedUnderlying]);
   const activeExpiry = selectedExpiry || chain?.selected_expiry || chain?.selectedExpiry || normalizedExpiries[0]?.value || "";
+
+  const router = useRouter();
+
+  const handleSelectOptionContract = (
+    optObj: any,
+    optionType: "CE" | "PE",
+    strikeNum: number,
+    ltp: number
+  ) => {
+    const sym = optObj?.canonical_symbol || optObj?.symbol || `${selectedUnderlying}-${activeExpiry}-${strikeNum}-${optionType}`;
+
+    // Call custom handler if provided
+    if (onSelectContract) {
+      onSelectContract(sym, optionType, strikeNum, ltp);
+    }
+
+    // Dismiss modal cleanly
+    onClose();
+
+    // Directly open Bot Creation page with pre-populated option parameters
+    openBotCreator(
+      {
+        symbol: sym,
+        canonicalSymbol: optObj?.canonical_symbol || sym,
+        underlying: selectedUnderlying,
+        strike: strikeNum,
+        optionType: optionType,
+        expiry: activeExpiry,
+        ltp: Number(ltp || 0),
+        currentPrice: Number(ltp || 0),
+        spotPrice: spotPrice,
+        delta: optObj?.delta != null ? Number(optObj.delta) : (optObj?.greeks?.delta != null ? Number(optObj.greeks.delta) : null),
+        iv: optObj?.implied_volatility != null ? Number(optObj.implied_volatility) : (optObj?.iv != null ? Number(optObj.iv) : null),
+        oi: optObj?.open_interest != null ? Number(optObj.open_interest) : (optObj?.oi != null ? Number(optObj.oi) : null),
+        side: "BUY",
+        assetClass: isCrypto ? "CRYPTO_OPTIONS" : "OPTIONS",
+        market: isCrypto ? "CRYPTO" : "INDIAN_EQUITIES",
+        exchange: isCrypto ? "DELTA" : "NSE",
+        broker: isCrypto ? "DELTA" : "UPSTOX",
+        origin: "OPTIONS",
+        sourcePage: "OptionChainModal",
+      },
+      router
+    );
+  };
 
   if (!isOpen) return null;
 
@@ -250,9 +297,25 @@ export function OptionChainModal({ underlying, isOpen, onClose, onSelectContract
                       <td className="py-2 px-2 text-right text-cyan-300 text-[10px]">
                         {callDelta != null ? Number(callDelta).toFixed(2) : "—"}
                       </td>
-                      {/* Call LTP */}
-                      <td className={`py-2 px-2 text-right font-bold ${isCallItm ? "text-emerald-300" : "text-white"}`}>
-                        {callLtp != null ? `${currencySymbol}${Number(callLtp).toFixed(2)}` : "—"}
+                      {/* Call LTP (Premium) */}
+                      <td
+                        onClick={() =>
+                          callObj &&
+                          handleSelectOptionContract(
+                            callObj,
+                            "CE",
+                            strikeNum,
+                            Number(callLtp || 0)
+                          )
+                        }
+                        className={`py-2 px-2 text-right font-bold transition-all cursor-pointer hover:bg-emerald-500/20 hover:scale-105 active:scale-95 group ${
+                          isCallItm ? "text-emerald-300" : "text-white"
+                        }`}
+                        title={callObj ? `Directly launch Bot Creation for ${selectedUnderlying} ${strikeNum} CE @ ${currencySymbol}${Number(callLtp || 0).toFixed(2)}` : undefined}
+                      >
+                        <span className="group-hover:underline">
+                          {callLtp != null ? `${currencySymbol}${Number(callLtp).toFixed(2)}` : "—"}
+                        </span>
                       </td>
                       {/* Call Chg% */}
                       <td className="py-2 px-2 text-right text-[10px]">
@@ -270,14 +333,15 @@ export function OptionChainModal({ underlying, isOpen, onClose, onSelectContract
                         {callObj && (
                           <button
                             onClick={() =>
-                              onSelectContract?.(
-                                callObj.canonical_symbol || callObj.symbol || `${selectedUnderlying}-${activeExpiry}-${strikeNum}-CE`,
+                              handleSelectOptionContract(
+                                callObj,
                                 "CE",
                                 strikeNum,
                                 Number(callLtp || 0)
                               )
                             }
-                            className="px-2 py-0.5 rounded bg-emerald-500/20 hover:bg-emerald-500/40 text-emerald-300 text-[10px] font-bold border border-emerald-500/30 transition-colors"
+                            className="px-2 py-0.5 rounded bg-emerald-500/20 hover:bg-emerald-500/40 text-emerald-300 text-[10px] font-bold border border-emerald-500/30 transition-colors cursor-pointer"
+                            title={`Directly launch Bot Creation for ${selectedUnderlying} ${strikeNum} CE`}
                           >
                             Buy CE
                           </button>
@@ -295,14 +359,15 @@ export function OptionChainModal({ underlying, isOpen, onClose, onSelectContract
                         {putObj && (
                           <button
                             onClick={() =>
-                              onSelectContract?.(
-                                putObj.canonical_symbol || putObj.symbol || `${selectedUnderlying}-${activeExpiry}-${strikeNum}-PE`,
+                              handleSelectOptionContract(
+                                putObj,
                                 "PE",
                                 strikeNum,
                                 Number(putLtp || 0)
                               )
                             }
-                            className="px-2 py-0.5 rounded bg-rose-500/20 hover:bg-rose-500/40 text-rose-300 text-[10px] font-bold border border-rose-500/30 transition-colors"
+                            className="px-2 py-0.5 rounded bg-rose-500/20 hover:bg-rose-500/40 text-rose-300 text-[10px] font-bold border border-rose-500/30 transition-colors cursor-pointer"
+                            title={`Directly launch Bot Creation for ${selectedUnderlying} ${strikeNum} PE`}
                           >
                             Buy PE
                           </button>
@@ -319,9 +384,25 @@ export function OptionChainModal({ underlying, isOpen, onClose, onSelectContract
                           "—"
                         )}
                       </td>
-                      {/* Put LTP */}
-                      <td className={`py-2 px-2 text-left font-bold ${isPutItm ? "text-rose-300" : "text-white"}`}>
-                        {putLtp != null ? `${currencySymbol}${Number(putLtp).toFixed(2)}` : "—"}
+                      {/* Put LTP (Premium) */}
+                      <td
+                        onClick={() =>
+                          putObj &&
+                          handleSelectOptionContract(
+                            putObj,
+                            "PE",
+                            strikeNum,
+                            Number(putLtp || 0)
+                          )
+                        }
+                        className={`py-2 px-2 text-left font-bold transition-all cursor-pointer hover:bg-rose-500/20 hover:scale-105 active:scale-95 group ${
+                          isPutItm ? "text-rose-300" : "text-white"
+                        }`}
+                        title={putObj ? `Directly launch Bot Creation for ${selectedUnderlying} ${strikeNum} PE @ ${currencySymbol}${Number(putLtp || 0).toFixed(2)}` : undefined}
+                      >
+                        <span className="group-hover:underline">
+                          {putLtp != null ? `${currencySymbol}${Number(putLtp).toFixed(2)}` : "—"}
+                        </span>
                       </td>
                       {/* Put Delta */}
                       <td className="py-2 px-2 text-left text-cyan-300 text-[10px]">
@@ -357,7 +438,7 @@ export function OptionChainModal({ underlying, isOpen, onClose, onSelectContract
         </div>
 
         {/* Footer info */}
-        <div className="p-3 bg-[#0D121C] border-t border-[#1A2A3F] flex items-center justify-between text-[11px] text-slate-400">
+        <div className="p-3 bg-[#0D121C] border-t border-[#1A2A3F] flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-400">
           <div className="flex items-center gap-3">
             <span className="flex items-center gap-1">
               <span className="h-2 w-2 rounded-full bg-emerald-400 inline-block" /> ITM Calls (Green Shading)
@@ -367,6 +448,9 @@ export function OptionChainModal({ underlying, isOpen, onClose, onSelectContract
             </span>
             <span className="flex items-center gap-1">
               <span className="h-2 w-2 rounded-full bg-cyan-400 inline-block" /> At-The-Money (ATM)
+            </span>
+            <span className="flex items-center gap-1.5 text-cyan-300 font-semibold bg-cyan-950/40 border border-cyan-500/30 px-2.5 py-0.5 rounded-full">
+              <Bot className="h-3 w-3 text-cyan-400" /> Click any Premium or Buy button to launch Bot Creation directly
             </span>
           </div>
           <span className="text-slate-500 font-mono">Realtime Greeks (Delta, IV, Theta, Vega) dynamically computed</span>

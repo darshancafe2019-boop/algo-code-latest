@@ -1066,7 +1066,7 @@ class BotDeploymentEngine:
             self._save_bot_to_db(bot_id)
             return {"status": "success", "bot": bot.to_dict()}
 
-    def stop_bot(self, bot_id: str) -> Dict[str, Any]:
+    def stop_bot(self, bot_id: str, db_save: bool = True) -> Dict[str, Any]:
         """Stops bot and releases capital reservation."""
         with self._lock:
             bot = self._bots.get(bot_id)
@@ -1105,7 +1105,8 @@ class BotDeploymentEngine:
             bot.state = BotLifecycleState.STOPPED
             bot.last_decision = "BOT_STOPPED"
             bot.updated_at = datetime.now(timezone.utc).isoformat()
-            self._save_bot_to_db(bot_id)
+            if db_save:
+                self._save_bot_to_db(bot_id)
             return {"status": "success", "bot": bot.to_dict()}
 
     def emergency_kill(self, bot_id: str) -> Dict[str, Any]:
@@ -1127,11 +1128,11 @@ class BotDeploymentEngine:
 
             return self.stop_bot(bot_id)
 
-    def delete_bot(self, bot_id: str) -> bool:
+    def delete_bot(self, bot_id: str, db_delete: bool = True) -> bool:
         """Permanently stops, releases reservations/subscriptions, and deletes bot & spec from memory and database."""
         with self._lock:
             try:
-                self.stop_bot(bot_id)
+                self.stop_bot(bot_id, db_save=False)
             except Exception as e:
                 logger.warning(f"Error stopping data_core bot {bot_id} during delete: {e}")
 
@@ -1142,11 +1143,12 @@ class BotDeploymentEngine:
             self._stream_preview.pop(bot_id, None)
 
             # Delete from SQLite tables
-            try:
-                db.safe_execute("DELETE FROM data_core_persisted_bots WHERE bot_id = ?", (bot_id,))
-                db.safe_execute("DELETE FROM bot_instances WHERE id = ?", (bot_id,))
-            except Exception as e:
-                logger.warning(f"Error deleting data_core bot {bot_id} from db: {e}")
+            if db_delete:
+                try:
+                    db.safe_execute("DELETE FROM data_core_persisted_bots WHERE bot_id = ?", (bot_id,))
+                    db.safe_execute("DELETE FROM bot_instances WHERE id = ?", (bot_id,))
+                except Exception as e:
+                    logger.warning(f"Error deleting data_core bot {bot_id} from db: {e}")
             return True
 
     def process_market_tick(

@@ -219,65 +219,6 @@ export default function Step7ReviewDeploy({ draft, updateDraft, onPrev, onSucces
         </div>
       )}
 
-      {/* Pre-Deployment Validation Panel */}
-      <div className="rounded-2xl border border-slate-800/80 bg-gradient-to-b from-[#0D182E] to-[#080E1B] p-6 shadow-xl space-y-4">
-        <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
-          <h4 className="text-sm sm:text-base font-mono font-bold uppercase tracking-wider text-white flex items-center gap-2">
-            <Radio className="h-4 w-4 text-cyan-400" />
-            Pre-Deployment Validation Status:
-          </h4>
-          {validationResult && (
-            <span
-              className={`text-xs sm:text-sm font-mono font-bold px-3.5 py-1.5 rounded-full border shadow-sm ${
-                isReady
-                  ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
-                  : "bg-rose-500/20 text-rose-300 border-rose-500/40"
-              }`}
-            >
-              {isReady ? "SYSTEM READY TO DEPLOY" : "CRITICAL VALIDATION BLOCKED"}
-            </span>
-          )}
-        </div>
-
-        {validating ? (
-          <div className="py-10 text-center text-xs sm:text-sm font-mono text-slate-300 flex items-center justify-center gap-2.5">
-            <Activity className="h-5 w-5 animate-spin text-cyan-400" />
-            Running cross-system validation checks...
-          </div>
-        ) : validationResult?.checks ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-            {validationResult.checks.map((chk: any, idx: number) => (
-              <div
-                key={idx}
-                className="p-3.5 rounded-xl bg-[#070D1A] border border-slate-800/80 flex items-center justify-between text-xs sm:text-sm font-mono shadow-inner"
-              >
-                <span className="text-slate-200 font-bold">{chk.name}</span>
-                <div className="flex items-center gap-2">
-                  <span
-                    className={`font-black ${
-                      chk.status === "PASS"
-                        ? "text-emerald-400"
-                        : chk.status === "FAIL"
-                        ? "text-rose-400"
-                        : "text-amber-400"
-                    }`}
-                  >
-                    {chk.status}
-                  </span>
-                  {chk.status === "PASS" ? (
-                    <CheckCircle2 className="h-4 w-4 text-emerald-400" />
-                  ) : chk.status === "FAIL" ? (
-                    <XCircle className="h-4 w-4 text-rose-400" />
-                  ) : (
-                    <AlertTriangle className="h-4 w-4 text-amber-400" />
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : null}
-      </div>
-
       {/* Target Execution Environment Selector */}
       <div className="rounded-2xl border border-slate-800/80 bg-[#0B1426]/90 p-5 shadow-lg backdrop-blur-md flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>

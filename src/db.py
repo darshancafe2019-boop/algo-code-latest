@@ -1345,6 +1345,12 @@ def init_db(force: bool = False) -> None:
                                 except Exception:
                                     pass
 
+                            # Ensure supabase_uid exists on users in PostgreSQL
+                            try:
+                                getattr(cur, "execute")("ALTER TABLE users ADD COLUMN IF NOT EXISTS supabase_uid VARCHAR(128) UNIQUE;")
+                            except Exception:
+                                pass
+
                             # Ensure critical composite indexes exist in PostgreSQL
                             pg_indexes = [
                                 'CREATE INDEX IF NOT EXISTS "idx_pg_user_sessions_lookup" ON "user_sessions"("token_hash", "is_revoked", "expires_at");',
@@ -1353,6 +1359,7 @@ def init_db(force: bool = False) -> None:
                                 'CREATE INDEX IF NOT EXISTS "idx_pg_system_health_ts" ON "system_health"("last_updated" DESC);',
                                 'CREATE INDEX IF NOT EXISTS "idx_pg_bot_config_versions" ON "bot_config_versions"("bot_id", "version" DESC);',
                                 'CREATE INDEX IF NOT EXISTS "idx_pg_bot_instances_slug" ON "bot_instances"("slug");',
+                                'CREATE INDEX IF NOT EXISTS "idx_users_supabase_uid" ON "users"("supabase_uid");',
                                 'CREATE INDEX IF NOT EXISTS "idx_pg_orders_bot_id" ON "orders"("bot_id");',
                                 'CREATE INDEX IF NOT EXISTS "idx_pg_orders_status" ON "orders"("status");',
                                 'CREATE INDEX IF NOT EXISTS "idx_pg_trades_bot_id" ON "trades"("bot_id");',
@@ -4164,6 +4171,16 @@ def init_db(force: bool = False) -> None:
                 # Safe migration for must_change_password column
                 try:
                     cursor.execute("ALTER TABLE users ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 0")
+                except Exception:
+                    pass
+
+                # Safe migration for supabase_uid column
+                try:
+                    cursor.execute("ALTER TABLE users ADD COLUMN supabase_uid TEXT")
+                except Exception:
+                    pass
+                try:
+                    cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_supabase_uid ON users(supabase_uid)")
                 except Exception:
                     pass
 
@@ -12550,6 +12567,25 @@ def set_user_2fa_settings(user_id: str, is_2fa_enabled: int, totp_secret_encrypt
     return safe_execute(
         "UPDATE users SET is_2fa_enabled = ?, totp_secret_encrypted = ?, recovery_codes_json = ?, updated_at = ? WHERE id = ?",
         (is_2fa_enabled, totp_secret_encrypted, recovery_codes_json, now_iso, user_id)
+    )
+
+
+def get_user_by_supabase_uid(supabase_uid: str) -> Optional[Dict[str, Any]]:
+    """Fetches user record mapped to a Supabase auth.users.id UUID."""
+    if not supabase_uid:
+        return None
+    rows = safe_query("SELECT * FROM users WHERE supabase_uid = ? AND is_active = 1 ORDER BY created_at ASC", (supabase_uid.strip(),))
+    return rows[0] if rows else None
+
+
+def link_user_supabase_uid(user_id: str, supabase_uid: str) -> bool:
+    """Binds an existing QUANT.OS user to their Supabase auth UUID."""
+    if not user_id or not supabase_uid:
+        return False
+    now_iso = datetime.now(timezone.utc).isoformat()
+    return safe_execute(
+        "UPDATE users SET supabase_uid = ?, updated_at = ? WHERE id = ?",
+        (supabase_uid.strip(), now_iso, user_id)
     )
 
 

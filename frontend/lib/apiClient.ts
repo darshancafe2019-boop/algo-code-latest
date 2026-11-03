@@ -335,7 +335,10 @@ class ResilientApiClient {
           "X-Request-Id": this.generateRequestId(),
         };
         try {
-          const storedToken = localStorage.getItem("quantos_session_token") || sessionStorage.getItem("quantos_session_token");
+          const storedToken =
+            localStorage.getItem("quantos_session_token") ||
+            sessionStorage.getItem("quantos_session_token") ||
+            localStorage.getItem("quantos_supabase_access_token");
           if (storedToken) {
             headers["Authorization"] = `Bearer ${storedToken}`;
           }
@@ -657,7 +660,10 @@ class ResilientApiClient {
 
     if (typeof window !== "undefined" && !headers["Authorization"]) {
       try {
-        const storedToken = localStorage.getItem("quantos_session_token") || sessionStorage.getItem("quantos_session_token");
+        const storedToken =
+          localStorage.getItem("quantos_session_token") ||
+          sessionStorage.getItem("quantos_session_token") ||
+          localStorage.getItem("quantos_supabase_access_token");
         if (storedToken) {
           headers["Authorization"] = `Bearer ${storedToken}`;
         }

@@ -22,6 +22,7 @@ from flask import request, jsonify
 
 from src import db
 from src.security_auth import SessionManager, StepUpAuthenticationService
+from src.supabase_auth import global_supabase_validator
 
 ROLE_HIERARCHY: Dict[str, int] = {
     "VIEWER": 0,
@@ -87,6 +88,12 @@ def get_current_user_and_session(allow_dev_fallback: bool = False) -> Tuple[Opti
     # 2. Check Cookie fallback (supports both production and legacy cookie names)
     if not token:
         token = request.cookies.get("algo_session_token", "") or request.cookies.get("quantos_session_token", "")
+
+    # 3. Check Supabase JWT if token has JWT format (3 dot-separated segments)
+    if token and len(token.split(".")) == 3:
+        sb_user, sb_session, sb_err = global_supabase_validator.authenticate_jwt(token)
+        if sb_user and sb_session:
+            return sb_user, sb_session
 
     session = SessionManager.validate_session(token) if token else None
     if not session:

@@ -756,3 +756,4 @@ export function CentralDataInfrastructureMonitor() {
     </div>
   );
 }
+

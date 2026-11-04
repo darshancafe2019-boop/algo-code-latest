@@ -13,6 +13,11 @@ import {
   RefreshCw,
   Plus,
   Trash2,
+  Power,
+  ToggleLeft,
+  ToggleRight,
+  ShieldCheck,
+  Check,
 } from "lucide-react";
 
 interface Step4Props {
@@ -27,9 +32,14 @@ export default function Step4OptionStrategies({ draft, updateDraft, onNext, onPr
   const [selectedStrategyId, setSelectedStrategyId] = useState<string>(
     draft.option_strategy?.strategy_id || ""
   );
+  const [cachedStrategy, setCachedStrategy] = useState<OptionStrategyConfig | null>(
+    draft.option_strategy || null
+  );
   const [loading, setLoading] = useState(false);
   const [calculatingPayoff, setCalculatingPayoff] = useState(false);
   const currencySymbol = draft.market_type.includes("INDIA") ? "₹" : "$";
+
+  const isStrategyEnabled = Boolean(draft.option_strategy && selectedStrategyId);
 
   useEffect(() => {
     const loadOptionStrategies = async () => {
@@ -117,6 +127,8 @@ export default function Step4OptionStrategies({ draft, updateDraft, onNext, onPr
         payoff_points: payoffRes.payoff_points || [],
       };
 
+      setCachedStrategy(optConfig);
+
       updateDraft({
         option_strategy: optConfig,
         bot_name: formatPositionBotName(draft.contract?.symbol || draft.underlying, strat.name),
@@ -128,9 +140,36 @@ export default function Step4OptionStrategies({ draft, updateDraft, onNext, onPr
     }
   };
 
-  const handleDisableStrategy = () => {
-    setSelectedStrategyId("");
-    updateDraft({ option_strategy: null });
+  const handleToggleOptionStrategy = () => {
+    if (isStrategyEnabled) {
+      // Turn OFF
+      if (draft.option_strategy) {
+        setCachedStrategy(draft.option_strategy);
+      }
+      setSelectedStrategyId("");
+      updateDraft({ option_strategy: null });
+    } else {
+      // Turn ON
+      if (cachedStrategy) {
+        setSelectedStrategyId(cachedStrategy.strategy_id);
+        updateDraft({
+          option_strategy: cachedStrategy,
+          bot_name: formatPositionBotName(draft.contract?.symbol || draft.underlying, cachedStrategy.strategy_name),
+        });
+      } else if (strategies.length > 0) {
+        handleSelectStrategy(strategies[0]);
+      }
+    }
+  };
+
+  const handleCardClick = (strat: any) => {
+    if (selectedStrategyId === strat.id && isStrategyEnabled) {
+      // Clicking the already selected strategy toggles it OFF
+      handleToggleOptionStrategy();
+    } else {
+      // Selecting strategy turns it ON
+      handleSelectStrategy(strat);
+    }
   };
 
   const optStrategy = draft.option_strategy;
@@ -158,14 +197,14 @@ export default function Step4OptionStrategies({ draft, updateDraft, onNext, onPr
 
   return (
     <div className="space-y-6 animate-fadeIn">
-      {/* Header Info Banner */}
-      <div className="rounded-2xl border border-slate-800/80 bg-gradient-to-r from-[#0B1528] via-[#09101F] to-[#0D182E] p-6 shadow-xl flex items-start justify-between gap-4">
+      {/* ── HEADER INFO BANNER WITH PERSISTENT ON / OFF TOGGLE ──────────────── */}
+      <div className="rounded-2xl border border-slate-800/80 bg-gradient-to-r from-[#0B1528] via-[#09101F] to-[#0D182E] p-6 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-5">
         <div className="flex items-start gap-4">
           <div className="h-12 w-12 rounded-xl bg-blue-600/10 border border-blue-500/30 flex items-center justify-center text-cyan-400 flex-shrink-0 shadow-sm">
             <Layers className="h-6 w-6" />
           </div>
           <div>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               <h3 className="text-base sm:text-lg font-black text-white font-mono uppercase tracking-wide">
                 Step 4 — Option Strategy & Payoff Architecture
               </h3>
@@ -179,23 +218,65 @@ export default function Step4OptionStrategies({ draft, updateDraft, onNext, onPr
           </div>
         </div>
 
-        {optStrategy && (
+        {/* ── INTERACTIVE ON / OFF TOGGLE SWITCH ─────────────────────────────── */}
+        <div className="flex items-center gap-3 bg-slate-950/90 border border-slate-800 p-2.5 rounded-2xl shadow-inner flex-shrink-0">
+          <div className="flex flex-col text-right">
+            <span className="text-[11px] font-mono font-bold text-slate-400 uppercase tracking-wider">
+              Option Strategy
+            </span>
+            <span className="text-[10px] font-mono text-slate-500">
+              {isStrategyEnabled ? "Multi-Leg Active" : "Direct Execution"}
+            </span>
+          </div>
+
           <button
             type="button"
-            onClick={handleDisableStrategy}
-            className="text-xs sm:text-sm font-mono font-bold text-slate-300 hover:text-rose-400 px-4 py-2.5 rounded-xl border border-slate-800 bg-slate-900/80 hover:bg-slate-800 transition-all cursor-pointer shadow-sm active:scale-95 whitespace-nowrap"
+            onClick={handleToggleOptionStrategy}
+            role="switch"
+            aria-checked={isStrategyEnabled}
+            className={`relative inline-flex h-8 w-16 flex-shrink-0 cursor-pointer rounded-full border-2 transition-all duration-200 ease-in-out focus:outline-none ${
+              isStrategyEnabled
+                ? "bg-cyan-600 border-cyan-400 shadow-md shadow-cyan-500/40"
+                : "bg-slate-800 border-slate-700 hover:border-slate-600"
+            }`}
           >
-            Disable Strategy Layer
+            <span
+              className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out mt-0.5 ${
+                isStrategyEnabled ? "translate-x-8" : "translate-x-1"
+              }`}
+            />
           </button>
-        )}
+
+          <span
+            className={`px-3 py-1 rounded-xl text-xs font-mono font-black border transition-all ${
+              isStrategyEnabled
+                ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/40 shadow-sm"
+                : "bg-slate-800/80 text-slate-400 border-slate-700"
+            }`}
+          >
+            {isStrategyEnabled ? "ON" : "OFF"}
+          </span>
+        </div>
       </div>
 
-      {/* Strategy Selector Carousel / Grid */}
-      <div className="space-y-3 bg-[#0B1426]/90 p-5 rounded-2xl border border-slate-800/80 shadow-lg">
-        <div className="flex items-center justify-between">
-          <h4 className="text-sm sm:text-base font-mono font-bold uppercase tracking-wider text-white">
-            21 Quantitative Option Strategies
-          </h4>
+      {/* ── STRATEGY SELECTOR CAROUSEL / GRID ──────────────────────────────── */}
+      <div className={`space-y-3 bg-[#0B1426]/90 p-5 rounded-2xl border transition-all shadow-lg ${
+        isStrategyEnabled ? "border-slate-800/80" : "border-slate-800/50 opacity-90"
+      }`}>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5">
+            <h4 className="text-sm sm:text-base font-mono font-bold uppercase tracking-wider text-white">
+              21 Quantitative Option Strategies
+            </h4>
+            <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border ${
+              isStrategyEnabled
+                ? "bg-cyan-500/10 text-cyan-300 border-cyan-500/30"
+                : "bg-slate-800 text-slate-400 border-slate-700"
+            }`}>
+              {isStrategyEnabled ? "CLICK TO SELECT OR TOGGLE" : "CLICK ANY STRATEGY TO TURN ON"}
+            </span>
+          </div>
+
           <span className="text-xs sm:text-sm font-mono text-slate-300">
             Base Contract: <strong className="text-emerald-400">{draft.contract?.symbol || "No contract chosen in Step 2"}</strong>
           </span>
@@ -203,19 +284,24 @@ export default function Step4OptionStrategies({ draft, updateDraft, onNext, onPr
 
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-2.5 max-h-56 overflow-y-auto pr-1 scrollbar-none">
           {strategies.map((strat) => {
-            const isSelected = selectedStrategyId === strat.id;
+            const isSelected = selectedStrategyId === strat.id && isStrategyEnabled;
             return (
               <button
                 key={strat.id}
                 type="button"
-                onClick={() => handleSelectStrategy(strat)}
-                className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer ${
+                onClick={() => handleCardClick(strat)}
+                className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer relative ${
                   isSelected
                     ? "border-cyan-500/60 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold shadow-md shadow-blue-600/30 ring-1 ring-cyan-400/40"
                     : "border-slate-800 bg-slate-900/60 text-slate-300 hover:border-slate-700 hover:text-white hover:bg-slate-900"
                 }`}
               >
-                <div className="text-xs sm:text-sm font-mono font-bold truncate">{strat.name}</div>
+                {isSelected && (
+                  <span className="absolute top-2 right-2 h-4 w-4 rounded-full bg-cyan-400 text-slate-950 flex items-center justify-center text-[10px] font-bold">
+                    <Check className="h-2.5 w-2.5" />
+                  </span>
+                )}
+                <div className="text-xs sm:text-sm font-mono font-bold truncate pr-3">{strat.name}</div>
                 <div className="text-xs font-mono text-cyan-300/90 mt-1 font-medium">{strat.market_view}</div>
               </button>
             );
@@ -223,8 +309,8 @@ export default function Step4OptionStrategies({ draft, updateDraft, onNext, onPr
         </div>
       </div>
 
-      {/* Active Strategy Detail & Live Payoff Chart */}
-      {optStrategy ? (
+      {/* ── ACTIVE STRATEGY DETAIL & LIVE PAYOFF CHART OR OFF NOTICE ────────── */}
+      {isStrategyEnabled && optStrategy ? (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           {/* Strategy Analytics & Legs */}
           <div className="lg:col-span-5 rounded-2xl border border-slate-800/80 bg-gradient-to-b from-[#0D182E] to-[#080E1B] p-6 shadow-xl space-y-4">
@@ -235,9 +321,18 @@ export default function Step4OptionStrategies({ draft, updateDraft, onNext, onPr
                   {optStrategy.market_view}
                 </span>
               </div>
-              <span className="text-sm sm:text-base font-mono font-black text-emerald-400">
-                {optStrategy.cost_type}: {currencySymbol}{optStrategy.net_cost != null && !isNaN(Number(optStrategy.net_cost)) ? Math.abs(Number(optStrategy.net_cost)).toFixed(2) : "0.00"}
-              </span>
+              <div className="text-right">
+                <span className="text-sm sm:text-base font-mono font-black text-emerald-400 block">
+                  {optStrategy.cost_type}: {currencySymbol}{optStrategy.net_cost != null && !isNaN(Number(optStrategy.net_cost)) ? Math.abs(Number(optStrategy.net_cost)).toFixed(2) : "0.00"}
+                </span>
+                <button
+                  type="button"
+                  onClick={handleToggleOptionStrategy}
+                  className="text-[11px] font-mono text-rose-400 hover:text-rose-300 mt-1 cursor-pointer font-bold underline"
+                >
+                  Turn OFF
+                </button>
+              </div>
             </div>
 
             {/* Metrics Matrix */}
@@ -314,10 +409,10 @@ export default function Step4OptionStrategies({ draft, updateDraft, onNext, onPr
             <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
               <h4 className="text-sm sm:text-base font-mono font-bold uppercase tracking-wider text-white flex items-center gap-2">
                 <BarChart2 className="h-5 w-5 text-cyan-400" />
-                Live Expiry Payoff Curve ($ P&L)
+                Live Expiry Payoff Curve ({currencySymbol} P&L)
               </h4>
               <span className="text-xs sm:text-sm font-mono text-slate-300">
-                Underlying Spot: <strong className="text-emerald-400">${spotPrice.toLocaleString()}</strong>
+                Underlying Spot: <strong className="text-emerald-400">{currencySymbol}{spotPrice.toLocaleString()}</strong>
               </span>
             </div>
 
@@ -376,7 +471,7 @@ export default function Step4OptionStrategies({ draft, updateDraft, onNext, onPr
                       fontWeight="bold"
                       textAnchor="middle"
                     >
-                      BE: ${be.toFixed(0)}
+                      BE: {currencySymbol}{be.toFixed(0)}
                     </text>
                   </g>
                 ))}
@@ -391,12 +486,36 @@ export default function Step4OptionStrategies({ draft, updateDraft, onNext, onPr
           </div>
         </div>
       ) : (
-        <div className="py-14 text-center text-sm sm:text-base font-mono text-slate-300 border border-dashed border-slate-800/80 rounded-2xl bg-[#070D1A]/50">
-          Option strategy layer is currently disabled. The bot will trade the base instrument selected in Step 2 directly.
+        <div className="py-12 px-6 text-center rounded-2xl border border-dashed border-slate-800 bg-[#070D1A]/70 shadow-lg space-y-4">
+          <div className="inline-flex p-3 rounded-2xl bg-slate-900 border border-slate-800 text-slate-400 shadow-inner">
+            <Layers className="h-6 w-6 text-cyan-500/60" />
+          </div>
+          <div>
+            <div className="flex items-center justify-center gap-2">
+              <h4 className="text-base font-mono font-bold text-white uppercase tracking-wide">
+                Option Strategy Multi-Leg Layer is Turned OFF
+              </h4>
+              <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-800 text-slate-400 border border-slate-700">
+                OFF / DIRECT
+              </span>
+            </div>
+            <p className="text-xs font-mono text-slate-400 mt-1 max-w-xl mx-auto leading-relaxed">
+              The bot will trade the base instrument selected in Step 2 directly (Single Leg / Spot / Futures / Single Option) without multi-leg structuring or spread combinations.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleToggleOptionStrategy}
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-600 via-blue-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white font-mono font-bold text-xs shadow-lg shadow-cyan-600/30 transition-all cursor-pointer active:scale-95"
+          >
+            <Power className="h-3.5 w-3.5" />
+            <span>Turn Option Strategy ON</span>
+          </button>
         </div>
       )}
 
-      {/* Navigation Footer */}
+      {/* ── NAVIGATION FOOTER ──────────────────────────────────────────────── */}
       <div className="flex items-center justify-between pt-5 border-t border-slate-800/80">
         <button
           type="button"

@@ -12,6 +12,8 @@ import {
   Sparkles,
   Search,
   Filter,
+  Power,
+  Check,
 } from "lucide-react";
 
 interface Step5Props {
@@ -27,6 +29,9 @@ export default function Step5TradingStrategy({ draft, updateDraft, onNext, onPre
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("ALL");
   const [activeStrategy, setActiveStrategy] = useState<any | null>(null);
+  const [cachedStrategy, setCachedStrategy] = useState<any | null>(null);
+
+  const isStrategyEnabled = Boolean(draft.trading_strategy && activeStrategy);
 
   useEffect(() => {
     const loadStrategies = async () => {
@@ -37,7 +42,10 @@ export default function Step5TradingStrategy({ draft, updateDraft, onNext, onPre
 
         if (draft.trading_strategy) {
           const match = list.find((s: any) => s.id === draft.trading_strategy?.strategy_id);
-          if (match) setActiveStrategy(match);
+          if (match) {
+            setActiveStrategy(match);
+            setCachedStrategy(match);
+          }
         } else if (list && list.length > 0) {
           selectStrategy(list[0]);
         }
@@ -52,6 +60,7 @@ export default function Step5TradingStrategy({ draft, updateDraft, onNext, onPre
 
   const selectStrategy = (strat: any) => {
     setActiveStrategy(strat);
+    setCachedStrategy(strat);
 
     // Check compatibility with selected market and broker
     let compatible = true;
@@ -89,6 +98,34 @@ export default function Step5TradingStrategy({ draft, updateDraft, onNext, onPre
     updateDraft({ trading_strategy: stratConfig });
   };
 
+  const handleToggleStrategy = () => {
+    if (isStrategyEnabled) {
+      // Turn OFF
+      if (activeStrategy) {
+        setCachedStrategy(activeStrategy);
+      }
+      setActiveStrategy(null);
+      updateDraft({ trading_strategy: null });
+    } else {
+      // Turn ON
+      if (cachedStrategy) {
+        selectStrategy(cachedStrategy);
+      } else if (strategies.length > 0) {
+        selectStrategy(strategies[0]);
+      }
+    }
+  };
+
+  const handleCardClick = (strat: any) => {
+    if (activeStrategy?.id === strat.id && isStrategyEnabled) {
+      // Clicking the already active strategy card toggles it OFF
+      handleToggleStrategy();
+    } else {
+      // Selecting strategy card turns it ON and selects it
+      selectStrategy(strat);
+    }
+  };
+
   const categories = ["ALL", "TREND", "MOMENTUM", "BREAKOUT", "MEAN_REVERSION", "VOLUME", "REGIME"];
 
   const filteredStrategies = strategies.filter((s) => {
@@ -105,23 +142,65 @@ export default function Step5TradingStrategy({ draft, updateDraft, onNext, onPre
 
   return (
     <div className="space-y-6 animate-fadeIn">
-      {/* Header Info Banner */}
-      <div className="rounded-2xl border border-slate-800/80 bg-gradient-to-r from-[#0B1528] via-[#09101F] to-[#0D182E] p-6 shadow-xl flex items-start gap-4">
-        <div className="h-12 w-12 rounded-xl bg-blue-600/10 border border-blue-500/30 flex items-center justify-center text-cyan-400 flex-shrink-0 shadow-sm">
-          <Cpu className="h-6 w-6" />
+      {/* Header Info Banner with Persistent ON / OFF Toggle */}
+      <div className="rounded-2xl border border-slate-800/80 bg-gradient-to-r from-[#0B1528] via-[#09101F] to-[#0D182E] p-6 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-5">
+        <div className="flex items-start gap-4">
+          <div className="h-12 w-12 rounded-xl bg-blue-600/10 border border-blue-500/30 flex items-center justify-center text-cyan-400 flex-shrink-0 shadow-sm">
+            <Cpu className="h-6 w-6" />
+          </div>
+          <div>
+            <div className="flex flex-wrap items-center gap-3">
+              <h3 className="text-base sm:text-lg font-black text-white font-mono uppercase tracking-wide">
+                Step 5 — Trading Strategy Engine
+              </h3>
+              <span className="text-xs font-mono font-bold px-2.5 py-1 rounded-full bg-cyan-500/10 text-cyan-300 border border-cyan-500/30">
+                30 QUANT ALGORITHMS
+              </span>
+            </div>
+            <p className="text-xs sm:text-sm text-slate-300 mt-1.5 leading-relaxed">
+              Select the high-level quantitative trading engine. The system automatically verifies market feed compatibility against {draft.broker} capabilities.
+            </p>
+          </div>
         </div>
-        <div>
-          <div className="flex items-center gap-3">
-            <h3 className="text-base sm:text-lg font-black text-white font-mono uppercase tracking-wide">
-              Step 5 — Trading Strategy Engine
-            </h3>
-            <span className="text-xs font-mono font-bold px-2.5 py-1 rounded-full bg-cyan-500/10 text-cyan-300 border border-cyan-500/30">
-              30 QUANT ALGORITHMS
+
+        {/* ── INTERACTIVE ON / OFF TOGGLE SWITCH ─────────────────────────────── */}
+        <div className="flex items-center gap-3 bg-slate-950/90 border border-slate-800 p-2.5 rounded-2xl shadow-inner flex-shrink-0">
+          <div className="flex flex-col text-right">
+            <span className="text-[11px] font-mono font-bold text-slate-400 uppercase tracking-wider">
+              Strategy Engine
+            </span>
+            <span className="text-[10px] font-mono text-slate-500">
+              {isStrategyEnabled ? "Quant Model Active" : "Bypassed / Direct"}
             </span>
           </div>
-          <p className="text-xs sm:text-sm text-slate-300 mt-1.5 leading-relaxed">
-            Select the high-level quantitative trading engine. The system automatically verifies market feed compatibility against {draft.broker} capabilities.
-          </p>
+
+          <button
+            type="button"
+            onClick={handleToggleStrategy}
+            role="switch"
+            aria-checked={isStrategyEnabled}
+            className={`relative inline-flex h-8 w-16 flex-shrink-0 cursor-pointer rounded-full border-2 transition-all duration-200 ease-in-out focus:outline-none ${
+              isStrategyEnabled
+                ? "bg-cyan-600 border-cyan-400 shadow-md shadow-cyan-500/40"
+                : "bg-slate-800 border-slate-700 hover:border-slate-600"
+            }`}
+          >
+            <span
+              className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out mt-0.5 ${
+                isStrategyEnabled ? "translate-x-8" : "translate-x-1"
+              }`}
+            />
+          </button>
+
+          <span
+            className={`px-3 py-1 rounded-xl text-xs font-mono font-black border transition-all ${
+              isStrategyEnabled
+                ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/40 shadow-sm"
+                : "bg-slate-800/80 text-slate-400 border-slate-700"
+            }`}
+          >
+            {isStrategyEnabled ? "ON" : "OFF"}
+          </span>
         </div>
       </div>
 
@@ -158,23 +237,37 @@ export default function Step5TradingStrategy({ draft, updateDraft, onNext, onPre
 
           <div className="space-y-2.5 max-h-[480px] overflow-y-auto pr-1 scrollbar-none">
             {filteredStrategies.map((strat) => {
-              const isSelected = activeStrategy?.id === strat.id;
+              const isSelected = isStrategyEnabled && activeStrategy?.id === strat.id;
               return (
                 <button
                   key={strat.id}
                   type="button"
-                  onClick={() => selectStrategy(strat)}
+                  onClick={() => handleCardClick(strat)}
                   className={`w-full p-4 rounded-xl border text-left transition-all cursor-pointer ${
                     isSelected
                       ? "border-cyan-500/60 bg-gradient-to-r from-blue-600/20 via-indigo-600/10 to-transparent text-white ring-1 ring-cyan-400/40 shadow-lg shadow-blue-950/40"
-                      : "border-slate-800/80 bg-[#070D1A] text-slate-300 hover:border-slate-700 hover:text-white"
+                      : isStrategyEnabled
+                      ? "border-slate-800/80 bg-[#070D1A] text-slate-300 hover:border-slate-700 hover:text-white"
+                      : "border-slate-800/50 bg-[#070D1A]/60 text-slate-400 hover:border-cyan-500/40 hover:text-white"
                   }`}
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs sm:text-sm font-mono font-bold text-white">{strat.name}</span>
-                    <span className="text-xs font-mono px-2.5 py-0.5 rounded-full bg-slate-900 border border-slate-800 text-cyan-300 font-bold">
-                      {strat.category}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      {isSelected && (
+                        <span className="h-2 w-2 rounded-full bg-cyan-400 animate-pulse" />
+                      )}
+                      <span className="text-xs sm:text-sm font-mono font-bold text-white">{strat.name}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      {isSelected && (
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 font-bold">
+                          ACTIVE
+                        </span>
+                      )}
+                      <span className="text-xs font-mono px-2.5 py-0.5 rounded-full bg-slate-900 border border-slate-800 text-cyan-300 font-bold">
+                        {strat.category}
+                      </span>
+                    </div>
                   </div>
                   <p className="text-xs sm:text-sm text-slate-300 mt-2 line-clamp-2 leading-relaxed font-sans">
                     {strat.description}
@@ -187,7 +280,7 @@ export default function Step5TradingStrategy({ draft, updateDraft, onNext, onPre
 
         {/* Right Side: Active Strategy Configuration & Rules */}
         <div className="lg:col-span-7 space-y-4">
-          {activeStrategy && draft.trading_strategy ? (
+          {isStrategyEnabled && activeStrategy && draft.trading_strategy ? (
             <div className="rounded-2xl border border-slate-800/80 bg-gradient-to-b from-[#0D182E] to-[#080E1B] p-6 shadow-xl space-y-5">
               {/* Header */}
               <div className="flex items-start justify-between border-b border-slate-800/80 pb-4">
@@ -203,15 +296,17 @@ export default function Step5TradingStrategy({ draft, updateDraft, onNext, onPre
                   </div>
                 </div>
 
-                {draft.trading_strategy.compatible ? (
-                  <span className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-mono font-bold text-emerald-400 bg-emerald-950/60 border border-emerald-500/40 px-3.5 py-1.5 rounded-full shadow-sm">
-                    <CheckCircle2 className="h-4 w-4" /> DATA COMPATIBLE
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-mono font-bold text-rose-400 bg-rose-950/60 border border-rose-500/40 px-3.5 py-1.5 rounded-full shadow-sm">
-                    <AlertTriangle className="h-4 w-4" /> STRATEGY_NOT_COMPATIBLE
-                  </span>
-                )}
+                <div className="flex items-center gap-2">
+                  {draft.trading_strategy.compatible ? (
+                    <span className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-mono font-bold text-emerald-400 bg-emerald-950/60 border border-emerald-500/40 px-3.5 py-1.5 rounded-full shadow-sm">
+                      <CheckCircle2 className="h-4 w-4" /> DATA COMPATIBLE
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-mono font-bold text-rose-400 bg-rose-950/60 border border-rose-500/40 px-3.5 py-1.5 rounded-full shadow-sm">
+                      <AlertTriangle className="h-4 w-4" /> STRATEGY_NOT_COMPATIBLE
+                    </span>
+                  )}
+                </div>
               </div>
 
               {!draft.trading_strategy.compatible && (
@@ -224,13 +319,13 @@ export default function Step5TradingStrategy({ draft, updateDraft, onNext, onPre
               {/* Logic Rules Definition */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 text-xs sm:text-sm font-mono">
                 <div className="p-4 rounded-xl border border-slate-800/80 bg-[#070D1A] space-y-2 shadow-inner">
-                  <span className="text-emerald-400 text-xs uppercase font-bold block flex items-center gap-1.5">
+                  <span className="text-emerald-400 text-xs uppercase font-bold flex items-center gap-1.5">
                     <span className="h-2 w-2 rounded-full bg-emerald-400" /> ENTRY TRIGGER
                   </span>
                   <p className="text-slate-200 leading-relaxed font-sans text-xs sm:text-sm">{activeStrategy.entry_logic}</p>
                 </div>
                 <div className="p-4 rounded-xl border border-slate-800/80 bg-[#070D1A] space-y-2 shadow-inner">
-                  <span className="text-cyan-400 text-xs uppercase font-bold block flex items-center gap-1.5">
+                  <span className="text-cyan-400 text-xs uppercase font-bold flex items-center gap-1.5">
                     <span className="h-2 w-2 rounded-full bg-cyan-400" /> EXIT / STOP TRIGGER
                   </span>
                   <p className="text-slate-200 leading-relaxed font-sans text-xs sm:text-sm">{activeStrategy.exit_logic}</p>
@@ -325,8 +420,32 @@ export default function Step5TradingStrategy({ draft, updateDraft, onNext, onPre
               </div>
             </div>
           ) : (
-            <div className="py-16 text-center text-sm font-mono text-slate-400 border border-dashed border-slate-800/80 rounded-2xl bg-[#070D1A]/50">
-              Select a strategy from the left panel to configure its execution logic.
+            <div className="rounded-2xl border border-slate-800/80 bg-gradient-to-b from-[#0D182E] to-[#080E1B] p-8 shadow-xl text-center space-y-4">
+              <div className="h-14 w-14 rounded-2xl bg-slate-900/80 border border-slate-800 flex items-center justify-center text-slate-500 mx-auto">
+                <Cpu className="h-7 w-7 text-cyan-500/40" />
+              </div>
+              <div className="space-y-2 max-w-md mx-auto">
+                <h4 className="text-base font-mono font-bold text-white">
+                  Trading Strategy Engine is Turned OFF
+                </h4>
+                <p className="text-xs font-mono text-slate-400 leading-relaxed">
+                  The bot will bypass quantitative algorithmic models and trigger orders directly based on your <strong className="text-cyan-400">Indicator Confluence Rules</strong> configured in Step 3, or discretionary order actions.
+                </p>
+                <div className="inline-block px-3 py-1 rounded-full bg-slate-900 border border-slate-800 text-[11px] font-mono text-emerald-400 mt-1">
+                  ✓ Direct Execution Path Armed
+                </div>
+              </div>
+
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={handleToggleStrategy}
+                  className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 text-white font-mono text-xs font-black shadow-lg shadow-blue-600/30 transition-all cursor-pointer inline-flex items-center gap-2 active:scale-95"
+                >
+                  <Cpu className="h-4 w-4" />
+                  <span>Turn Trading Strategy ON</span>
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -345,9 +464,9 @@ export default function Step5TradingStrategy({ draft, updateDraft, onNext, onPre
         <button
           type="button"
           onClick={onNext}
-          disabled={!draft.trading_strategy?.compatible}
+          disabled={isStrategyEnabled && !draft.trading_strategy?.compatible}
           className={`inline-flex items-center gap-2 rounded-xl px-7 py-3 text-xs sm:text-sm font-mono font-bold text-white shadow-lg transition-all active:scale-95 ${
-            draft.trading_strategy?.compatible
+            !isStrategyEnabled || draft.trading_strategy?.compatible
               ? "bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 shadow-blue-600/30 cursor-pointer font-black"
               : "bg-slate-800/60 text-slate-500 border border-slate-800 cursor-not-allowed opacity-50"
           }`}

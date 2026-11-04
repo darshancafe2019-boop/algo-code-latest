@@ -243,19 +243,26 @@ def validate_wizard_draft(payload_data: Dict[str, Any]) -> Dict[str, Any]:
         })
 
     # 4. Strategy & Indicator Compatibility Check
-    strat = payload_data.get("trading_strategy") or {}
-    strat_id = strat.get("strategy_id", "trend_pullback_ema")
-    strat_name = strat.get("strategy_name", "Trend Pullback to EMA")
-    c_type = contract.get("contract_type", "OPTION")
-
-    if strat.get("compatible") is False:
-        checks.append({"name": "Strategy Compatibility", "status": "FAIL", "message": strat.get("compatibility_reason") or "Strategy not compatible with chosen market."})
-        is_ready = False
-    elif "BASIS" in strat_id.upper() and c_type == "SPOT":
-        checks.append({"name": "Strategy Compatibility", "status": "FAIL", "message": "Basis Arbitrage requires Futures/Perpetual instrument."})
-        is_ready = False
+    strat = payload_data.get("trading_strategy")
+    if strat is None:
+        checks.append({
+            "name": "Strategy Compatibility",
+            "status": "PASS",
+            "message": "Direct / Indicator Confluence execution active (Trading Strategy Engine bypassed)."
+        })
     else:
-        checks.append({"name": "Strategy Compatibility", "status": "PASS", "message": f"Strategy '{strat_name}' compatible with {c_type}."})
+        strat_id = strat.get("strategy_id", "trend_pullback_ema")
+        strat_name = strat.get("strategy_name", "Trend Pullback to EMA")
+        c_type = contract.get("contract_type", "OPTION")
+
+        if strat.get("compatible") is False:
+            checks.append({"name": "Strategy Compatibility", "status": "FAIL", "message": strat.get("compatibility_reason") or "Strategy not compatible with chosen market."})
+            is_ready = False
+        elif "BASIS" in strat_id.upper() and c_type == "SPOT":
+            checks.append({"name": "Strategy Compatibility", "status": "FAIL", "message": "Basis Arbitrage requires Futures/Perpetual instrument."})
+            is_ready = False
+        else:
+            checks.append({"name": "Strategy Compatibility", "status": "PASS", "message": f"Strategy '{strat_name}' compatible with {c_type}."})
 
     # 5. Risk Boundary Check
     risk = payload_data.get("risk") or {}
@@ -382,7 +389,7 @@ def deploy_wizard_bot(payload_data: Dict[str, Any]) -> Dict[str, Any]:
             "mode": exec_mode,
         },
         "strategy": {
-            "type": payload_data.get("trading_strategy", {}).get("strategy_name", "Trend Pullback to EMA"),
+            "type": (payload_data.get("trading_strategy") or {}).get("strategy_name", "Indicator Confluence Trigger"),
             "timeframe": payload_data.get("timeframe", "5m"),
             "parameters": {
                 "trading_strategy": payload_data.get("trading_strategy") or {},
@@ -448,7 +455,7 @@ def deploy_wizard_bot(payload_data: Dict[str, Any]) -> Dict[str, Any]:
 
     # Persist in authoritative bot_instances table so multi_bot_manager and live_runner can execute it
     try:
-        strat_name = payload_data.get("trading_strategy", {}).get("strategy_name") or "Trend Pullback to EMA"
+        strat_name = (payload_data.get("trading_strategy") or {}).get("strategy_name") or "Indicator Confluence Trigger"
         tf = payload_data.get("timeframe") or "5m"
         raw_cap = payload_data.get("capital") or payload_data.get("allocated_capital") or payload_data.get("capital_allocation") or 10000.0
         if isinstance(raw_cap, dict):

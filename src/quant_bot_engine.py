@@ -708,8 +708,8 @@ class QuantBotEngine:
             try:
                 with sqlite3.connect(str(ALGO_DB_PATH), timeout=10.0) as conn_algo:
                     bot_name = self.bot_config.get("name") or self.bot_config.get("bot_name") or self.bot_id
-                    strat_name = self.bot_config.get("strategy", {}).get("type") or self.bot_config.get("trading_strategy", {}).get("strategy_name") or "Quant Strategy"
-                    strat_id = self.bot_config.get("strategy", {}).get("parameters", {}).get("trading_strategy", {}).get("strategy_id") or "quant_strategy"
+                    strat_name = (self.bot_config.get("strategy") or {}).get("type") or (self.bot_config.get("trading_strategy") or {}).get("strategy_name") or "Quant Strategy"
+                    strat_id = (((self.bot_config.get("strategy") or {}).get("parameters") or {}).get("trading_strategy") or {}).get("strategy_id") or "quant_strategy"
 
                     if is_closing_order:
                         # Close matching open trade(s) in trades_log for this bot & symbol

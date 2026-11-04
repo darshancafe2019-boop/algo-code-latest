@@ -471,6 +471,7 @@ def enforce_server_side_security():
         or path.startswith("/api/status/")
         or path == "/api/bots"
         or (path.startswith("/api/bots/") and request.method == "GET")
+        or path.startswith("/api/wizard/")
         or path == "/api/dashboard/snapshot"
         or path == "/api/portfolio/snapshot"
         or path == "/api/movers"

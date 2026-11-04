@@ -313,7 +313,7 @@ export function AlertsMonitoring() {
       />
 
       {/* 3. Live Subsystem Health Observability Bar */}
-      <LiveOperationsBar health={systemHealthData?.health} />
+      <LiveOperationsBar health={systemHealthData?.health || systemHealthData?.data?.health || systemHealthData} />
 
       {/* 4. Multi-Criteria Filter Toolbar */}
       <AlertFiltersToolbar

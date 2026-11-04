@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
           Accept: "text/event-stream",
           "Cache-Control": "no-cache",
         },
-        signal: AbortSignal.timeout(3000),
+        signal: req.signal,
         cache: "no-store",
       });
 

@@ -481,6 +481,9 @@ def enforce_server_side_security():
         or path == "/api/alerts/test"
         or path.startswith("/api/alerts/")
         or path == "/api/stream/alerts"
+        or path == "/api/system/health"
+        or path.startswith("/api/system/health")
+        or path.startswith("/api/notifications/")
         or path.startswith("/api/futures/")
         or (path in ["/api/positions", "/api/orders", "/api/risk/summary", "/api/risk/overview", "/api/stream/portfolio", "/api/audit/events"] and request.method == "GET" and (request.args.get("mode", "PAPER").upper() == "PAPER" or getattr(config, "TRADING_MODE", "PAPER") == "PAPER"))
         or (path.startswith("/api/tax/") and request.method == "GET")
@@ -1046,7 +1049,22 @@ def api_stream_alerts():
         last_summary_hash = ""
         heartbeat_counter = 0
         try:
+            # Yield initial snapshot immediately on client connection
+            summary = global_alert_engine.get_metrics_summary()
+            system_health = global_self_healing_manager.get_system_health_status()
+            incidents, _ = global_alert_engine.get_incidents(status="ACTIVE", limit=50, is_test=None)
+            payload = {
+                "type": "INCIDENTS_STREAM",
+                "incidents": incidents,
+                "summary": summary,
+                "system_health": system_health,
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            }
+            yield f"data: {json.dumps(payload)}\n\n"
+            last_summary_hash = f"{summary.get('active_incidents')}:{summary.get('unacknowledged')}:{summary.get('critical')}:{summary.get('error')}:{system_health.get('overall_status')}"
+
             while True:
+                time.sleep(2.0)
                 summary = global_alert_engine.get_metrics_summary()
                 system_health = global_self_healing_manager.get_system_health_status()
                 current_hash = f"{summary.get('active_incidents')}:{summary.get('unacknowledged')}:{summary.get('critical')}:{summary.get('error')}:{system_health.get('overall_status')}"
@@ -1054,7 +1072,7 @@ def api_stream_alerts():
                 # Push if metrics changed or on every 5th cycle (10s heartbeat)
                 if current_hash != last_summary_hash or heartbeat_counter % 5 == 0:
                     last_summary_hash = current_hash
-                    incidents, _ = global_alert_engine.get_incidents(status="ACTIVE", limit=20, is_test=None)
+                    incidents, _ = global_alert_engine.get_incidents(status="ACTIVE", limit=50, is_test=None)
                     payload = {
                         "type": "INCIDENTS_STREAM",
                         "incidents": incidents,
@@ -1063,20 +1081,35 @@ def api_stream_alerts():
                         "timestamp": datetime.now(timezone.utc).isoformat()
                     }
                     yield f"data: {json.dumps(payload)}\n\n"
+                else:
+                    yield ": keepalive\n\n"
                 
                 heartbeat_counter += 1
-                time.sleep(2.0)
         except GeneratorExit:
             logger.info("SSE client disconnected from /api/stream/alerts")
+        except Exception as e:
+            logger.warning(f"Error in SSE stream generate: {e}")
 
     return Response(
         generate(),
         mimetype="text/event-stream",
         headers={
-            "Cache-Control": "no-cache",
+            "Cache-Control": "no-cache, no-transform",
             "X-Accel-Buffering": "no",
         }
     )
+
+
+@app.route("/api/system/health", methods=["GET"])
+def api_system_health():
+    """Returns real-time system and subsystem health status."""
+    from src.self_healing_manager import global_self_healing_manager
+    health = global_self_healing_manager.get_system_health_status()
+    return jsonify({
+        "status": "success",
+        "data": {"health": health},
+        "health": health
+    })
 
 
 @app.route("/api/ticker", methods=["GET"])
@@ -13783,7 +13816,7 @@ def api_incidents_list():
     limit = min(200, max(1, int(request.args.get("limit", 50))))
     offset = max(0, int(request.args.get("offset", 0)))
     is_test_param = request.args.get("is_test")
-    is_test = int(is_test_param) if is_test_param in ["0", "1"] else 0
+    is_test = int(is_test_param) if is_test_param in ["0", "1"] else None
 
     incidents, total_count = global_alert_engine.get_incidents(
         status=status,

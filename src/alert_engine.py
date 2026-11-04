@@ -481,7 +481,7 @@ class AlertEngine:
         timeframe: str = "ALL",
         limit: int = 50,
         offset: int = 0,
-        is_test: Optional[int] = 0
+        is_test: Optional[int] = None
     ) -> Tuple[List[Dict[str, Any]], int]:
         """Server-side filtered and paginated query for incidents."""
         query = "SELECT * FROM incidents WHERE 1=1"
@@ -586,7 +586,7 @@ class AlertEngine:
 
     def get_metrics_summary(self) -> Dict[str, Any]:
         """Calculates authoritative KPI strip statistics from database records."""
-        incidents = db.safe_query("SELECT * FROM incidents WHERE COALESCE(is_test, 0) = 0")
+        incidents = db.safe_query("SELECT * FROM incidents")
 
         active_incidents = [i for i in incidents if i.get("status") in ["NEW", "ACKNOWLEDGED", "INVESTIGATING"]]
         critical_count = sum(1 for i in active_incidents if i.get("severity") == SEVERITY_CRITICAL)

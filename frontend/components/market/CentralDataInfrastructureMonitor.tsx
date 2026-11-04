@@ -343,11 +343,10 @@ export function CentralDataInfrastructureMonitor() {
           <button
             key={tab.id}
             onClick={() => setSelectedDomain(tab.id as any)}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-mono font-bold transition-all ${
-              selectedDomain === tab.id
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-mono font-bold transition-all ${selectedDomain === tab.id
                 ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm"
                 : "bg-slate-900/60 text-slate-400 hover:text-slate-200 border border-slate-800/80 hover:border-slate-700"
-            }`}
+              }`}
           >
             {tab.label}
           </button>

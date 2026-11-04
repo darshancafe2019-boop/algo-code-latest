@@ -449,8 +449,17 @@ def enforce_server_side_security():
         or path.startswith("/api/health")
         or path.startswith("/health")
         or path.startswith("/static/")
+        or path == "/api/market-health"
+        or path.startswith("/api/market-health")
         or path.startswith("/api/market/")
         or path.startswith("/api/market-data/")
+        or path.startswith("/api/system-health")
+        or path == "/api/system/providers"
+        or path.startswith("/api/system/providers")
+        or path == "/api/providers"
+        or path.startswith("/api/providers/")
+        or path == "/api/providers/status"
+        or path.startswith("/api/data-infrastructure")
         or path.startswith("/api/universe/")
         or path.startswith("/api/options/")
         or path.startswith("/api/strategies/")
@@ -4375,6 +4384,14 @@ def api_market_live_diagnostics():
     })
 
 
+@app.route("/api/data-infrastructure/status", methods=["GET"])
+@app.route("/api/data-infrastructure/telemetry", methods=["GET"])
+def api_data_infrastructure_status():
+    """Returns authoritative end-to-end data infrastructure status across all 5 monitoring domains."""
+    from src.market_data.data_infrastructure_service import get_data_infrastructure_status
+    return jsonify(get_data_infrastructure_status())
+
+
 @app.route("/api/instruments/search", methods=["GET"])
 def api_instruments_search():
     """Universal multi-token instrument search across Global Indices, Indian Markets, Crypto, and Commodities."""
@@ -7553,7 +7570,7 @@ def health_ready():
     # block readiness when the database itself is healthy.
     market_data_ok = True
     try:
-        cand = safe_query_one("SELECT close, timestamp FROM candles_cache ORDER BY id DESC LIMIT 1")
+        cand = safe_query_one("SELECT id FROM candles_cache LIMIT 1")
         if not cand:
             market_data_ok = False
     except Exception:

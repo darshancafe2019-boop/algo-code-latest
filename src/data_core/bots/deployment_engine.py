@@ -976,7 +976,7 @@ class BotDeploymentEngine:
                     subscriber_id=bot_id,
                     on_tick=lambda tick, _bot_id=bot_id: self._on_subscription_tick(_bot_id, tick),
                 )
-                bot.subscription_key = sub.get("key")
+                bot.subscription_key = sub.get("key") if isinstance(sub, dict) else str(sub or "")
             except Exception as exc:
                 bot.state = BotLifecycleState.ERROR
                 self._save_bot_to_db(bot_id)

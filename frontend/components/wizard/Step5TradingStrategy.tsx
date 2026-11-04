@@ -348,29 +348,48 @@ export default function Step5TradingStrategy({ draft, updateDraft, onNext, onPre
                           {key.replace(/_/g, " ")}:
                         </label>
                         {isBool ? (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const updated = {
-                                ...draft.trading_strategy!.parameters,
-                                [key]: !val,
-                              };
-                              updateDraft({
-                                trading_strategy: {
-                                  ...draft.trading_strategy!,
-                                  parameters: updated,
-                                },
-                              });
-                            }}
-                            className={`w-full py-2.5 px-3.5 rounded-xl text-xs sm:text-sm font-mono font-bold border transition-colors flex items-center justify-between cursor-pointer ${
-                              val
-                                ? "bg-emerald-950/40 border-emerald-500/50 text-emerald-400"
-                                : "bg-slate-900 border-slate-800 text-slate-400"
-                            }`}
-                          >
-                            <span>{key.replace(/_/g, " ")}</span>
-                            <span className="text-xs uppercase font-bold">{val ? "ENABLED" : "DISABLED"}</span>
-                          </button>
+                          <div className="flex items-center justify-between p-2.5 rounded-xl border border-slate-800 bg-[#070D1A]">
+                            <span className="text-xs font-mono text-slate-300 capitalize">{key.replace(/_/g, " ")}</span>
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const updated = {
+                                    ...draft.trading_strategy!.parameters,
+                                    [key]: !val,
+                                  };
+                                  updateDraft({
+                                    trading_strategy: {
+                                      ...draft.trading_strategy!,
+                                      parameters: updated,
+                                    },
+                                  });
+                                }}
+                                role="switch"
+                                aria-checked={Boolean(val)}
+                                className={`relative inline-flex h-6 w-12 flex-shrink-0 cursor-pointer rounded-full border-2 transition-all duration-200 ease-in-out focus:outline-none ${
+                                  val
+                                    ? "bg-cyan-600 border-cyan-400 shadow-sm"
+                                    : "bg-slate-800 border-slate-700 hover:border-slate-600"
+                                }`}
+                              >
+                                <span
+                                  className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out mt-0.5 ${
+                                    val ? "translate-x-6" : "translate-x-1"
+                                  }`}
+                                />
+                              </button>
+                              <span
+                                className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border transition-all ${
+                                  val
+                                    ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/40"
+                                    : "bg-slate-800 text-slate-400 border-slate-700"
+                                }`}
+                              >
+                                {val ? "ON" : "OFF"}
+                              </span>
+                            </div>
+                          </div>
                         ) : (
                           <input
                             type="number"

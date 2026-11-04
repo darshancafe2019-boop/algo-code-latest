@@ -237,6 +237,8 @@ def validate_wizard_api():
 def deploy_wizard_api():
     try:
         data = request.get_json(force=True) or {}
+        if not isinstance(data, dict):
+            data = {}
         # Support both wizard payload format and canonical bot payload
         if "bot_name" in data or "capital_allocation" in data or "contract" in data:
             deployed = bot_wizard_service.deploy_wizard_bot(data)
@@ -251,7 +253,7 @@ def deploy_wizard_api():
                 "timeframe": data.get("timeframe", "5m"),
                 "broker": data.get("broker", "DELTA"),
                 "execution_mode": data.get("environment", "PAPER"),
-                "capital_allocation": float(data.get("allocated_capital") or 1000.0),
+                "capital_allocation": float(data.get("allocated_capital") or data.get("capital_allocation") or 1000.0),
                 "contract": {
                     "symbol": data.get("symbol"),
                     "strike": data.get("strike"),
@@ -271,6 +273,11 @@ def deploy_wizard_api():
                 },
                 "auto_start": True,
             }
+            deployed = bot_wizard_service.deploy_wizard_bot(wizard_format)
+
+        if not isinstance(deployed, dict):
+            deployed = {}
+
         bot_id = deployed.get("bot_id") or deployed.get("id") or (deployed.get("config", {}) if isinstance(deployed.get("config"), dict) else {}).get("id")
         return jsonify({
             "success": True,

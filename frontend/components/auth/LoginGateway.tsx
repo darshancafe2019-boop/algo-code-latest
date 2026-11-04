@@ -57,7 +57,7 @@ export function LoginGateway() {
   const [authStep, setAuthStep] = useState<"credentials" | "email_otp" | "totp">("credentials");
   const [challengeId, setChallengeId] = useState<string | null>(null);
   const [destinationEmail, setDestinationEmail] = useState<string>("");
-  const [otpDigits, setOtpDigits] = useState<string[]>(["", "", "", "", "", ""]);
+  const [otpDigits, setOtpDigits] = useState<string[]>(Array(8).fill(""));
   const [useRecoveryCode, setUseRecoveryCode] = useState(false);
   const [recoveryCode, setRecoveryCode] = useState("");
   const [devOtp, setDevOtp] = useState<string | null>(null);
@@ -238,8 +238,8 @@ export function LoginGateway() {
         }
         if (res.devOtp) setDevOtp(res.devOtp);
         setResendCooldown(res.cooldown_seconds || 60);
-        setOtpDigits(["", "", "", "", "", ""]);
-        setSuccessMessage(res.message || `A 6-digit verification code was sent to ${res.destination || target}.`);
+        setOtpDigits(res.devOtp && res.devOtp.length === 6 ? Array(6).fill("") : Array(8).fill(""));
+        setSuccessMessage(res.message || `A verification code was sent to ${res.destination || target}.`);
         setTimeout(() => {
           digitInputRefs.current[0]?.focus();
         }, 200);
@@ -292,15 +292,15 @@ export function LoginGateway() {
         }
         if (res.devOtp) setDevOtp(res.devOtp);
         setResendCooldown(60);
-        setOtpDigits(["", "", "", "", "", ""]);
-        setSuccessMessage(`A 6-digit verification code was sent to ${res.destination || "your registered email"}.`);
+        setOtpDigits(res.devOtp && res.devOtp.length === 6 ? Array(6).fill("") : Array(8).fill(""));
+        setSuccessMessage(`A verification code was sent to ${res.destination || "your registered email"}.`);
         setTimeout(() => {
           digitInputRefs.current[0]?.focus();
         }, 200);
       } else if (res.requires2FA) {
         setAuthStep("totp");
         if (res.challengeId) setChallengeId(res.challengeId);
-        setOtpDigits(["", "", "", "", "", ""]);
+        setOtpDigits(Array(6).fill(""));
         setSuccessMessage("Credentials verified. Please complete Two-Factor Authentication.");
         setTimeout(() => {
           digitInputRefs.current[0]?.focus();
@@ -321,9 +321,9 @@ export function LoginGateway() {
     setErrorMessage(null);
     setSuccessMessage(null);
 
-    const otpCode = codeToSubmit || otpDigits.join("");
-    if (!otpCode || otpCode.length !== 6) {
-      setErrorMessage("Please enter the complete 6-digit verification code.");
+    const otpCode = (codeToSubmit || otpDigits.join("")).trim();
+    if (!otpCode || (otpCode.length !== 6 && otpCode.length !== 8)) {
+      setErrorMessage("Please enter the complete verification code (6 or 8 digits).");
       return;
     }
 
@@ -429,7 +429,7 @@ export function LoginGateway() {
     }
   };
 
-  // Handle 6-Digit OTP Input Navigation
+  // Handle Flexible OTP Input Navigation (6 to 8 digits)
   const handleDigitChange = (index: number, val: string) => {
     const char = val.slice(-1);
     if (char && !/[0-9]/.test(char)) return;
@@ -438,13 +438,13 @@ export function LoginGateway() {
     newDigits[index] = char;
     setOtpDigits(newDigits);
 
-    // Auto-advance
-    if (char && index < 5) {
+    // Auto-advance to next box
+    if (char && index < otpDigits.length - 1) {
       digitInputRefs.current[index + 1]?.focus();
     }
 
-    // Auto-submit when all 6 digits entered
-    if (char && index === 5 && newDigits.every((d) => d !== "")) {
+    // Auto-submit when all digits entered
+    if (char && index === otpDigits.length - 1 && newDigits.every((d) => d !== "")) {
       const fullCode = newDigits.join("");
       if (authStep === "email_otp") {
         submitEmailOTP(fullCode);
@@ -463,10 +463,12 @@ export function LoginGateway() {
   const handleDigitPaste = (e: React.ClipboardEvent) => {
     e.preventDefault();
     const pasted = e.clipboardData.getData("text").trim();
-    if (/^[0-9]{6}$/.test(pasted)) {
+    if (/^[0-9]{6,8}$/.test(pasted)) {
       const chars = pasted.split("");
       setOtpDigits(chars);
-      digitInputRefs.current[5]?.focus();
+      setTimeout(() => {
+        digitInputRefs.current[chars.length - 1]?.focus();
+      }, 50);
       if (authStep === "email_otp") {
         submitEmailOTP(pasted);
       } else if (authStep === "totp") {
@@ -917,7 +919,7 @@ export function LoginGateway() {
                 <button
                   type="button"
                   onClick={() => {
-                    const digits = devOtp.split("").slice(0, 6);
+                    const digits = devOtp.split("");
                     setOtpDigits(digits);
                     submitEmailOTP(devOtp);
                   }}
@@ -929,9 +931,9 @@ export function LoginGateway() {
               </div>
             )}
 
-            {/* 6-Digit OTP Input Boxes */}
+            {/* Verification Code Input Boxes (Adaptive 6 or 8 Digits) */}
             <div>
-              <div className="flex justify-center gap-2 sm:gap-3 my-4">
+              <div className={`flex justify-center my-4 ${otpDigits.length > 6 ? "gap-1.5 sm:gap-2" : "gap-2 sm:gap-3"}`}>
                 {otpDigits.map((digit, idx) => (
                   <input
                     key={idx}
@@ -947,9 +949,28 @@ export function LoginGateway() {
                     onKeyDown={(e) => handleDigitKeyDown(idx, e)}
                     onPaste={handleDigitPaste}
                     disabled={isSubmitting}
-                    className="w-11 h-13 sm:w-12 sm:h-14 text-center text-xl font-mono font-bold bg-[#060913] border border-slate-700 rounded-xl text-cyan-300 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition-all"
+                    className={`text-center font-mono font-bold bg-[#060913] border border-slate-700 rounded-xl text-cyan-300 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition-all ${
+                      otpDigits.length > 6
+                        ? "w-8 h-11 sm:w-10 sm:h-13 text-lg sm:text-xl"
+                        : "w-11 h-13 sm:w-12 sm:h-14 text-xl"
+                    }`}
                   />
                 ))}
+              </div>
+
+              {/* Length Mode Switcher */}
+              <div className="flex justify-center -mt-1 mb-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const nextLen = otpDigits.length === 8 ? 6 : 8;
+                    setOtpDigits(Array(nextLen).fill(""));
+                    setTimeout(() => digitInputRefs.current[0]?.focus(), 50);
+                  }}
+                  className="text-[11px] font-mono text-cyan-400/80 hover:text-cyan-300 underline cursor-pointer"
+                >
+                  {otpDigits.length === 8 ? "Switch to 6-digit code entry" : "Switch to 8-digit code entry"}
+                </button>
               </div>
             </div>
 

@@ -382,14 +382,14 @@ class DeltaOptionsClient:
             params["expiry_date"] = exp_str
 
         res = self._request("/v2/tickers", params=params, method="GET", use_cache=False, weight=1.0)
-        result = res.get("result", [])
+        result = res.get("result", []) if isinstance(res, dict) else []
         return result if isinstance(result, list) else []
 
     def get_ticker(self, symbol: str) -> Optional[Dict[str, Any]]:
         """Fetches live ticker snapshot for a single symbol (/v2/tickers/{symbol})."""
         try:
             res = self._request(f"/v2/tickers/{symbol}", method="GET", use_cache=False, weight=1.0)
-            return res.get("result")
+            return res.get("result") if isinstance(res, dict) else None
         except Exception as e:
             logger.debug(f"Failed to fetch Delta ticker for {symbol}: {e}")
             return None
@@ -409,18 +409,18 @@ class DeltaOptionsClient:
 
     def get_spot_indices(self) -> List[Dict[str, Any]]:
         res = self._request("/v2/indices", method="GET", use_cache=True, cache_ttl=15.0, weight=1.0)
-        result = res.get("result", [])
+        result = res.get("result", []) if isinstance(res, dict) else []
         return result if isinstance(result, list) else []
 
     def get_l2_orderbook(self, symbol: str) -> Dict[str, Any]:
         """Fetches L2 orderbook snapshot for a symbol."""
         res = self._request(f"/v2/l2orderbook/{symbol}", method="GET", use_cache=False, weight=1.0)
-        return res.get("result", {})
+        return res.get("result", {}) if isinstance(res, dict) else {}
 
     def get_recent_trades(self, symbol: str) -> List[Dict[str, Any]]:
         """Fetches recent public trades for a symbol."""
         res = self._request(f"/v2/trades/{symbol}", method="GET", use_cache=False, weight=1.0)
-        result = res.get("result", [])
+        result = res.get("result", []) if isinstance(res, dict) else []
         return result if isinstance(result, list) else []
 
     def get_candles(
@@ -437,13 +437,13 @@ class DeltaOptionsClient:
         if end_time:
             params["end"] = end_time
         res = self._request("/v2/history/candles", params=params, method="GET", use_cache=True, cache_ttl=10.0, weight=1.5)
-        result = res.get("result", [])
+        result = res.get("result", []) if isinstance(res, dict) else []
         return result if isinstance(result, list) else []
 
     def get_product_by_id(self, product_id: int) -> Optional[Dict[str, Any]]:
         try:
             res = self._request(f"/v2/products/{product_id}", method="GET", use_cache=True, cache_ttl=120.0, weight=1.0)
-            return res.get("result")
+            return res.get("result") if isinstance(res, dict) else None
         except Exception:
             return None
 

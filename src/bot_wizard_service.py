@@ -192,11 +192,14 @@ def validate_wizard_draft(payload_data: Dict[str, Any]) -> Dict[str, Any]:
     Executes the 7 authoritative pre-deployment checks matching the source implementation.
     Guarantees that the contract selected in Step 2 / Step 4 is fully validated.
     """
+    if not isinstance(payload_data, dict):
+        payload_data = {}
+
     checks: List[Dict[str, Any]] = []
     is_ready = True
 
     # 1. Identity Check
-    contract = payload_data.get("contract") or {}
+    contract = payload_data.get("contract") if isinstance(payload_data.get("contract"), dict) else {}
     symbol = contract.get("symbol") or payload_data.get("underlying") or "BTCUSD"
     bot_name = (payload_data.get("bot_name") or payload_data.get("name") or "").strip()
     if not bot_name:
@@ -208,7 +211,7 @@ def validate_wizard_draft(payload_data: Dict[str, Any]) -> Dict[str, Any]:
     checks.append({"name": "Identity Check", "status": "PASS", "message": f"Bot Identity '{bot_name}' registered."})
 
     # 2. Selected Contract Continuity Check
-    contract = payload_data.get("contract") or {}
+    contract = payload_data.get("contract") if isinstance(payload_data.get("contract"), dict) else {}
     symbol = contract.get("symbol") or payload_data.get("underlying") or "BTCUSD"
     if not symbol:
         checks.append({"name": "Contract Mapping", "status": "FAIL", "message": "No valid canonical instrument selected from Step 2."})
@@ -227,6 +230,8 @@ def validate_wizard_draft(payload_data: Dict[str, Any]) -> Dict[str, Any]:
 
     # 3. Live Market Feed Health & Price Check
     live_quote = get_live_quote(symbol, contract.get("provider"))
+    if not isinstance(live_quote, dict):
+        live_quote = {}
     ltp = live_quote.get("last", 0.0)
     if ltp > 0:
         age_ms = live_quote.get("age_ms", 12.0)
@@ -244,6 +249,8 @@ def validate_wizard_draft(payload_data: Dict[str, Any]) -> Dict[str, Any]:
 
     # 4. Strategy & Indicator Compatibility Check
     strat = payload_data.get("trading_strategy")
+    if not isinstance(strat, dict):
+        strat = None
     if strat is None:
         checks.append({
             "name": "Strategy Compatibility",
@@ -251,9 +258,9 @@ def validate_wizard_draft(payload_data: Dict[str, Any]) -> Dict[str, Any]:
             "message": "Direct / Indicator Confluence execution active (Trading Strategy Engine bypassed)."
         })
     else:
-        strat_id = strat.get("strategy_id", "trend_pullback_ema")
-        strat_name = strat.get("strategy_name", "Trend Pullback to EMA")
-        c_type = contract.get("contract_type", "OPTION")
+        strat_id = str(strat.get("strategy_id") or "trend_pullback_ema")
+        strat_name = str(strat.get("strategy_name") or "Trend Pullback to EMA")
+        c_type = str(contract.get("contract_type") or "OPTION")
 
         if strat.get("compatible") is False:
             checks.append({"name": "Strategy Compatibility", "status": "FAIL", "message": strat.get("compatibility_reason") or "Strategy not compatible with chosen market."})
@@ -265,7 +272,7 @@ def validate_wizard_draft(payload_data: Dict[str, Any]) -> Dict[str, Any]:
             checks.append({"name": "Strategy Compatibility", "status": "PASS", "message": f"Strategy '{strat_name}' compatible with {c_type}."})
 
     # 5. Risk Boundary Check
-    risk = payload_data.get("risk") or {}
+    risk = payload_data.get("risk") if isinstance(payload_data.get("risk"), dict) else {}
     qty = float(risk.get("quantity") or 1.0)
     max_pos = float(risk.get("max_position_size") or 2.0)
     max_loss = float(risk.get("max_daily_loss") or 500.0)
@@ -332,13 +339,16 @@ def deploy_wizard_bot(payload_data: Dict[str, Any]) -> Dict[str, Any]:
     Runs validation, creates a canonical BotConfig, persists it in quant_bot_v2.db,
     and optionally auto-starts the bot.
     """
+    if not isinstance(payload_data, dict):
+        payload_data = {}
+
     val_res = validate_wizard_draft(payload_data)
     if not val_res["ready"]:
         failed_msgs = [c["message"] for c in val_res.get("checks", []) if c.get("status") == "FAIL"]
         raise ValueError(" | ".join(failed_msgs) if failed_msgs else "Pre-deployment validation failed.")
 
     bot_id = str(payload_data.get("bot_id") or f"BOT-{uuid.uuid4().hex[:8].upper()}")
-    contract = payload_data.get("contract") or {}
+    contract = payload_data.get("contract") if isinstance(payload_data.get("contract"), dict) else {}
     symbol = contract.get("symbol") or payload_data.get("underlying") or "BTCUSD"
     
     # Authoritative rule: Bot name must always be according to the positions and include time date
@@ -356,7 +366,10 @@ def deploy_wizard_bot(payload_data: Dict[str, Any]) -> Dict[str, Any]:
     market_type = payload_data.get("market_type", "CRYPTO_OPTION")
     broker = payload_data.get("broker", "DELTA")
     exec_mode = str(payload_data.get("execution_mode", "PAPER")).upper()
-    risk = payload_data.get("risk") or {}
+    risk = payload_data.get("risk") if isinstance(payload_data.get("risk"), dict) else {}
+    trading_strat = payload_data.get("trading_strategy") if isinstance(payload_data.get("trading_strategy"), dict) else {}
+    opt_strat = payload_data.get("option_strategy") if isinstance(payload_data.get("option_strategy"), dict) else {}
+    indicators = payload_data.get("indicators") if isinstance(payload_data.get("indicators"), list) else []
     auto_start = bool(payload_data.get("auto_start", False))
 
     inst_id = contract.get("instrument_id") or contract.get("canonical_instrument_id") or symbol
@@ -389,12 +402,12 @@ def deploy_wizard_bot(payload_data: Dict[str, Any]) -> Dict[str, Any]:
             "mode": exec_mode,
         },
         "strategy": {
-            "type": (payload_data.get("trading_strategy") or {}).get("strategy_name", "Indicator Confluence Trigger"),
+            "type": trading_strat.get("strategy_name") or opt_strat.get("strategy_name") or "Indicator Confluence Trigger",
             "timeframe": payload_data.get("timeframe", "5m"),
             "parameters": {
-                "trading_strategy": payload_data.get("trading_strategy") or {},
-                "option_strategy": payload_data.get("option_strategy") or {},
-                "indicators": payload_data.get("indicators") or [],
+                "trading_strategy": trading_strat,
+                "option_strategy": opt_strat,
+                "indicators": indicators,
                 "selected_contract": contract,
             },
         },
@@ -455,7 +468,7 @@ def deploy_wizard_bot(payload_data: Dict[str, Any]) -> Dict[str, Any]:
 
     # Persist in authoritative bot_instances table so multi_bot_manager and live_runner can execute it
     try:
-        strat_name = (payload_data.get("trading_strategy") or {}).get("strategy_name") or "Indicator Confluence Trigger"
+        strat_name = trading_strat.get("strategy_name") or opt_strat.get("strategy_name") or "Indicator Confluence Trigger"
         tf = payload_data.get("timeframe") or "5m"
         raw_cap = payload_data.get("capital") or payload_data.get("allocated_capital") or payload_data.get("capital_allocation") or 10000.0
         if isinstance(raw_cap, dict):
@@ -1308,14 +1321,15 @@ def _get_live_quote_uncached(symbol: str = "BTCUSD", provider: Optional[str] = N
                 und_filter = ["BTC"] if "BTC" in symbol.upper() else (["ETH"] if "ETH" in symbol.upper() else (["SOL"] if "SOL" in symbol.upper() else None))
                 _cached_delta_tickers = global_delta_client.get_tickers(underlying_asset_symbols=und_filter)
                 _cached_delta_tickers_ts = now_ts_mono
-            tickers = _cached_delta_tickers
-            for t in tickers:
-                if t.get("symbol") == symbol.strip():
-                    q_dict = t.get("quotes") or {}
-                    bb = float(q_dict.get("best_bid") or 0.0) if q_dict.get("best_bid") else 0.0
-                    ba = float(q_dict.get("best_ask") or 0.0) if q_dict.get("best_ask") else 0.0
-                    raw_p = t.get("mark_price") or t.get("close") or bb or ba or 0.0
-                    p_val = float(raw_p) if raw_p else 0.0
+            tickers = _cached_delta_tickers or []
+            if isinstance(tickers, list):
+                for t in tickers:
+                    if isinstance(t, dict) and t.get("symbol") == symbol.strip():
+                        q_dict = t.get("quotes") if isinstance(t.get("quotes"), dict) else {}
+                        bb = float(q_dict.get("best_bid") or 0.0) if q_dict.get("best_bid") else 0.0
+                        ba = float(q_dict.get("best_ask") or 0.0) if q_dict.get("best_ask") else 0.0
+                        raw_p = t.get("mark_price") or t.get("close") or bb or ba or 0.0
+                        p_val = float(raw_p) if raw_p else 0.0
                     if p_val > 0:
                         return {
                             "symbol": symbol,
@@ -1769,11 +1783,15 @@ def get_live_option_chain(market_type: str = "CRYPTO_OPTION", underlying: str = 
         with urllib.request.urlopen(req, timeout=8.0) as resp:
             if resp.status == 200:
                 gw_chain = json.loads(resp.read().decode("utf-8"))
+                if not isinstance(gw_chain, dict):
+                    gw_chain = {}
                 strikes_data = gw_chain.get("strikes") or gw_chain.get("rows") or []
-                if strikes_data:
+                if strikes_data and isinstance(strikes_data, list):
                     gw_spot = float(gw_chain.get("spot") or gw_chain.get("spot_price") or spot)
                     chain_rows = []
                     for row in strikes_data:
+                        if not isinstance(row, dict):
+                            continue
                         st = float(row.get("strike") or row.get("strikePrice") or 0.0)
                         if st <= 0:
                             continue
@@ -1781,7 +1799,7 @@ def get_live_option_chain(market_type: str = "CRYPTO_OPTION", underlying: str = 
                         p_raw = row.get("put") or row.get("pe")
 
                         c_obj = None
-                        if c_raw:
+                        if isinstance(c_raw, dict):
                             c_iv_raw = float(c_raw.get("iv") or c_raw.get("markIv") or 0.0)
                             c_iv = round(c_iv_raw * 100, 1) if (0.0 < c_iv_raw < 2.0) else round(c_iv_raw, 1)
                             c_ltp = float(c_raw.get("ltp") or c_raw.get("lastPrice") or c_raw.get("mark") or 0.0)
@@ -1843,7 +1861,7 @@ def get_live_option_chain(market_type: str = "CRYPTO_OPTION", underlying: str = 
                             }
 
                         p_obj = None
-                        if p_raw:
+                        if isinstance(p_raw, dict):
                             p_iv_raw = float(p_raw.get("iv") or p_raw.get("markIv") or 0.0)
                             p_iv = round(p_iv_raw * 100, 1) if (0.0 < p_iv_raw < 2.0) else round(p_iv_raw, 1)
                             p_ltp = float(p_raw.get("ltp") or p_raw.get("lastPrice") or p_raw.get("mark") or 0.0)

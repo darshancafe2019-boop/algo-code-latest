@@ -316,19 +316,25 @@ async function handleProxy(req: NextRequest, ctx: { params?: { path: string[] } 
   const isUniverse = subPath.includes("universe") || subPath.includes("instruments") || subPath.includes("screener") || subPath.includes("expiries");
   const isHeavy = subPath.includes("backtest") || subPath.includes("simulate") || subPath.includes("risk/simulate");
   const isProductionEnv = isProduction();
-  const timeoutMs = isStream
-    ? (isProductionEnv ? 25000 : 15000)
-    : isAuth
-      ? (isProductionEnv ? 55000 : 25000)
-      : isUniverse
-        ? (isProductionEnv ? 45000 : 25000)
-        : isHeavy
-          ? (isProductionEnv ? 50000 : 30000)
-          : (isStatus || isIndicator)
-            ? (isProductionEnv ? 30000 : 10000)
-            : (isProductionEnv ? 35000 : 15000);
 
-  let bodyData: BodyInit | null = null;
+  // In cloud production (Vercel Serverless environment), bound timeouts to 13500ms
+  // so the proxy can catch the timeout and return structured JSON (GATEWAY_TIMEOUT)
+  // before Vercel terminates the function at its platform ceiling with an HTML 504.
+  const timeoutMs = isProductionEnv
+    ? (isStream ? 13500 : isHeavy ? 14000 : 13500)
+    : isStream
+      ? 15000
+      : isAuth
+        ? 25000
+        : isUniverse
+          ? 25000
+          : isHeavy
+            ? 30000
+            : (isStatus || isIndicator)
+              ? 10000
+              : 15000;
+
+  let bodyData: string | null = null;
   if (["POST", "PUT", "PATCH", "DELETE"].includes(req.method)) {
     try {
       bodyData = await req.text();
@@ -356,14 +362,24 @@ async function handleProxy(req: NextRequest, ctx: { params?: { path: string[] } 
     });
   }
 
+  // Set Content-Length and configure duplex: 'half' for Node 18+ Undici streaming
+  if (bodyData) {
+    forwardHeaders.set("Content-Length", Buffer.byteLength(bodyData).toString());
+  }
+
   try {
-    const backendRes = await fetch(targetUrl, {
+    const fetchOptions: RequestInit & { duplex?: string } = {
       method: req.method,
       headers: forwardHeaders,
       body: bodyData,
       signal: controller.signal,
       cache: "no-store",
-    });
+    };
+    if (bodyData) {
+      fetchOptions.duplex = "half";
+    }
+
+    const backendRes = await fetch(targetUrl, fetchOptions);
 
     clearTimeout(timeoutTimer);
     finalResponse = backendRes;
@@ -556,7 +572,7 @@ async function handleProxy(req: NextRequest, ctx: { params?: { path: string[] } 
         code: errorCode,
         message: errorMessage,
         retryable: isTimeout,
-        details: lastError?.message || String(lastError),
+        details: lastError?.cause?.message || lastError?.message || String(lastError),
       },
       requestId,
       timestamp: new Date().toISOString(),

@@ -571,7 +571,7 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
       if (eventSourceRef.current === es) eventSourceRef.current = null;
       safeCloseEventSource(es);
       scheduleReconnect();
-    }, 10000);
+    }, 16000);
 
     connectTimeoutRef.current = connectTimeout;
 

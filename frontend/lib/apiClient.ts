@@ -349,7 +349,7 @@ class ResilientApiClient {
           headers,
           credentials: "include",
           cache: "no-store",
-          signal: AbortSignal.timeout(10000),
+          signal: AbortSignal.timeout(16000),
         });
 
 

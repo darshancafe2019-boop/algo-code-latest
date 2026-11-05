@@ -566,8 +566,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                   message: data.message || "Supabase authentication verified successfully.",
                 };
               }
-            } else {
-              console.warn(`[SUPABASE_OTP_NOTICE] Supabase verification returned status=${(sbError as any)?.status || 403}. Falling through to backend challenge verification.`);
+
+              // Upstream backend verification error
+              const backendError = data?.message || data?.error?.message || "Failed to establish QUANT.OS trading session.";
+              return {
+                success: false,
+                error: backendError,
+                message: backendError,
+              };
+            } else if (sbError) {
+              console.warn(`[SUPABASE_OTP_ERROR] Supabase verification returned status=${(sbError as any)?.status || 403}: ${sbError.message}`);
+              const isExpired = (sbError as any)?.code === "otp_expired" || sbError.message?.toLowerCase().includes("expired");
+              const userFriendlyMsg = isExpired
+                ? "Verification code has expired or is invalid. Please request a new code."
+                : (sbError.message || "Invalid verification code.");
+              return {
+                success: false,
+                error: userFriendlyMsg,
+                message: userFriendlyMsg,
+              };
             }
           }
         }

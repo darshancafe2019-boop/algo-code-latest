@@ -14584,6 +14584,7 @@ _RECENT_VERIFIED_CHALLENGES: Dict[str, Dict[str, Any]] = {}
 
 @app.route("/api/auth/email-otp/verify", methods=["POST"])
 @app.route("/api/auth/verify-otp", methods=["POST"])
+@app.route("/api/auth/otp/verify", methods=["POST"])
 def api_auth_email_otp_verify():
     """
     Stage 2 of Authentication:
@@ -14596,25 +14597,6 @@ def api_auth_email_otp_verify():
     t_start = time.perf_counter()
     request_id = f"req_{secrets.token_hex(6)}"
     client_ip = request.remote_addr or "127.0.0.1"
-
-    if getattr(config, "IS_PRODUCTION", False):
-        from src.supabase_auth import is_supabase_configured
-        if not is_supabase_configured():
-            logger.error("[AUTH] Supabase Auth is not configured in production. Rejecting legacy OTP verification.")
-            return jsonify({
-                "status": "error",
-                "success": False,
-                "error_code": "SUPABASE_NOT_CONFIGURED",
-                "message": "Authentication service unavailable: Supabase configuration is missing in production.",
-                "request_id": request_id
-            }), 503
-        return jsonify({
-            "status": "error",
-            "success": False,
-            "error_code": "LEGACY_OTP_DEPRECATED",
-            "message": "Legacy OTP authentication is deprecated. Please verify with Supabase Auth.",
-            "request_id": request_id
-        }), 400
 
     data = request.get_json(silent=True) or {}
     challenge_id = (data.get("challenge_id") or "").strip()

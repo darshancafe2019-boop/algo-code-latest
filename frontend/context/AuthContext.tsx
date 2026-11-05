@@ -501,8 +501,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     email?: string,
     isRecovery: boolean = false
   ): Promise<LoginResult> => {
-    // 1. Supabase Auth Verification (if Supabase is configured)
-    if (isSupabaseConfigured()) {
+    const isSupabaseChallenge = challengeId?.startsWith("sb_") || (!challengeId && isSupabaseConfigured());
+
+    // 1. Supabase Auth Verification (if challenge was issued by Supabase or default Supabase mode)
+    if (isSupabaseConfigured() && isSupabaseChallenge) {
       try {
         const sb = getSupabase();
         if (sb) {
@@ -513,103 +515,68 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             } catch { }
           }
 
-          if (!targetEmail) {
-            return {
-              success: false,
-              error: "Missing verification email address. Please request a new code.",
-              errorCode: "MISSING_EMAIL",
-              statusCode: 400,
-            };
-          }
+          if (targetEmail) {
+            const { data: sbAuthData, error: sbError } = await sb.auth.verifyOtp({
+              email: targetEmail,
+              token: otp.trim(),
+              type: "email",
+            });
 
-          const { data: sbAuthData, error: sbError } = await sb.auth.verifyOtp({
-            email: targetEmail,
-            token: otp.trim(),
-            type: "email",
-          });
+            if (!sbError && sbAuthData?.session?.access_token) {
+              const sbAccessToken = sbAuthData.session.access_token;
 
-          if (sbError || !sbAuthData?.session?.access_token) {
-            console.warn(`[SUPABASE_OTP_VERIFY_FAILED] status=${(sbError as any)?.status || 403} code=${(sbError as any)?.code || sbError?.name} msg=${sbError?.message}`);
-            return {
-              success: false,
-              error: sbError?.message || "Invalid or expired verification code.",
-              errorCode: (sbError as any)?.code || "INVALID_OTP",
-              statusCode: (sbError as any)?.status || 401,
-            };
-          }
+              // Exchange Supabase token with Flask backend to obtain authoritative QUANT.OS session
+              const res = await fetch("/api/auth/supabase/verify", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  "Authorization": `Bearer ${sbAccessToken}`,
+                },
+                credentials: "include",
+                body: JSON.stringify({ access_token: sbAccessToken }),
+              });
 
-          const sbAccessToken = sbAuthData.session.access_token;
+              const { ok, data } = await safeParseAuthResponse(res);
+              if (res.ok && data.status === "success") {
+                setUser(data.user);
+                setSession(data.session || null);
+                setIsAuthenticated(true);
+                setIsLocked(false);
+                setFailedAttempts(0);
+                setLockoutUntil(null);
+                loginTimestampRef.current = Date.now();
 
-          // Exchange Supabase token with Flask backend to obtain authoritative QUANT.OS session
-          const res = await fetch("/api/auth/supabase/verify", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "Authorization": `Bearer ${sbAccessToken}`,
-            },
-            credentials: "include",
-            body: JSON.stringify({ access_token: sbAccessToken }),
-          });
+                try {
+                  const todayStr = getLocalCalendarDate();
+                  if (data.session_token) {
+                    localStorage.setItem("quantos_session_token", data.session_token);
+                  }
+                  localStorage.setItem("quantos_supabase_access_token", sbAccessToken);
+                  localStorage.setItem("quantos_session_date", todayStr);
+                  sessionStorage.removeItem("quantos_otp_challenge_id");
+                  sessionStorage.removeItem("quantos_otp_destination_email");
+                  sessionStorage.removeItem("quantos_pending_email");
+                  sessionStorage.removeItem(LOCK_STORAGE_KEY);
+                  sessionStorage.removeItem(FAILED_ATTEMPTS_KEY);
+                  sessionStorage.removeItem(LOCKOUT_UNTIL_KEY);
+                } catch { }
 
-          const { ok, data } = await safeParseAuthResponse(res);
-          if (res.ok && data.status === "success") {
-            setUser(data.user);
-            setSession(data.session || null);
-            setIsAuthenticated(true);
-            setIsLocked(false);
-            setFailedAttempts(0);
-            setLockoutUntil(null);
-            loginTimestampRef.current = Date.now();
-
-            try {
-              const todayStr = getLocalCalendarDate();
-              if (data.session_token) {
-                localStorage.setItem("quantos_session_token", data.session_token);
+                return {
+                  success: true,
+                  message: data.message || "Supabase authentication verified successfully.",
+                };
               }
-              localStorage.setItem("quantos_supabase_access_token", sbAccessToken);
-              localStorage.setItem("quantos_session_date", todayStr);
-              sessionStorage.removeItem("quantos_otp_challenge_id");
-              sessionStorage.removeItem("quantos_otp_destination_email");
-              sessionStorage.removeItem("quantos_pending_email");
-              sessionStorage.removeItem(LOCK_STORAGE_KEY);
-              sessionStorage.removeItem(FAILED_ATTEMPTS_KEY);
-              sessionStorage.removeItem(LOCKOUT_UNTIL_KEY);
-            } catch { }
-
-            return {
-              success: true,
-              message: data.message || "Supabase authentication verified successfully.",
-            };
+            } else {
+              console.warn(`[SUPABASE_OTP_NOTICE] Supabase verification returned status=${(sbError as any)?.status || 403}. Falling through to backend challenge verification.`);
+            }
           }
-
-          return {
-            success: false,
-            error: data.message || "Backend verification failed for Supabase token.",
-            errorCode: data.error_code || "BACKEND_REJECTED",
-            statusCode: res.status,
-          };
         }
       } catch (sbEx: any) {
-        return {
-          success: false,
-          error: sbEx?.message || "Failed to complete Supabase OTP verification.",
-          errorCode: "SUPABASE_ERROR",
-          statusCode: 0,
-        };
+        console.warn("[SUPABASE_OTP_EXCEPTION] Falling through to backend verification:", sbEx?.message);
       }
     }
 
-    // 2. Production fail-closed: Never fall back to legacy OTP in production
-    if (process.env.NODE_ENV === "production") {
-      return {
-        success: false,
-        error: "Supabase Authentication is required in production. Legacy OTP verification is disabled.",
-        errorCode: "SUPABASE_REQUIRED",
-        statusCode: 403,
-      };
-    }
-
-    // 3. Fallback to existing native Flask Email OTP verification (development/local only)
+    // 2. Authoritative Backend Email OTP Verification (Resend / Database OTP challenge)
     try {
       const res = await fetch("/api/auth/email-otp/verify", {
         method: "POST",
@@ -835,48 +802,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           });
 
           if (error) {
+            console.warn(`[SUPABASE_DISPATCH_NOTICE] Supabase OTP send notice: ${error.message}. Falling through to backend email dispatch.`);
+          } else {
+            const challengeId = `sb_${Date.now()}`;
+            try {
+              sessionStorage.setItem("quantos_otp_challenge_id", challengeId);
+            } catch { }
+
             return {
-              success: false,
-              message: error.message || "Failed to dispatch Supabase verification code.",
-              error: error.message,
+              success: true,
+              message: `A 6-digit verification code was dispatched to ${email} via Supabase Auth.`,
+              challengeId,
+              destination: email,
               cooldown_seconds: 60,
             };
           }
-
-          const challengeId = `sb_${Date.now()}`;
-          try {
-            sessionStorage.setItem("quantos_otp_challenge_id", challengeId);
-          } catch { }
-
-          return {
-            success: true,
-            message: `A 6-digit verification code was dispatched to ${email} via Supabase Auth.`,
-            challengeId,
-            destination: email,
-            cooldown_seconds: 60,
-          };
         }
       } catch (sbEx: any) {
-        return {
-          success: false,
-          message: "Failed to dispatch Supabase verification code.",
-          error: sbEx?.message,
-          cooldown_seconds: 60,
-        };
+        console.warn("[SUPABASE_DISPATCH_EXCEPTION] Falling through to backend email dispatch:", sbEx?.message);
       }
     }
 
-    // 2. Production fail-closed: Never fall back to legacy OTP in production
-    if (process.env.NODE_ENV === "production") {
-      return {
-        success: false,
-        message: "Supabase Authentication is required in production.",
-        error: "Supabase Authentication is not configured or failed to initialize.",
-        cooldown_seconds: 60,
-      };
-    }
-
-    // 3. Fallback to existing native Flask Send OTP (development/local only)
+    // 2. Authoritative Backend Email OTP Dispatch (Resend Email Service)
     try {
       const res = await fetch("/api/auth/send-otp", {
         method: "POST",

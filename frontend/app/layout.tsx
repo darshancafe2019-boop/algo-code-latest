@@ -93,21 +93,31 @@ export default function RootLayout({
                       for (var i = 0; i < names.length; i++) caches.delete(names[i]);
                     }).catch(function() {});
                   }
-                  // Auto-recover from stale Webpack chunk / Fast Refresh hash mismatches after server restarts
-                  window.addEventListener('error', function(e) {
-                    if (e && e.message && (
-                      e.message.indexOf("Cannot read properties of undefined (reading 'call')") !== -1 ||
-                      e.message.indexOf("Loading chunk") !== -1 ||
-                      e.message.indexOf("ChunkLoadError") !== -1
-                    )) {
+                  // Auto-recover from stale Webpack chunk / Fast Refresh hash mismatches after server restarts or deploys
+                  function handleChunkLoadFailure(msg) {
+                    if (!msg) return;
+                    if (
+                      msg.indexOf("Cannot read properties of undefined (reading 'call')") !== -1 ||
+                      msg.indexOf("Loading chunk") !== -1 ||
+                      msg.indexOf("ChunkLoadError") !== -1 ||
+                      msg.indexOf("Failed to fetch dynamically imported module") !== -1
+                    ) {
                       var reloadKey = 'quantos_chunk_recover_ts';
                       var lastReload = sessionStorage.getItem(reloadKey);
                       var now = Date.now();
-                      if (!lastReload || (now - Number(lastReload)) > 5000) {
+                      if (!lastReload || (now - Number(lastReload)) > 10000) {
                         sessionStorage.setItem(reloadKey, String(now));
                         window.location.reload();
                       }
                     }
+                  }
+                  window.addEventListener('error', function(e) {
+                    handleChunkLoadFailure(e && e.message);
+                  });
+                  window.addEventListener('unhandledrejection', function(e) {
+                    var reason = e && e.reason;
+                    var msg = (reason && (reason.message || reason.name)) || String(reason || '');
+                    handleChunkLoadFailure(msg);
                   });
                 }
               } catch (e) {}

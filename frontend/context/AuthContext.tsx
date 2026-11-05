@@ -725,17 +725,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
-    // 2. Production fail-closed: Never fall back to legacy OTP in production
-    if (process.env.NODE_ENV === "production") {
-      return {
-        success: false,
-        message: "Supabase Authentication is required in production.",
-        error: "Legacy OTP resend is disabled in production.",
-        cooldown_seconds: 60,
-      };
-    }
-
-    // 3. Fallback to existing native Flask Resend (development/local only)
+    // 2. Fallback to authoritative backend email OTP resend
     try {
       const res = await fetch("/api/auth/email-otp/resend", {
         method: "POST",

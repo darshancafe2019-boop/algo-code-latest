@@ -13,6 +13,23 @@ export default function GlobalError({
 }) {
   useEffect(() => {
     console.error("Quant.OS Client Component Error Boundary:", error);
+
+    // Auto-recover from stale Webpack chunks, dynamic import timeouts, or Fast Refresh hash mismatches
+    const isChunkError =
+      error?.name === "ChunkLoadError" ||
+      error?.message?.includes("Loading chunk") ||
+      error?.message?.includes("Failed to fetch dynamically imported module") ||
+      error?.message?.includes("Cannot read properties of undefined (reading 'call')");
+
+    if (isChunkError && typeof window !== "undefined") {
+      const reloadKey = "quantos_chunk_reload_ts";
+      const lastReload = sessionStorage.getItem(reloadKey);
+      const now = Date.now();
+      if (!lastReload || now - Number(lastReload) > 10000) {
+        sessionStorage.setItem(reloadKey, String(now));
+        window.location.reload();
+      }
+    }
   }, [error]);
 
   return (

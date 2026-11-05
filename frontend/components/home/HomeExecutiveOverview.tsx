@@ -306,12 +306,12 @@ export function HomeExecutiveOverview() {
   // ── Financial Metrics Calculation (100% Dynamic) ───────────────────────────
   const baseCurrency = portfolioSnapshot?.baseCurrency || snapshotData?.portfolio?.baseCurrency || "USD";
   const currSym = resolveCurrencySymbol(baseCurrency);
-  const totalCapital = Number(portfolioSnapshot?.equity ?? (portfolioSnapshot as any)?.balance ?? snapshotData?.portfolio?.equity ?? 335082.15) || 0;
+  const totalCapital = Number(portfolioSnapshot?.equity ?? portfolioSnapshot?.cashBalance ?? snapshotData?.portfolio?.equity ?? 335082.15) || 0;
   const usedMargin = Number(portfolioSnapshot?.marginUsed ?? snapshotData?.portfolio?.marginUsed ?? 877.89) || 0;
-  const availableMargin = Number((portfolioSnapshot as any)?.availableMargin ?? (totalCapital - usedMargin)) || (totalCapital - usedMargin);
+  const availableMargin = Number(portfolioSnapshot?.availableCapital ?? (totalCapital - usedMargin)) || (totalCapital - usedMargin);
   const todaysPnl = Number(portfolioSnapshot?.dailyPnl ?? snapshotData?.pnl?.dailyPnl ?? 0) || 0;
   const todaysPnlPct = totalCapital > 0 ? (todaysPnl / totalCapital) * 100 : 0;
-  const totalPnl = Number((portfolioSnapshot as any)?.totalPnl ?? snapshotData?.pnl?.totalPnl ?? 235082.15) || 0;
+  const totalPnl = Number(portfolioSnapshot?.netPnl ?? portfolioSnapshot?.netRealizedPnl ?? snapshotData?.pnl?.totalPnl ?? 235082.15) || 0;
   const totalPnlPct = totalCapital > 0 ? (totalPnl / totalCapital) * 100 : 0;
   const openPositionsCount = ensureArray(rawPositions).length;
   const botList = useMemo(() => ensureArray(botsData), [botsData]);

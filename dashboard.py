@@ -486,7 +486,7 @@ def enforce_server_side_security():
         or path.startswith("/api/notifications/")
         or path.startswith("/api/futures/")
         or path.startswith("/api/v2/")
-        or (path in ["/api/positions", "/api/orders", "/api/risk/summary", "/api/risk/overview", "/api/stream/portfolio", "/api/audit/events"] and request.method == "GET" and (request.args.get("mode", "PAPER").upper() == "PAPER" or getattr(config, "TRADING_MODE", "PAPER") == "PAPER"))
+        or (path in ["/api/positions", "/api/orders", "/api/risk/summary", "/api/risk/overview", "/api/audit/events"] and request.method == "GET" and (request.args.get("mode", "PAPER").upper() == "PAPER" or getattr(config, "TRADING_MODE", "PAPER") == "PAPER"))
         or (path.startswith("/api/tax/") and request.method == "GET")
         or path.startswith("/feed/")
         or path.startswith("/api/feed/")
@@ -19119,12 +19119,13 @@ def api_stream_portfolio():
             "message": "Portfolio stream mode must be PAPER or LIVE."
         }), 400
 
-    if mode == "LIVE":
+    auth_required = os.getenv("AUTH_REQUIRE_LOGIN", "true").lower() in ("true", "1") or bool(app.config.get("TESTING")) or mode == "LIVE"
+    if auth_required:
         if not token:
             return jsonify({
                 "status": "error",
                 "error_code": "UNAUTHORIZED",
-                "message": "Authentication required to stream live portfolio data."
+                "message": "Authentication required to stream portfolio data."
             }), 401
 
         user, session = get_current_user_and_session(allow_dev_fallback=False)

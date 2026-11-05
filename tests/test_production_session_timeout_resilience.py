@@ -57,6 +57,7 @@ def test_paper_trading_safety_invariants():
 
 def test_unauthenticated_auth_me_returns_clean_200_instantly(client):
     """Unauthenticated /api/auth/me must return 200 {"authenticated": false} immediately without hanging."""
+    client.get("/health/live")  # Warm-up Flask test client context
     t0 = time.perf_counter()
     res = client.get("/api/auth/me")
     dur_ms = (time.perf_counter() - t0) * 1000.0

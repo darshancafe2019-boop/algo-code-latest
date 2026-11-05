@@ -12,14 +12,14 @@ export const isSupabaseConfigured = (): boolean => {
   );
 };
 
-let _supabaseInstance: SupabaseClient | null = null;
+const globalForSupabase = globalThis as unknown as { _quantosSupabaseClient?: SupabaseClient };
 
 export const getSupabase = (): SupabaseClient | null => {
   if (!isSupabaseConfigured()) {
     return null;
   }
-  if (!_supabaseInstance) {
-    _supabaseInstance = createClient(supabaseUrl, supabaseAnonKey, {
+  if (!globalForSupabase._quantosSupabaseClient) {
+    globalForSupabase._quantosSupabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
       auth: {
         persistSession: true,
         autoRefreshToken: true,
@@ -28,7 +28,7 @@ export const getSupabase = (): SupabaseClient | null => {
       },
     });
   }
-  return _supabaseInstance;
+  return globalForSupabase._quantosSupabaseClient;
 };
 
 // Singleton instance reuses the exact same GoTrueClient to avoid multiple instances in browser

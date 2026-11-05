@@ -260,9 +260,11 @@ class FailoverManager:
         # ── TIER 4: Fallback to first configured adapter in chain ───────────────
         for provider_id in chain:
             adapter = self._adapters.get(provider_id)
-            if adapter is not None and getattr(adapter, "get_status", lambda: "")().upper() != "NOT_CONFIGURED":
-                self._record_selection(symbol, provider_id)
-                return adapter
+            if adapter is not None:
+                st = getattr(adapter, "get_status", lambda: "")().upper()
+                if st not in ("NOT_CONFIGURED", "DISCONNECTED", "AUTH_FAILED", "CONFIG_MISSING", "ERROR", ""):
+                    self._record_selection(symbol, provider_id)
+                    return adapter
 
         logger.warning("No available provider for %s (chain: %s)", symbol, chain)
         return None

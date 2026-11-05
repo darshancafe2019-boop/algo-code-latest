@@ -410,6 +410,16 @@ def resolve_canonical_quote(
             "message": "Symbol query parameter is required."
         }
 
+    gw_secret = os.environ.get("MARKET_GATEWAY_SECRET", "").strip()
+    if not gw_secret:
+        return 500, {
+            "ok": False,
+            "status": "error",
+            "code": "GATEWAY_SECRET_UNCONFIGURED",
+            "symbol": symbol.strip() if symbol else "",
+            "message": "MARKET_GATEWAY_SECRET is required but not configured in environment."
+        }
+
     clean_symbol = symbol.strip()
     aliases = resolve_symbol_aliases(clean_symbol)
 

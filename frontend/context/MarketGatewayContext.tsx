@@ -182,6 +182,7 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
   const eventSourceRef = useRef<EventSource | null>(null);
   const streamIdRef = useRef<string>("");
   const mountedRef = useRef(true);
+  const connectionGenerationRef = useRef(0);
   const reconnectAttemptRef = useRef(0);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const connectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -531,13 +532,14 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
       }
     }
 
+    const generationId = ++connectionGenerationRef.current;
     const nextStatus = reconnectAttemptRef.current > 0 ? "RECONNECTING" : "CONNECTING";
     setConnectionStatus(nextStatus);
     useMarketFeedStore.getState().setConnectionStatus(nextStatus);
 
     if (process.env.NODE_ENV === "production" && !isAuthenticated) {
-      setConnectionStatus("LIVE");
-      useMarketFeedStore.getState().setConnectionStatus("LIVE");
+      setConnectionStatus("DISCONNECTED");
+      useMarketFeedStore.getState().setConnectionStatus("DISCONNECTED");
       return;
     }
 
@@ -564,6 +566,7 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
     }
 
     const connectTimeout = setTimeout(() => {
+      if (generationId !== connectionGenerationRef.current) return;
       if (es.readyState !== EventSource.CONNECTING) return;
       if (eventSourceRef.current === es) eventSourceRef.current = null;
       safeCloseEventSource(es);
@@ -575,7 +578,7 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
     es.onopen = () => {
       clearTimeout(connectTimeout);
       if (connectTimeoutRef.current === connectTimeout) connectTimeoutRef.current = null;
-      if (!mountedRef.current || eventSourceRef.current !== es) return;
+      if (!mountedRef.current || generationId !== connectionGenerationRef.current || eventSourceRef.current !== es) return;
 
       reconnectAttemptRef.current = 0;
       lastHeartbeatRef.current = Date.now();
@@ -584,7 +587,7 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
     };
 
     es.onmessage = (event) => {
-      if (!mountedRef.current || eventSourceRef.current !== es) return;
+      if (!mountedRef.current || generationId !== connectionGenerationRef.current || eventSourceRef.current !== es) return;
       try {
         const msg = JSON.parse(event.data);
         processIncomingMessage(msg);
@@ -594,7 +597,7 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
     es.onerror = () => {
       clearTimeout(connectTimeout);
       if (connectTimeoutRef.current === connectTimeout) connectTimeoutRef.current = null;
-      if (!mountedRef.current || eventSourceRef.current !== es) return;
+      if (!mountedRef.current || generationId !== connectionGenerationRef.current || eventSourceRef.current !== es) return;
 
       if (eventSourceRef.current === es) eventSourceRef.current = null;
       safeCloseEventSource(es);
@@ -645,6 +648,7 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
       }
     }
 
+    const generationId = ++connectionGenerationRef.current;
     const nextStatus = reconnectAttemptRef.current > 0 ? "RECONNECTING" : "CONNECTING";
     setConnectionStatus(nextStatus);
     useMarketFeedStore.getState().setConnectionStatus(nextStatus);
@@ -664,6 +668,7 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
     let finalWsUrl = baseWsUrl;
     try {
       const token = await fetchStreamToken();
+      if (generationId !== connectionGenerationRef.current || !mountedRef.current) return;
       if (token) {
         const u = new URL(finalWsUrl);
         u.searchParams.set("token", token);
@@ -673,7 +678,7 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
       // proceed with baseWsUrl
     }
 
-    if (!mountedRef.current) return;
+    if (!mountedRef.current || generationId !== connectionGenerationRef.current) return;
     if (wsRef.current && (wsRef.current.readyState === WebSocket.OPEN || wsRef.current.readyState === WebSocket.CONNECTING)) {
       return;
     }
@@ -689,6 +694,7 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
     }
 
     const connectTimeout = setTimeout(() => {
+      if (generationId !== connectionGenerationRef.current) return;
       if (ws.readyState !== WebSocket.CONNECTING) return;
       if (wsRef.current === ws) wsRef.current = null;
       safeCloseSocket(ws, 4000, "Connection timeout");
@@ -703,7 +709,7 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
         connectTimeoutRef.current = null;
       }
 
-      if (!mountedRef.current || wsRef.current !== ws || (ws as ManagedWebSocket)._suppressReconnect) {
+      if (!mountedRef.current || generationId !== connectionGenerationRef.current || wsRef.current !== ws || (ws as ManagedWebSocket)._suppressReconnect) {
         return;
       }
 
@@ -736,7 +742,7 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
     };
 
     ws.onmessage = (event) => {
-      if (!mountedRef.current || wsRef.current !== ws || (ws as ManagedWebSocket)._suppressReconnect) {
+      if (!mountedRef.current || generationId !== connectionGenerationRef.current || wsRef.current !== ws || (ws as ManagedWebSocket)._suppressReconnect) {
         return;
       }
       try {
@@ -748,7 +754,7 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
     ws.onerror = () => {
       clearTimeout(connectTimeout);
       if (connectTimeoutRef.current === connectTimeout) connectTimeoutRef.current = null;
-      if (!mountedRef.current || wsRef.current !== ws) return;
+      if (!mountedRef.current || generationId !== connectionGenerationRef.current || wsRef.current !== ws) return;
 
       if (wsRef.current === ws) wsRef.current = null;
       safeCloseSocket(ws, 1000, "Socket error");
@@ -762,7 +768,7 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
     ws.onclose = () => {
       clearTimeout(connectTimeout);
       if (connectTimeoutRef.current === connectTimeout) connectTimeoutRef.current = null;
-      if (!mountedRef.current) return;
+      if (!mountedRef.current || generationId !== connectionGenerationRef.current) return;
 
       const managedWs = ws as ManagedWebSocket;
       if (managedWs._suppressReconnect) return;

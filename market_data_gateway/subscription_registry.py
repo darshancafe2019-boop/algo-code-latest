@@ -105,10 +105,11 @@ class SubscriptionRegistry:
     def subscribe(self, symbol: str, reason: str, source: str = "", mode: str = "full") -> None:
         """Register a subscription for a symbol with a given reason and mode."""
         sym = symbol.upper()
-        effective_reason = reason if reason in VALID_REASONS else "WATCHLIST"
         if reason not in VALID_REASONS:
-            logger.debug("Remapping custom subscription reason '%s' to '%s' for %s", reason, effective_reason, sym)
+            logger.warning("Rejected invalid subscription reason '%s' for %s", reason, sym)
+            return
 
+        effective_reason = reason
         clean_mode = mode.lower() if mode.lower() in MODE_PRIORITY else "full"
         sub_key = self._make_key(effective_reason, source)
 

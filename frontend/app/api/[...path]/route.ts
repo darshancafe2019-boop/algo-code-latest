@@ -347,6 +347,28 @@ async function handleProxy(req: NextRequest, ctx: { params?: { path: string[] } 
   const canonicalPath = subPath.startsWith("api/") ? subPath : `api/${subPath}`;
   const targetUrl = `${BACKEND_URL}/${canonicalPath}${url.search}`;
 
+  // ── 2.5 Fast In-Memory Catalog Cache for Public Read Queries ───────────────
+  const isCatalog = req.method === "GET" && (
+    subPath.includes("universe/summary") ||
+    subPath.includes("universe/instruments") ||
+    subPath.includes("universe/expiries")
+  );
+
+  if (isCatalog) {
+    const cached = PROXY_MEMORY_CACHE.get(targetUrl) || PROXY_MEMORY_CACHE.get(subPath);
+    if (cached && (Date.now() - cached.timestamp < 15_000)) {
+      return new NextResponse(cached.body, {
+        status: cached.status,
+        headers: {
+          "X-Request-Id": requestId,
+          "X-Response-Time-Ms": "0",
+          "X-Proxy-Cache": "HIT",
+          "Content-Type": cached.contentType,
+        },
+      });
+    }
+  }
+
   let finalResponse: Response | null = null;
   let lastError: any = null;
 

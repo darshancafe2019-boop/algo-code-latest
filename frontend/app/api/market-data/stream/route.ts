@@ -190,14 +190,6 @@ async function authenticateRequest(
     console.warn(
       `[STREAM_AUTH] [req_id=${requestId}] Auth verification error (timeout=${isTimeout}): ${err?.message || "network failure"}.`
     );
-    // Transient backend timeout during cold start: allow valid-format tokens a short grace period
-    if (token && token.length >= 16 && isTimeout) {
-      tokenAuthCache.set(token, {
-        authenticated: true,
-        expiresAt: Date.now() + 30_000,
-      });
-      return { authenticated: true };
-    }
     return {
       authenticated: false,
       error: isTimeout
@@ -312,8 +304,10 @@ export async function GET(req: NextRequest) {
         }
       };
 
+      let isFallbackRunning = false;
       const startFallbackStream = async (statusMessage?: string) => {
-        if (isCleanedUp) return;
+        if (isCleanedUp || isFallbackRunning) return;
+        isFallbackRunning = true;
 
         activeStreams.set(streamId, {
           ws: null,
@@ -595,8 +589,8 @@ export async function GET(req: NextRequest) {
 
   return new Response(stream, {
     headers: {
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache, no-transform",
+      "Content-Type": "text/event-stream; charset=utf-8",
+      "Cache-Control": "no-cache, no-transform, no-store, must-revalidate",
       Connection: "keep-alive",
       "X-Accel-Buffering": "no",
     },

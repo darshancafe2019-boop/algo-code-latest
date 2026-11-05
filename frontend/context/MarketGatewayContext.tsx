@@ -193,6 +193,8 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
   const subRefsRef = useRef<Map<string, SubRef>>(new Map());
   const quotesRef = useRef<Map<string, NormalizedQuote>>(new Map());
   const symbolListenersRef = useRef<Map<string, Set<(quote: NormalizedQuote) => void>>>(new Map());
+  const sseFailureCountRef = useRef<number>(0);
+  const lastSubscribedSymbolsKeyRef = useRef<string>("");
   const pendingQuotesRef = useRef<Map<string, NormalizedQuote>>(new Map());
   const batchFrameRef = useRef<number | null>(null);
 
@@ -487,12 +489,14 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
   const scheduleReconnect = useCallback(() => {
     if (!mountedRef.current) return;
 
-    setConnectionStatus("RECONNECTING");
-    useMarketFeedStore.getState().setConnectionStatus("RECONNECTING");
+    const isFailing = sseFailureCountRef.current >= 2;
+    const nextStatus = isFailing ? "POLLING" : "RECONNECTING";
+    setConnectionStatus(nextStatus);
+    useMarketFeedStore.getState().setConnectionStatus(nextStatus as any);
 
     const attempt = reconnectAttemptRef.current;
     const delayIndex = Math.min(attempt, RECONNECT_DELAYS.length - 1);
-    const baseDelay = RECONNECT_DELAYS[delayIndex];
+    const baseDelay = isFailing ? Math.max(5000, RECONNECT_DELAYS[delayIndex]) : RECONNECT_DELAYS[delayIndex];
     const jitter = Math.floor(Math.random() * 300);
     const delay = baseDelay + jitter;
 
@@ -580,6 +584,7 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
       if (connectTimeoutRef.current === connectTimeout) connectTimeoutRef.current = null;
       if (!mountedRef.current || generationId !== connectionGenerationRef.current || eventSourceRef.current !== es) return;
 
+      sseFailureCountRef.current = 0;
       reconnectAttemptRef.current = 0;
       lastHeartbeatRef.current = Date.now();
       setConnectionStatus("CONNECTED");
@@ -601,7 +606,9 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
 
       if (eventSourceRef.current === es) eventSourceRef.current = null;
       safeCloseEventSource(es);
-      if (quotesRef.current.size > 0) {
+
+      sseFailureCountRef.current++;
+      if (sseFailureCountRef.current >= 2 || quotesRef.current.size > 0) {
         setConnectionStatus("POLLING");
         useMarketFeedStore.getState().setConnectionStatus("POLLING" as any);
       }
@@ -831,6 +838,11 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
     // If using SSE, sync via POST or debounced reconnect
     if (eventSourceRef.current && streamIdRef.current) {
       const symbolsToSend = allSubs.length > 0 ? allSubs : ["*"];
+      const symbolsKey = symbolsToSend.slice().sort().join(",");
+      if (symbolsKey === lastSubscribedSymbolsKeyRef.current) {
+        return;
+      }
+
       try {
         const res = await fetch("/api/market-data/stream", {
           method: "POST",
@@ -847,6 +859,7 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
         if (res.ok) {
           const data = await res.json().catch(() => ({}));
           if (data.handled) {
+            lastSubscribedSymbolsKeyRef.current = symbolsKey;
             return;
           }
         }
@@ -854,7 +867,9 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
         // Fall back to reconnect below
       }
 
-      if (mountedRef.current && eventSourceRef.current) {
+      // If instance mismatch or unhandled, only reconnect if symbols genuinely changed
+      if (mountedRef.current && eventSourceRef.current && symbolsKey !== lastSubscribedSymbolsKeyRef.current) {
+        lastSubscribedSymbolsKeyRef.current = symbolsKey;
         safeCloseEventSource(eventSourceRef.current);
         eventSourceRef.current = null;
         connectSSE();
@@ -869,7 +884,7 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
     pendingSubscriptionFlushRef.current = setTimeout(() => {
       pendingSubscriptionFlushRef.current = null;
       flushSubscriptionUpdates();
-    }, 150);
+    }, 400);
   }, [flushSubscriptionUpdates]);
 
   // ───────────────────────────────────────────────────────────────────────────

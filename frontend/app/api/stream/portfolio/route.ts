@@ -45,7 +45,17 @@ export async function GET(req: NextRequest) {
       });
       clearTimeout(connectTimer);
 
-      if (upstreamRes.ok && upstreamRes.body) {
+      if (!upstreamRes.ok) {
+        const errText = await upstreamRes.text();
+        return new NextResponse(errText, {
+          status: upstreamRes.status,
+          headers: {
+            "Content-Type": upstreamRes.headers.get("Content-Type") || "application/json",
+          },
+        });
+      }
+
+      if (upstreamRes.body) {
         return new Response(upstreamRes.body, {
           status: 200,
           headers: {
@@ -62,6 +72,7 @@ export async function GET(req: NextRequest) {
         const snapRes = await fetch(`${backendUrl}/api/portfolio/snapshot?mode=${encodeURIComponent(mode)}`, {
           headers: getForwardHeaders(req),
           cache: "no-store",
+          signal: AbortSignal.timeout(2000),
         });
         if (snapRes.ok) {
           const snapData = await snapRes.json();
@@ -91,11 +102,27 @@ export async function GET(req: NextRequest) {
       });
     } catch (err: any) {
       clearTimeout(connectTimer);
-      // Graceful fallback on connection/timeout error
+      const isTimeout = err?.name === "AbortError" || err?.name === "TimeoutError";
+      if (isTimeout) {
+        return NextResponse.json(
+          {
+            ok: false,
+            success: false,
+            status: "error",
+            error: {
+              code: "STREAM_ERROR",
+              message: "Portfolio stream connection timed out.",
+            },
+          },
+          { status: 503 }
+        );
+      }
+      // Graceful fallback on connection/network error
       try {
         const snapRes = await fetch(`${backendUrl}/api/portfolio/snapshot?mode=${encodeURIComponent(mode)}`, {
           headers: getForwardHeaders(req),
           cache: "no-store",
+          signal: AbortSignal.timeout(2000),
         });
         if (snapRes.ok) {
           const snapData = await snapRes.json();

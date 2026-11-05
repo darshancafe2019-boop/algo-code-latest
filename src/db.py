@@ -8486,8 +8486,8 @@ def update_instrument_controls(
         return False, str(exc)
 
 
-def get_universe_summary_stats() -> Dict[str, Any]:
-    """Returns total counts by asset class, volatility, trading status, and last sync timestamp."""
+def get_universe_summary_stats_legacy() -> Dict[str, Any]:
+    """Legacy helper: Returns counts by asset class from market_universe table."""
     stats = {
         "total_instruments": 0,
         "indices_count": 0,

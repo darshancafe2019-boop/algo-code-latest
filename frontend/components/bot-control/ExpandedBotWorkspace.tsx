@@ -130,14 +130,17 @@ export function ExpandedBotWorkspace({
     }, 600);
   };
 
-  // Mock orders for the bot
-  const recentOrders = [
-    { id: "ORD-183004", time: "13:45:32", type: "MARKET", side: "BUY", qty: 1, price: 254.29, status: "FILLED" },
-    { id: "ORD-183003", time: "13:45:18", type: "MARKET", side: "BUY", qty: 1, price: 254.31, status: "FILLED" },
-    { id: "ORD-183002", time: "13:45:17", type: "LIMIT", side: "BUY", qty: 1, price: 254.29, status: "FILLED" },
-    { id: "ORD-183000", time: "13:44:55", type: "MARKET", side: "BUY", qty: 1, price: 254.29, status: "FILLED" },
-    { id: "ORD-182999", time: "13:44:36", type: "MARKET", side: "SELL", qty: 1, price: 254.40, status: "FILLED" },
-  ];
+  // Authoritative recent orders from bot state or empty ledger
+  const rawOrders = (bot as any)?.recent_orders || (bot as any)?.orders || [];
+  const recentOrders: Array<{
+    id: string;
+    time: string;
+    type: string;
+    side: string;
+    qty?: number;
+    price: string | number;
+    status: string;
+  }> = Array.isArray(rawOrders) ? rawOrders.slice(0, 5) : [];
 
   return (
     <div className="w-full rounded-[8px] bg-[#091426] border border-[#1A2B43] p-3.5 space-y-3.5 select-none font-sans shadow-xl">
@@ -427,26 +430,32 @@ export function ExpandedBotWorkspace({
               </div>
 
               <div className="space-y-1">
-                {recentOrders.map((ord) => (
-                  <div
-                    key={ord.id}
-                    className="flex items-center justify-between py-1 border-b border-[#1A2B43]/40 last:border-0 text-[9px]"
-                  >
-                    <div>
-                      <div className="flex items-center gap-1">
-                        <span className={cn("px-1 py-0.1 rounded text-[8px] font-bold", ord.side === "BUY" ? "bg-[#00D6A0]/15 text-[#00D6A0]" : "bg-[#FF5268]/15 text-[#FF5268]")}>
-                          {ord.side}
-                        </span>
-                        <span className="font-bold text-[#EAF3FF]">{ord.id}</span>
+                {recentOrders.length > 0 ? (
+                  recentOrders.map((ord) => (
+                    <div
+                      key={ord.id}
+                      className="flex items-center justify-between py-1 border-b border-[#1A2B43]/40 last:border-0 text-[9px]"
+                    >
+                      <div>
+                        <div className="flex items-center gap-1">
+                          <span className={cn("px-1 py-0.1 rounded text-[8px] font-bold", ord.side === "BUY" ? "bg-[#00D6A0]/15 text-[#00D6A0]" : "bg-[#FF5268]/15 text-[#FF5268]")}>
+                            {ord.side}
+                          </span>
+                          <span className="font-bold text-[#EAF3FF]">{ord.id}</span>
+                        </div>
+                        <span className="text-[#91A7C1] text-[8px]">{ord.time} • {ord.type}</span>
                       </div>
-                      <span className="text-[#91A7C1] text-[8px]">{ord.time} • {ord.type}</span>
+                      <div className="text-right">
+                        <div className="font-bold text-[#EAF3FF]">{ord.price}</div>
+                        <span className="text-[#00D6A0] text-[8px]">{ord.status}</span>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <div className="font-bold text-[#EAF3FF]">{ord.price}</div>
-                      <span className="text-[#00D6A0] text-[8px]">{ord.status}</span>
-                    </div>
+                  ))
+                ) : (
+                  <div className="py-3 text-center text-[9px] text-[#91A7C1]/70 font-mono">
+                    No active or recent orders
                   </div>
-                ))}
+                )}
               </div>
             </div>
 

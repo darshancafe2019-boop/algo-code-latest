@@ -9,7 +9,7 @@
     "predev": "node -e \"const fs=require('fs');try{fs.rmSync('.next',{recursive:true,force:true});fs.rmSync('tsconfig.tsbuildinfo',{force:true});}catch(e){}\"",
     "dev": "next dev -p 3100",
     "dev:all": "python ../run_system.py",
-    "prebuild": "node -e \"const fs=require('fs');try{fs.rmSync('.next',{recursive:true,force:true});fs.rmSync('tsconfig.tsbuildinfo',{force:true});}catch(e){}\"",
+    "prebuild": "node -e \"const fs=require('fs');try{fs.rmSync('tsconfig.tsbuildinfo',{force:true});}catch(e){}\"",
     "build": "next build",
     "start": "next start -p 3100",
     "lint": "next lint",

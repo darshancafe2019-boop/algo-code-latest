@@ -15247,93 +15247,109 @@ def api_auth_supabase_verify():
     maps to the authoritative QUANT.OS user record, checks active status,
     issues an authoritative trading session, and sets secure HttpOnly cookies.
     """
-    data = request.get_json(silent=True) or {}
-    token = (data.get("access_token") or data.get("token") or "").strip()
-    if not token:
-        auth_hdr = request.headers.get("Authorization", "")
-        if auth_hdr.startswith("Bearer "):
-            token = auth_hdr.split(" ")[1].strip()
+    t_start = time.perf_counter()
+    req_id = getattr(g, "request_id", "") or request.headers.get("X-Request-Id", "")
+    try:
+        data = request.get_json(silent=True) or {}
+        token = (data.get("access_token") or data.get("token") or "").strip()
+        if not token:
+            auth_hdr = request.headers.get("Authorization", "")
+            if auth_hdr.startswith("Bearer "):
+                token = auth_hdr.split(" ")[1].strip()
 
-    if not token:
-        return jsonify({
-            "status": "error",
-            "success": False,
-            "error_code": "MISSING_TOKEN",
-            "message": "Supabase access token is required."
-        }), 400
+        if not token:
+            return jsonify({
+                "status": "error",
+                "success": False,
+                "error_code": "MISSING_TOKEN",
+                "message": "Supabase access token is required."
+            }), 400
 
-    from src.supabase_auth import global_supabase_validator
-    user, session, err = global_supabase_validator.authenticate_jwt(token)
-    if err or not user or not session:
-        return jsonify({
-            "status": "error",
-            "success": False,
-            "error_code": err or "INVALID_TOKEN",
-            "message": f"Supabase token validation failed: {err}"
-        }), 401
+        from src.supabase_auth import global_supabase_validator
+        user, session, err = global_supabase_validator.authenticate_jwt(token)
+        if err or not user or not session:
+            dur_ms = round((time.perf_counter() - t_start) * 1000.0, 2)
+            logger.warning("[AUTH_SUPABASE_VERIFY] [req_id=%s] [dur=%0.2fms] validation_failed: %s", req_id, dur_ms, err)
+            return jsonify({
+                "status": "error",
+                "success": False,
+                "error_code": err or "INVALID_TOKEN",
+                "message": f"Supabase token validation failed: {err}"
+            }), 401
 
-    role = user.get("role", "ADMIN")
-    permissions = list(ROLE_PERMISSIONS.get(role, set()))
-    passkeys = json.loads(user.get("passkeys_json") or "[]")
-    recovery_codes = json.loads(user.get("recovery_codes_json") or "[]")
+        role = user.get("role", "ADMIN")
+        permissions = list(ROLE_PERMISSIONS.get(role, set()))
+        passkeys = json.loads(user.get("passkeys_json") or "[]")
+        recovery_codes = json.loads(user.get("recovery_codes_json") or "[]")
 
-    # Issue an internal session token so both cookie and Bearer tokens are supported interchangeably
-    raw_session_token, session_meta = SessionManager.create_session(
-        user_id=user["id"],
-        device_name=request.headers.get("User-Agent", "Web Terminal")[:50],
-        ip_address=request.remote_addr or "127.0.0.1",
-        user_agent=request.headers.get("User-Agent", "")[:250],
-    )
-
-    db.log_security_audit_event(
-        action="LOGIN_SUCCESS",
-        actor_user_id=user["id"],
-        actor_role=role,
-        resource_type="SESSION",
-        resource_id=session_meta["session_id"],
-        result="SUCCESS",
-        assurance_level="LEVEL_1_CONFIG",
-        details={
-            "auth_provider": "SUPABASE",
-            "supabase_uid": session.get("supabase_uid"),
-            "email": user.get("email")
-        }
-    )
-
-    resp_data = {
-        "status": "success",
-        "success": True,
-        "authenticated": True,
-        "user": {
-            "id": user["id"],
-            "username": user["username"],
-            "email": user["email"],
-            "role": role,
-            "is_2fa_enabled": bool(user.get("is_2fa_enabled")),
-            "must_change_password": bool(user.get("must_change_password", 0)),
-            "passkeys_count": len(passkeys),
-            "recovery_codes_remaining": len(recovery_codes),
-        },
-        "session": session_meta,
-        "session_token": raw_session_token,
-        "permissions": permissions,
-        "message": "Supabase authentication verified successfully."
-    }
-
-    resp = make_response(jsonify(resp_data), 200)
-    is_prod = bool(getattr(config, "IS_PRODUCTION", False))
-    cookie_secure = is_prod or request.is_secure
-    for c_name in ["algo_session_token", "quantos_session_token"]:
-        resp.set_cookie(
-            c_name,
-            raw_session_token,
-            max_age=86400,
-            httponly=True,
-            secure=cookie_secure,
-            samesite="Lax",
-            path="/"
+        # Issue an internal session token so both cookie and Bearer tokens are supported interchangeably
+        raw_session_token, session_meta = SessionManager.create_session(
+            user_id=user["id"],
+            device_name=request.headers.get("User-Agent", "Web Terminal")[:50],
+            ip_address=request.remote_addr or "127.0.0.1",
+            user_agent=request.headers.get("User-Agent", "")[:250],
         )
-    return resp
+
+        db.log_security_audit_event(
+            action="LOGIN_SUCCESS",
+            actor_user_id=user["id"],
+            actor_role=role,
+            resource_type="SESSION",
+            resource_id=session_meta["session_id"],
+            result="SUCCESS",
+            assurance_level="LEVEL_1_CONFIG",
+            details={
+                "auth_provider": "SUPABASE",
+                "supabase_uid": session.get("supabase_uid"),
+                "email": user.get("email")
+            }
+        )
+
+        resp_data = {
+            "status": "success",
+            "success": True,
+            "authenticated": True,
+            "user": {
+                "id": user["id"],
+                "username": user["username"],
+                "email": user["email"],
+                "role": role,
+                "is_2fa_enabled": bool(user.get("is_2fa_enabled")),
+                "must_change_password": bool(user.get("must_change_password", 0)),
+                "passkeys_count": len(passkeys),
+                "recovery_codes_remaining": len(recovery_codes),
+            },
+            "session": session_meta,
+            "session_token": raw_session_token,
+            "permissions": permissions,
+            "message": "Supabase authentication verified successfully."
+        }
+
+        resp = make_response(jsonify(resp_data), 200)
+        is_prod = bool(getattr(config, "IS_PRODUCTION", False))
+        cookie_secure = is_prod or request.is_secure
+        for c_name in ["algo_session_token", "quantos_session_token"]:
+            resp.set_cookie(
+                c_name,
+                raw_session_token,
+                max_age=86400,
+                httponly=True,
+                secure=cookie_secure,
+                samesite="Lax",
+                path="/"
+            )
+        dur_ms = round((time.perf_counter() - t_start) * 1000.0, 2)
+        logger.info("[AUTH_SUPABASE_VERIFY] [req_id=%s] [duration=%0.2fms] session_issued user_id=%s", req_id, dur_ms, user.get("id"))
+        return resp
+    except Exception as exc:
+        dur_ms = round((time.perf_counter() - t_start) * 1000.0, 2)
+        logger.exception("[AUTH_SUPABASE_VERIFY_ERROR] [req_id=%s] [duration=%0.2fms] exception: %s", req_id, dur_ms, exc)
+        return jsonify({
+            "status": "error",
+            "success": False,
+            "error_code": "INTERNAL_VERIFY_ERROR",
+            "message": "Internal error verifying Supabase authentication session."
+        }), 500
 
 
 @app.route("/api/auth/2fa/verify", methods=["POST"])

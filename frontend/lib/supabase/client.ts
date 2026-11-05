@@ -31,15 +31,5 @@ export const getSupabase = (): SupabaseClient | null => {
   return _supabaseInstance;
 };
 
-// Lazy getter instance for direct import convenience
-export const supabase = isSupabaseConfigured()
-  ? createClient(supabaseUrl, supabaseAnonKey, {
-    auth: {
-      persistSession: true,
-      autoRefreshToken: true,
-      detectSessionInUrl: true,
-      storageKey: "quantos_sb_auth_token",
-    },
-  })
-  : null;
-
+// Singleton instance reuses the exact same GoTrueClient to avoid multiple instances in browser
+export const supabase: SupabaseClient | null = getSupabase();

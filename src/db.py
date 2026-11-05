@@ -934,7 +934,7 @@ def get_authoritative_connection():
         pool_failed = False
         last_pool_exc = None
         if pool is not None:
-            checkout_timeout = float(os.getenv("PG_POOL_CHECKOUT_TIMEOUT", "1.5"))
+            checkout_timeout = float(os.getenv("PG_POOL_CHECKOUT_TIMEOUT", "8.0"))
             pool_conn = None
             try:
                 pool_conn = pool.getconn(timeout=checkout_timeout)
@@ -1010,7 +1010,7 @@ def safe_execute(sql: str, params: tuple = ()) -> bool:
         if pool is not None:
             pg_sql = translate_sqlite_sql_to_postgres(sql)
             is_ddl = sql.strip().upper().startswith(("CREATE ", "ALTER ", "DROP ", "VACUUM"))
-            checkout_timeout = float(os.getenv("PG_POOL_CHECKOUT_TIMEOUT", "1.5"))
+            checkout_timeout = float(os.getenv("PG_POOL_CHECKOUT_TIMEOUT", "8.0"))
             for attempt in range(2):
                 try:
                     with pool.connection(timeout=checkout_timeout) as conn:
@@ -1140,7 +1140,7 @@ def safe_query(sql: str, params: tuple = ()) -> list:
         pool = get_db_pool()
         if pool is not None:
             pg_sql = translate_sqlite_sql_to_postgres(sql)
-            checkout_timeout = float(os.getenv("PG_POOL_CHECKOUT_TIMEOUT", "1.5"))
+            checkout_timeout = float(os.getenv("PG_POOL_CHECKOUT_TIMEOUT", "8.0"))
             for attempt in range(2):
                 try:
                     from psycopg.rows import dict_row
@@ -1406,8 +1406,12 @@ def init_db(force: bool = False) -> None:
                                 logger.debug("PostgreSQL sequence check notice: %s", seq_err)
                         conn.commit()
                     logger.info("[OK] PostgreSQL database connection & critical tables verified.")
+                    _db_initialized = True
+                    return
             except Exception as e:
                 logger.warning("PostgreSQL verification notice: %s", e)
+                if getattr(config, "IS_POSTGRES", False) and getattr(config, "IS_PRODUCTION", False):
+                    return
 
         conn = None
         for attempt in range(5):
@@ -10014,12 +10018,12 @@ def bulk_upsert_instruments(instruments_list: List[Dict[str, Any]]) -> Tuple[int
 _UNIVERSE_STATS_CACHE: Dict[str, Any] = {}
 _UNIVERSE_STATS_CACHE_TS: float = 0.0
 _UNIVERSE_STATS_CACHE_LOCK = threading.Lock()
-_UNIVERSE_STATS_CACHE_TTL = 15.0
+_UNIVERSE_STATS_CACHE_TTL = 60.0
 
 _INSTRUMENTS_MASTER_CACHE: Dict[str, Any] = {}
 _INSTRUMENTS_MASTER_CACHE_TS: float = 0.0
 _INSTRUMENTS_MASTER_CACHE_LOCK = threading.Lock()
-_INSTRUMENTS_MASTER_CACHE_TTL = 10.0
+_INSTRUMENTS_MASTER_CACHE_TTL = 60.0
 
 
 def get_instruments_master(
@@ -10043,6 +10047,11 @@ def get_instruments_master(
             cached = _INSTRUMENTS_MASTER_CACHE.get(cache_key)
             if cached and (now_t - cached.get("_cached_at", 0)) < _INSTRUMENTS_MASTER_CACHE_TTL:
                 # Return copy without internal cache metadata
+                ret = dict(cached)
+                ret.pop("_cached_at", None)
+                return ret
+            # Stale-While-Revalidate: return stale copy up to 10 minutes old immediately to prevent HTTP timeouts
+            if cached and (now_t - cached.get("_cached_at", 0)) < 600.0:
                 ret = dict(cached)
                 ret.pop("_cached_at", None)
                 return ret
@@ -10215,6 +10224,9 @@ def get_universe_summary_stats() -> Dict[str, Any]:
     now_t = time.time()
     with _UNIVERSE_STATS_CACHE_LOCK:
         if _UNIVERSE_STATS_CACHE and (now_t - _UNIVERSE_STATS_CACHE_TS) < _UNIVERSE_STATS_CACHE_TTL:
+            return dict(_UNIVERSE_STATS_CACHE)
+        # Stale-While-Revalidate: return stale copy up to 10 minutes old immediately to prevent HTTP timeouts
+        if _UNIVERSE_STATS_CACHE and (now_t - _UNIVERSE_STATS_CACHE_TS) < 600.0:
             return dict(_UNIVERSE_STATS_CACHE)
 
     sql = """

@@ -317,18 +317,16 @@ async function handleProxy(req: NextRequest, ctx: { params?: { path: string[] } 
   const isHeavy = subPath.includes("backtest") || subPath.includes("simulate") || subPath.includes("risk/simulate");
   const isProductionEnv = isProduction();
   const timeoutMs = isStream
-    ? 5000
-    : (isStatus || isIndicator)
-      ? 4000
-      : isAuth
-        ? (isProductionEnv ? 24000 : 15000)
-        : isProductionEnv
-          ? 20000
-          : isUniverse
-            ? 25000
-            : isHeavy
-              ? 25000
-              : 15000;
+    ? (isProductionEnv ? 25000 : 15000)
+    : isAuth
+      ? (isProductionEnv ? 55000 : 25000)
+      : isUniverse
+        ? (isProductionEnv ? 45000 : 25000)
+        : isHeavy
+          ? (isProductionEnv ? 50000 : 30000)
+          : (isStatus || isIndicator)
+            ? (isProductionEnv ? 15000 : 8000)
+            : (isProductionEnv ? 30000 : 15000);
 
   let bodyData: BodyInit | null = null;
   if (["POST", "PUT", "PATCH", "DELETE"].includes(req.method)) {
@@ -484,7 +482,7 @@ async function handleProxy(req: NextRequest, ctx: { params?: { path: string[] } 
     }
 
     const responseString = JSON.stringify(jsonBody ?? {});
-    if (finalResponse.ok && req.method === "GET" && (subPath.includes("instruments") || subPath.includes("universe/instruments") || subPath.includes("expiries"))) {
+    if (finalResponse.ok && req.method === "GET" && (subPath.includes("instruments") || subPath.includes("universe") || subPath.includes("expiries"))) {
       const entry: CacheEntry = {
         body: responseString,
         contentType: "application/json",
@@ -502,7 +500,7 @@ async function handleProxy(req: NextRequest, ctx: { params?: { path: string[] } 
   }
 
   // Resilient Cache Fallback: Only serve static catalog data from memory cache
-  if (req.method === "GET" && (subPath.includes("instruments") || subPath.includes("expiries"))) {
+  if (req.method === "GET" && (subPath.includes("instruments") || subPath.includes("universe") || subPath.includes("expiries"))) {
     const cached = PROXY_MEMORY_CACHE.get(targetUrl) || PROXY_MEMORY_CACHE.get(subPath);
     if (cached && (Date.now() - cached.timestamp < 15 * 60 * 1000)) {
       return new NextResponse(cached.body, {

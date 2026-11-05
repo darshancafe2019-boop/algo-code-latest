@@ -57,7 +57,7 @@ export function LoginGateway() {
   const [authStep, setAuthStep] = useState<"credentials" | "email_otp" | "totp">("credentials");
   const [challengeId, setChallengeId] = useState<string | null>(null);
   const [destinationEmail, setDestinationEmail] = useState<string>("");
-  const [otpDigits, setOtpDigits] = useState<string[]>(Array(8).fill(""));
+  const [otpDigits, setOtpDigits] = useState<string[]>(Array(6).fill(""));
   const [useRecoveryCode, setUseRecoveryCode] = useState(false);
   const [recoveryCode, setRecoveryCode] = useState("");
   const [devOtp, setDevOtp] = useState<string | null>(null);
@@ -238,7 +238,7 @@ export function LoginGateway() {
         }
         if (res.devOtp) setDevOtp(res.devOtp);
         setResendCooldown(res.cooldown_seconds || 60);
-        setOtpDigits(res.devOtp && res.devOtp.length === 6 ? Array(6).fill("") : Array(8).fill(""));
+        setOtpDigits(res.devOtp && res.devOtp.length === 8 ? Array(8).fill("") : Array(6).fill(""));
         setSuccessMessage(res.message || `A verification code was sent to ${res.destination || target}.`);
         setTimeout(() => {
           digitInputRefs.current[0]?.focus();
@@ -292,7 +292,7 @@ export function LoginGateway() {
         }
         if (res.devOtp) setDevOtp(res.devOtp);
         setResendCooldown(60);
-        setOtpDigits(res.devOtp && res.devOtp.length === 6 ? Array(6).fill("") : Array(8).fill(""));
+        setOtpDigits(res.devOtp && res.devOtp.length === 8 ? Array(8).fill("") : Array(6).fill(""));
         setSuccessMessage(`A verification code was sent to ${res.destination || "your registered email"}.`);
         setTimeout(() => {
           digitInputRefs.current[0]?.focus();
@@ -964,8 +964,15 @@ export function LoginGateway() {
                   type="button"
                   onClick={() => {
                     const nextLen = otpDigits.length === 8 ? 6 : 8;
-                    setOtpDigits(Array(nextLen).fill(""));
-                    setTimeout(() => digitInputRefs.current[0]?.focus(), 50);
+                    const newDigits = Array(nextLen).fill("");
+                    for (let i = 0; i < Math.min(nextLen, otpDigits.length); i++) {
+                      newDigits[i] = otpDigits[i];
+                    }
+                    setOtpDigits(newDigits);
+                    setTimeout(() => {
+                      const firstEmpty = newDigits.findIndex((d) => !d);
+                      digitInputRefs.current[firstEmpty !== -1 ? firstEmpty : nextLen - 1]?.focus();
+                    }, 50);
                   }}
                   className="text-[11px] font-mono text-cyan-400/80 hover:text-cyan-300 underline cursor-pointer"
                 >

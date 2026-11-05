@@ -43,10 +43,12 @@ class SupabaseAuthValidator:
         self._last_jwks_url: Optional[str] = None
         self._user_cache: Dict[str, Tuple[float, Dict[str, Any]]] = {}
         self._user_cache_ttl = 60.0  # 60s in-memory user mapping cache
+        self._token_cache: Dict[str, Tuple[float, Dict[str, Any]]] = {}
+        self._token_cache_ttl = 60.0  # 60s in-memory token claims cache
 
     def is_configured(self) -> bool:
         """Checks if Supabase authentication is configured for this environment."""
-        url = os.getenv("SUPABASE_URL", "").strip()
+        url = (os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL") or "").strip()
         jwks = os.getenv("SUPABASE_JWKS_URL", "").strip()
         secret = os.getenv("SUPABASE_JWT_SECRET", "").strip()
         return bool(url or jwks or secret)
@@ -56,7 +58,7 @@ class SupabaseAuthValidator:
         explicit = os.getenv("SUPABASE_JWKS_URL", "").strip()
         if explicit:
             return explicit
-        base_url = os.getenv("SUPABASE_URL", "").strip().rstrip("/")
+        base_url = (os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL") or "").strip().rstrip("/")
         if base_url:
             return f"{base_url}/auth/v1/.well-known/jwks.json"
         return None
@@ -68,7 +70,7 @@ class SupabaseAuthValidator:
         explicit = os.getenv("SUPABASE_JWT_ISSUER", "").strip()
         if explicit:
             return explicit
-        base_url = os.getenv("SUPABASE_URL", "").strip().rstrip("/")
+        base_url = (os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL") or "").strip().rstrip("/")
         if base_url:
             return f"{base_url}/auth/v1"
         return None
@@ -86,13 +88,13 @@ class SupabaseAuthValidator:
         return os.getenv("SUPABASE_JWT_SECRET", "").strip() or None
 
     def _get_jwk_client(self) -> Optional[PyJWKClient]:
-        """Lazy-initializes or updates the PyJWKClient instance."""
+        """Lazy-initializes or updates the PyJWKClient instance with a fast connection timeout."""
         jwks_url = self.get_jwks_url()
         if not jwks_url:
             return None
         if self._jwk_client is None or self._last_jwks_url != jwks_url:
             try:
-                self._jwk_client = PyJWKClient(jwks_url, cache_keys=True, max_cached_keys=16, lifespan=3600)
+                self._jwk_client = PyJWKClient(jwks_url, cache_keys=True, max_cached_keys=16, lifespan=3600, timeout=10.0)
                 self._last_jwks_url = jwks_url
             except Exception as exc:
                 logger.error("Failed to initialize Supabase PyJWKClient for %s: %s", jwks_url, exc)
@@ -110,6 +112,13 @@ class SupabaseAuthValidator:
         parts = token.strip().split(".")
         if len(parts) != 3:
             return None, "MALFORMED_JWT_FORMAT"
+
+        now_ts = time.time()
+        cached = self._token_cache.get(token)
+        if cached and (now_ts - cached[0] < self._token_cache_ttl):
+            claims = cached[1]
+            if claims.get("exp", 0) > now_ts:
+                return claims, None
 
         try:
             unverified_header = jwt.get_unverified_header(token)
@@ -147,6 +156,9 @@ class SupabaseAuthValidator:
                     issuer=expected_iss if expected_iss else None,
                     options=options,
                 )
+                if len(self._token_cache) > 256:
+                    self._token_cache.clear()
+                self._token_cache[token] = (now_ts, claims)
                 return claims, None
             except jwt.ExpiredSignatureError:
                 return None, "TOKEN_EXPIRED"
@@ -172,6 +184,9 @@ class SupabaseAuthValidator:
                     issuer=expected_iss if expected_iss else None,
                     options=options,
                 )
+                if len(self._token_cache) > 256:
+                    self._token_cache.clear()
+                self._token_cache[token] = (now_ts, claims)
                 return claims, None
             except jwt.ExpiredSignatureError:
                 return None, "TOKEN_EXPIRED"
@@ -208,23 +223,30 @@ class SupabaseAuthValidator:
                 return None, "ACCOUNT_INACTIVE"
             return user, None
 
-        # 1. First lookup by bound supabase_uid
-        user = db.get_user_by_supabase_uid(supabase_uid)
+        # 1. First lookup by bound supabase_uid (guarded against schema or network errors)
+        user = None
+        try:
+            user = db.get_user_by_supabase_uid(supabase_uid)
+        except Exception as uid_err:
+            logger.warning("Supabase UID lookup notice (falling back to email): %s", uid_err)
 
         # 2. Fallback lookup by verified email
         if not user and email:
-            user = db.get_user_by_email(email)
-            if user:
-                # Link supabase_uid to the existing user record
-                try:
-                    db.link_user_supabase_uid(user["id"], supabase_uid)
-                    user["supabase_uid"] = supabase_uid
-                    logger.info("Bound Supabase UUID %s to existing user '%s' (%s)", supabase_uid, user.get("username"), email)
-                except Exception as exc:
-                    logger.warning("Failed to link supabase_uid to user %s: %s", user["id"], exc)
+            try:
+                user = db.get_user_by_email(email)
+                if user:
+                    # Link supabase_uid to the existing user record
+                    try:
+                        db.link_user_supabase_uid(user["id"], supabase_uid)
+                        user["supabase_uid"] = supabase_uid
+                        logger.info("Bound Supabase UUID to existing user '%s'", user.get("username"))
+                    except Exception as link_exc:
+                        logger.warning("Failed to link supabase_uid to user %s: %s", user["id"], link_exc)
+            except Exception as email_err:
+                logger.error("Failed to query user by email during Supabase mapping: %s", email_err)
 
         if not user:
-            logger.warning("Supabase authenticated identity %s (%s) does not match any QUANT.OS user", supabase_uid, email)
+            logger.warning("Supabase authenticated identity does not match any QUANT.OS user")
             return None, "USER_NOT_PROVISIONED"
 
         if not user.get("is_active"):
@@ -243,12 +265,15 @@ class SupabaseAuthValidator:
         3. Constructs an authoritative, request-scoped session dictionary.
         Returns (user_dict, session_dict, None) on success or (None, None, error_code) on failure.
         """
+        t0 = time.perf_counter()
         claims, err = self.verify_token(token)
         if err or not claims:
+            logger.warning("[SUPABASE_AUTH] Token verification failed [dur=%.2fms]: %s", (time.perf_counter() - t0) * 1000, err)
             return None, None, err or "TOKEN_VERIFICATION_FAILED"
 
         user, err = self.map_supabase_claims_to_user(claims)
         if err or not user:
+            logger.warning("[SUPABASE_AUTH] Identity resolution failed [dur=%.2fms]: %s", (time.perf_counter() - t0) * 1000, err)
             return None, None, err or "USER_RESOLUTION_FAILED"
 
         supabase_uid = claims.get("sub", "")
@@ -274,6 +299,8 @@ class SupabaseAuthValidator:
             },
         }
 
+        dur_ms = (time.perf_counter() - t0) * 1000
+        logger.info("[SUPABASE_AUTH] Authenticated user_id=%s successfully [dur=%.2fms]", user["id"], dur_ms)
         return user, session_dict, None
 
 

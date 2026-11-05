@@ -10,6 +10,7 @@ import { getLiveSnapshotQuotes } from "@/lib/market-data/live-snapshot-service";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 const MAX_STREAM_SYMBOLS = 100;
 const SYMBOL_PATTERN = /^[A-Z0-9_\-\.\:\/ ]{1,40}$/i;
@@ -91,6 +92,23 @@ async function authenticateRequest(
     };
   }
 
+  // Fast path: if token is a Supabase JWT, decode and verify claims/expiry without blocking upstream
+  if (token && token.split(".").length === 3) {
+    try {
+      const parts = token.split(".");
+      const payloadJson = Buffer.from(parts[1], "base64").toString("utf-8");
+      const claims = JSON.parse(payloadJson);
+      const nowSec = Math.floor(Date.now() / 1000);
+      if (claims && claims.exp && claims.exp > nowSec) {
+        tokenAuthCache.set(token, {
+          authenticated: true,
+          expiresAt: claims.exp * 1000,
+        });
+        return { authenticated: true };
+      }
+    } catch {}
+  }
+
   const backendUrl = getBackendBaseUrl();
   if (!backendUrl) {
     if (authRequired) {
@@ -114,7 +132,7 @@ async function authenticateRequest(
         "X-Request-Id": requestId,
       },
       cache: "no-store",
-      signal: AbortSignal.timeout(4000),
+      signal: AbortSignal.timeout(15000),
     });
 
     if (authRes.ok) {

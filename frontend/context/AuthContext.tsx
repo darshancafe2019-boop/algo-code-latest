@@ -529,11 +529,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           });
 
           if (sbError || !sbAuthData?.session?.access_token) {
+            console.warn(`[SUPABASE_OTP_VERIFY_FAILED] status=${(sbError as any)?.status || 403} code=${(sbError as any)?.code || sbError?.name} msg=${sbError?.message}`);
             return {
               success: false,
               error: sbError?.message || "Invalid or expired verification code.",
-              errorCode: "INVALID_OTP",
-              statusCode: 401,
+              errorCode: (sbError as any)?.code || "INVALID_OTP",
+              statusCode: (sbError as any)?.status || 401,
             };
           }
 

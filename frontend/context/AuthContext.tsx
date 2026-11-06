@@ -525,19 +525,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (!sbError && sbAuthData?.session?.access_token) {
               const sbAccessToken = sbAuthData.session.access_token;
 
-              // Exchange Supabase token with Flask backend to obtain authoritative QUANT.OS session
-              const res = await fetch("/api/auth/supabase/verify", {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  "Authorization": `Bearer ${sbAccessToken}`,
-                },
-                credentials: "include",
-                body: JSON.stringify({ access_token: sbAccessToken }),
-              });
+              // Immediately persist the verified Supabase access token so the session isn't lost if exchange times out
+              try {
+                localStorage.setItem("quantos_supabase_access_token", sbAccessToken);
+              } catch { }
 
-              const { ok, data } = await safeParseAuthResponse(res);
-              if (res.ok && data.status === "success") {
+              // Exchange Supabase token with Flask backend to obtain authoritative QUANT.OS session
+              let res: Response | null = null;
+              let parseRes: { ok: boolean; data: any } = { ok: false, data: null };
+
+              // Retry once after a 2-second delay if Render was cold and returning a 504
+              for (let attempt = 1; attempt <= 2; attempt++) {
+                try {
+                  res = await fetch("/api/auth/supabase/verify", {
+                    method: "POST",
+                    headers: {
+                      "Content-Type": "application/json",
+                      "Authorization": `Bearer ${sbAccessToken}`,
+                    },
+                    credentials: "include",
+                    body: JSON.stringify({ access_token: sbAccessToken }),
+                  });
+
+                  parseRes = await safeParseAuthResponse(res);
+                  if (res.ok && parseRes.data?.status === "success") {
+                    break;
+                  }
+                  if (res.status !== 504 && res.status !== 503) {
+                    // Definite non-transient error (e.g. 401, 403) — do not retry
+                    break;
+                  }
+                } catch (fetchErr) {
+                  console.warn(`[SUPABASE_VERIFY] Attempt ${attempt} failed:`, fetchErr);
+                }
+                if (attempt < 2) {
+                  await new Promise((r) => setTimeout(r, 2000));
+                }
+              }
+
+              const { data } = parseRes;
+              if (res && res.ok && data?.status === "success") {
                 setUser(data.user);
                 setSession(data.session || null);
                 setIsAuthenticated(true);
@@ -551,7 +578,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                   if (data.session_token) {
                     localStorage.setItem("quantos_session_token", data.session_token);
                   }
-                  localStorage.setItem("quantos_supabase_access_token", sbAccessToken);
                   localStorage.setItem("quantos_session_date", todayStr);
                   sessionStorage.removeItem("quantos_otp_challenge_id");
                   sessionStorage.removeItem("quantos_otp_destination_email");

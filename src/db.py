@@ -743,12 +743,13 @@ def validate_and_repair_sqlite(db_path: Optional[Path] = None) -> bool:
     global _db_health_state
     target_path = Path(db_path) if db_path else config.DB_PATH
     now_iso = datetime.now(timezone.utc).isoformat()
+    engine_name = "postgresql" if getattr(config, "IS_POSTGRES", False) else "sqlite"
 
     if not target_path.exists() or target_path.stat().st_size == 0:
         with _db_health_lock:
             _db_health_state.update({
                 "status": "HEALTHY",
-                "engine": "sqlite",
+                "engine": engine_name,
                 "integrity": "ok",
                 "corrupted": False,
                 "recovered": False,
@@ -771,7 +772,7 @@ def validate_and_repair_sqlite(db_path: Optional[Path] = None) -> bool:
             with _db_health_lock:
                 _db_health_state.update({
                     "status": "HEALTHY",
-                    "engine": "sqlite",
+                    "engine": engine_name,
                     "integrity": "ok",
                     "corrupted": False,
                     "last_validated": now_iso,
@@ -785,7 +786,7 @@ def validate_and_repair_sqlite(db_path: Optional[Path] = None) -> bool:
         with _db_health_lock:
             _db_health_state.update({
                 "status": "CORRUPTED",
-                "engine": "sqlite",
+                "engine": engine_name,
                 "integrity": "failed",
                 "corrupted": True,
                 "last_validated": now_iso,
@@ -807,7 +808,7 @@ def validate_and_repair_sqlite(db_path: Optional[Path] = None) -> bool:
             if recovered:
                 _db_health_state.update({
                     "status": "HEALTHY",
-                    "engine": "sqlite",
+                    "engine": engine_name,
                     "integrity": "ok",
                     "corrupted": False,
                     "recovered": True,
@@ -830,7 +831,7 @@ def validate_and_repair_sqlite(db_path: Optional[Path] = None) -> bool:
 
                 _db_health_state.update({
                     "status": "RECREATED",
-                    "engine": "sqlite",
+                    "engine": engine_name,
                     "integrity": "fresh",
                     "corrupted": False,
                     "recovered": False,
@@ -1269,8 +1270,9 @@ def init_db(force: bool = False) -> None:
         if _db_initialized and not force:
             return
 
-        # Pre-startup SQLite integrity check and automatic recovery if corrupted
-        validate_and_repair_sqlite()
+        # Pre-startup SQLite integrity check and automatic recovery if corrupted (SQLite mode only)
+        if not getattr(config, "IS_POSTGRES", False):
+            validate_and_repair_sqlite()
 
         if getattr(config, "IS_POSTGRES", False):
             logger.info("Initializing & verifying authoritative PostgreSQL connection...")
@@ -1393,7 +1395,8 @@ def init_db(force: bool = False) -> None:
                                     seq_name = f"{t_name}_id_seq"
                                     cur.execute(f"CREATE SEQUENCE IF NOT EXISTS {seq_name};")
                                     cur.execute(f"SELECT COALESCE(MAX(id), 0) + 1 FROM {t_name};")
-                                    next_val = cur.fetchone()[0]
+                                    seq_r = cur.fetchone()
+                                    next_val = seq_r[0] if seq_r else 1
                                     cur.execute(f"ALTER SEQUENCE {seq_name} RESTART WITH {max(1, next_val)};")
                                     cur.execute(f"ALTER TABLE {t_name} ALTER COLUMN id SET DEFAULT nextval('{seq_name}');")
                                     try:
@@ -1405,6 +1408,15 @@ def init_db(force: bool = False) -> None:
                             except Exception as seq_err:
                                 logger.debug("PostgreSQL sequence check notice: %s", seq_err)
                         conn.commit()
+                    with _db_health_lock:
+                        _db_health_state.update({
+                            "status": "HEALTHY",
+                            "engine": "postgresql",
+                            "integrity": "ok",
+                            "corrupted": False,
+                            "last_validated": datetime.now(timezone.utc).isoformat(),
+                            "error": None,
+                        })
                     logger.info("[OK] PostgreSQL database connection & critical tables verified.")
                     _db_initialized = True
                     return
@@ -3664,7 +3676,8 @@ def init_db(force: bool = False) -> None:
 
                 # Seed default alert rules if table is empty
                 cursor.execute("SELECT COUNT(*) FROM alert_rules")
-                if cursor.fetchone()[0] == 0:
+                _cnt_row = cursor.fetchone()
+                if (_cnt_row[0] if _cnt_row else 0) == 0:
                     now_iso = datetime.now(timezone.utc).isoformat()
                     default_rules = [
                         ("RULE_BROKER_DISCONNECT", "Broker Connection Lost", "BROKER", "CRITICAL", "HEARTBEAT_TIMEOUT", 10.0, 5.0, 300.0, 1, 1, 1, 1, 1, "Broker connection dropped with or without open exposure", now_iso, now_iso),
@@ -4776,7 +4789,8 @@ def seed_market_universe_if_needed() -> None:
         conn = get_connection()
         cursor = conn.cursor()
         cursor.execute("SELECT COUNT(*) as count FROM market_universe")
-        cnt = cursor.fetchone()["count"]
+        cnt_row = cursor.fetchone()
+        cnt = cnt_row["count"] if cnt_row else 0
         try:
             conn.close()
         except Exception:
@@ -4809,7 +4823,8 @@ def seed_bot_templates_if_needed() -> None:
         conn = get_connection()
         cursor = conn.cursor()
         cursor.execute("SELECT COUNT(*) as count FROM bot_templates")
-        if cursor.fetchone()["count"] == 0:
+        _tpl_row = cursor.fetchone()
+        if (_tpl_row["count"] if _tpl_row else 0) == 0:
             now_str = datetime.now(timezone.utc).isoformat()
             templates = [
                 (
@@ -4946,7 +4961,8 @@ def seed_demo_data_if_needed() -> None:
         # Seed default bot instances ONLY if table is empty AND bootstrap was never run
         if not is_bootstrapped:
             cursor.execute("SELECT COUNT(*) as count FROM bot_instances")
-            if cursor.fetchone()["count"] == 0:
+            _bot_row = cursor.fetchone()
+            if (_bot_row["count"] if _bot_row else 0) == 0:
                 now_str = datetime.now(timezone.utc).isoformat()
                 bot1_config = {
                     "risk_pct": 0.02,
@@ -4988,7 +5004,8 @@ def seed_demo_data_if_needed() -> None:
 
         # Seed default Indicator Profiles if empty
         cursor.execute("SELECT COUNT(*) as count FROM indicator_profiles")
-        if cursor.fetchone()["count"] == 0:
+        _ind_row = cursor.fetchone()
+        if (_ind_row["count"] if _ind_row else 0) == 0:
             now_str = datetime.now(timezone.utc).isoformat()
             profiles = [
                 (
@@ -5083,7 +5100,8 @@ def seed_demo_data_if_needed() -> None:
 
         # Seed default Scenario Profiles if empty
         cursor.execute("SELECT COUNT(*) as count FROM scenario_profiles")
-        if cursor.fetchone()["count"] == 0:
+        _sc_row = cursor.fetchone()
+        if (_sc_row["count"] if _sc_row else 0) == 0:
             scenarios = [
                 ("sc-trending-bull", "sc-trending-bull", "Trending Bull Market", "TRENDING_BULL", json.dumps(["ema", "macd", "adx", "supertrend", "vwap", "volume"]), json.dumps({"ema": {"fast": 20, "slow": 50}, "adx": {"threshold": 25}}), "Strong upward momentum trend preferred indicators."),
                 ("sc-trending-bear", "sc-trending-bear", "Trending Bear Market", "TRENDING_BEAR", json.dumps(["ema", "macd", "adx", "supertrend", "vwap", "volume"]), json.dumps({"ema": {"fast": 20, "slow": 50}, "adx": {"threshold": 25}}), "Strong downward trend preferred indicators."),
@@ -5101,7 +5119,8 @@ def seed_demo_data_if_needed() -> None:
 
         # Seed demo trades if trade history has fewer than 10 trades
         cursor.execute("SELECT COUNT(*) as count FROM trades_log")
-        if cursor.fetchone()["count"] < 5:
+        _tr_row = cursor.fetchone()
+        if (_tr_row["count"] if _tr_row else 0) < 5:
             now = datetime.now(timezone.utc)
             sample_trades = [
                 (
@@ -5173,7 +5192,8 @@ def seed_institutional_hierarchy_if_needed() -> None:
 
         # 1. Customer
         cursor.execute("SELECT COUNT(*) as count FROM customers")
-        if cursor.fetchone()["count"] == 0:
+        _c_row = cursor.fetchone()
+        if (_c_row["count"] if _c_row else 0) == 0:
             cursor.execute(
                 """
                 INSERT INTO customers (id, name, email, tier, status, base_currency, created_at, updated_at)
@@ -5184,7 +5204,8 @@ def seed_institutional_hierarchy_if_needed() -> None:
 
         # 2. Departments
         cursor.execute("SELECT COUNT(*) as count FROM departments")
-        if cursor.fetchone()["count"] == 0:
+        _d_row = cursor.fetchone()
+        if (_d_row["count"] if _d_row else 0) == 0:
             departments = [
                 ("dept_algo_trading", "cust_default", "Algorithmic Trading", 5000000.0, "USD", 100.0, "ACTIVE", now_str, now_str),
                 ("dept_hft", "cust_default", "High-Frequency Trading", 2500000.0, "USD", 50.0, "ACTIVE", now_str, now_str),
@@ -5200,7 +5221,8 @@ def seed_institutional_hierarchy_if_needed() -> None:
 
         # 3. Broker Folders
         cursor.execute("SELECT COUNT(*) as count FROM broker_folders")
-        if cursor.fetchone()["count"] == 0:
+        _bf_row = cursor.fetchone()
+        if (_bf_row["count"] if _bf_row else 0) == 0:
             folders = [
                 ("bf_dhan", "cust_default", "dept_algo_trading", "Dhan", "dhan", "INR", "ACTIVE", now_str, now_str),
                 ("bf_upstox", "cust_default", "dept_algo_trading", "Upstox", "upstox", "INR", "ACTIVE", now_str, now_str),
@@ -5217,7 +5239,8 @@ def seed_institutional_hierarchy_if_needed() -> None:
 
         # 4. Broker Accounts
         cursor.execute("SELECT COUNT(*) as count FROM broker_accounts")
-        if cursor.fetchone()["count"] == 0:
+        _ba_row = cursor.fetchone()
+        if (_ba_row["count"] if _ba_row else 0) == 0:
             accounts = [
                 ("ba_dhan_primary", "cust_default", "dept_algo_trading", "bf_dhan", "dhan", "DHAN-PRIMARY", "DHAN-100234", "INR", "LIVE", 1, 1250000.0, 1250000.0, 2500000.0, 1250000.0, 0.0, 0.0, "HEALTHY", now_str, now_str, "CONNECTED", 0, now_str, now_str),
                 ("ba_upstox_primary", "cust_default", "dept_algo_trading", "bf_upstox", "upstox", "UPSTOX-PRIMARY", "UPSTOX-88912", "INR", "LIVE", 1, 1000000.0, 1000000.0, 2000000.0, 1000000.0, 0.0, 0.0, "HEALTHY", now_str, now_str, "CONNECTED", 0, now_str, now_str),
@@ -5239,7 +5262,8 @@ def seed_institutional_hierarchy_if_needed() -> None:
 
         # 5. Capital Ledger initial funding events
         cursor.execute("SELECT COUNT(*) as count FROM capital_ledger")
-        if cursor.fetchone()["count"] == 0:
+        _cl_row = cursor.fetchone()
+        if (_cl_row["count"] if _cl_row else 0) == 0:
             ledger_entries = [
                 ("cap-init-001", "cust_default", "dept_algo_trading", "bf_dhan", "ba_dhan_primary", "", "", "DEPOSIT", 1250000.0, "INR", "LIVE", "BROKER_VERIFIED_DEPOSIT", "DHAN-TX-001", "system", "CONFIRMED", "Initial verified institutional Dhan funding", "idemp-cap-dhan-init", now_str, "AUDIT-CAP-001"),
                 ("cap-init-002", "cust_default", "dept_algo_trading", "bf_upstox", "ba_upstox_primary", "", "", "DEPOSIT", 1000000.0, "INR", "LIVE", "BROKER_VERIFIED_DEPOSIT", "UPSTOX-TX-001", "system", "CONFIRMED", "Initial verified institutional Upstox funding", "idemp-cap-upstox-init", now_str, "AUDIT-CAP-002"),
@@ -5416,7 +5440,7 @@ def close_all_open_positions_and_cancel_orders(reason: str = "TRADING HALTED: Em
         open_trades = cursor.fetchall()
         for t in open_trades:
             trade_id = t["id"]
-            entry_p = float(t["entry_price"])
+            entry_p = float(t["entry_price"] or 0.0)
             cursor.execute(
                 """
                 UPDATE trades_log
@@ -5701,7 +5725,7 @@ def get_system_incidents(
         query += " ORDER BY CASE status WHEN 'ACTIVE' THEN 1 WHEN 'ACKNOWLEDGED' THEN 2 WHEN 'RECOVERING' THEN 3 ELSE 4 END, id DESC LIMIT ? OFFSET ?"
         params.extend([limit, offset])
 
-        cursor.execute(query, params)
+        cursor.execute(query, tuple(params))
         rows = cursor.fetchall()
         return [dict(r) for r in rows]
     except Exception as exc:
@@ -5764,16 +5788,20 @@ def get_reliability_summary() -> Dict[str, Any]:
     cursor = conn.cursor()
     try:
         cursor.execute("SELECT COUNT(*) FROM system_errors WHERE status IN ('NEW', 'ACTIVE')")
-        active_count = cursor.fetchone()[0]
+        _r1 = cursor.fetchone()
+        active_count = int(_r1[0]) if _r1 and _r1[0] is not None else 0
 
         cursor.execute("SELECT COUNT(*) FROM system_errors WHERE status IN ('NEW', 'ACTIVE') AND severity = 'CRITICAL'")
-        critical_count = cursor.fetchone()[0]
+        _r2 = cursor.fetchone()
+        critical_count = int(_r2[0]) if _r2 and _r2[0] is not None else 0
 
         cursor.execute("SELECT COUNT(*) FROM system_errors WHERE status = 'RESOLVED'")
-        resolved_count = cursor.fetchone()[0]
+        _r3 = cursor.fetchone()
+        resolved_count = int(_r3[0]) if _r3 and _r3[0] is not None else 0
 
         cursor.execute("SELECT COUNT(DISTINCT bot_id) FROM system_errors WHERE status IN ('NEW', 'ACTIVE') AND bot_id != 'system'")
-        affected_bots = cursor.fetchone()[0]
+        _r4 = cursor.fetchone()
+        affected_bots = int(_r4[0]) if _r4 and _r4[0] is not None else 0
 
         return {
             "active_incidents": active_count,
@@ -5910,7 +5938,8 @@ def get_telegram_settings() -> Dict[str, bool]:
         for r in rows:
             k = r["key"] if isinstance(r, sqlite3.Row) else r[0]
             v = r["value"] if isinstance(r, sqlite3.Row) else r[1]
-            settings[k] = str(v).lower() in ("true", "1", "yes")
+            if k is not None:
+                settings[str(k)] = str(v).lower() in ("true", "1", "yes")
     except Exception as exc:
         logger.debug("Could not fetch telegram_settings: %s", exc)
     return settings
@@ -5949,7 +5978,8 @@ def get_appearance_settings() -> Optional[Dict[str, Any]]:
         conn.close()
         if row:
             config_str = row["config_json"] if isinstance(row, sqlite3.Row) else row[2]
-            return json.loads(config_str)
+            if config_str:
+                return json.loads(config_str)
     except Exception as exc:
         logger.debug("Could not fetch appearance settings: %s", exc)
     return None
@@ -6445,7 +6475,7 @@ def get_bot_strategy_diagnosis(bot_id: str) -> Dict[str, Any]:
             (bot_id,)
         )
         trade_count_row = cursor.fetchone()
-        closed_trades = trade_count_row["count"] if trade_count_row else 0
+        closed_trades = int(trade_count_row["count"]) if trade_count_row and trade_count_row["count"] is not None else 0
         conn.close()
         
         total_scans = len(decisions)
@@ -6595,7 +6625,7 @@ def get_todays_pnl(symbol: str = config.SYMBOL) -> float:
         )
         row = cursor.fetchone()
         conn.close()
-        total_pnl = row["total_pnl"]
+        total_pnl = row["total_pnl"] if row else None
         return float(total_pnl) if total_pnl is not None else 0.0
     except Exception as exc:
         logger.error("Error getting today's PnL from DB: %s", exc)
@@ -6612,12 +6642,12 @@ def get_daily_summary_stats() -> dict:
         day_ago = (now - timedelta(days=1)).isoformat()
         cursor.execute("SELECT COUNT(*) as count FROM heartbeat_log WHERE timestamp >= ?", (day_ago,))
         row = cursor.fetchone()
-        stats["cycles_run"] = row["count"] if row else 0
+        stats["cycles_run"] = int(row["count"]) if row and row["count"] is not None else 0
         cursor.execute("SELECT timestamp, signal_type, price, reason FROM signals_log WHERE timestamp >= ? AND signal_type != 'HOLD'", (day_ago,))
         stats["signals_fired"] = [dict(r) for r in cursor.fetchall()]
         cursor.execute("SELECT COUNT(*) as count FROM system_errors WHERE timestamp >= ?", (day_ago,))
         row = cursor.fetchone()
-        stats["errors_count"] = row["count"] if row else 0
+        stats["errors_count"] = int(row["count"]) if row and row["count"] is not None else 0
         conn.close()
     except Exception as exc:
         logger.error("Error fetching daily summary stats: %s", exc)
@@ -6675,12 +6705,15 @@ def reconcile_stale_bot_statuses() -> Dict[str, Any]:
             if last_session:
                 last_hb_str = last_session["last_heartbeat"] or last_session["server_start_time"]
                 summary["last_seen_at"] = last_hb_str
-                try:
-                    last_dt = datetime.fromisoformat(last_hb_str.replace("Z", "+00:00"))
-                    if last_dt.tzinfo is None:
-                        last_dt = last_dt.replace(tzinfo=timezone.utc)
-                    summary["offline_seconds"] = max(0, int((now_utc - last_dt).total_seconds()))
-                except Exception:
+                if last_hb_str and isinstance(last_hb_str, str):
+                    try:
+                        last_dt = datetime.fromisoformat(last_hb_str.replace("Z", "+00:00"))
+                        if last_dt.tzinfo is None:
+                            last_dt = last_dt.replace(tzinfo=timezone.utc)
+                        summary["offline_seconds"] = max(0, int((now_utc - last_dt).total_seconds()))
+                    except Exception:
+                        summary["offline_seconds"] = 0
+                else:
                     summary["offline_seconds"] = 0
 
                 cursor.execute("UPDATE system_session SET status = 'CLOSED' WHERE status = 'ACTIVE'")
@@ -6861,10 +6894,10 @@ def compute_bot_health(
     else:
         bot = bot_dict
 
-    symbol = bot.get("symbol", "BTC/USDT").upper()
-    timeframe = bot.get("timeframe", "5m")
+    symbol = str(bot.get("symbol") or "BTC/USDT").upper()
+    timeframe = str(bot.get("timeframe") or "5m")
     last_checked_str = bot.get("last_checked_at")
-    status = bot.get("status", "STOPPED")
+    status = str(bot.get("status") or "STOPPED")
 
     # 1. Process Survival Check
     from src.process_manager import multi_bot_manager
@@ -7066,8 +7099,8 @@ def audit_and_clean_db() -> Dict[str, Any]:
 
         for tr in closed_trades:
             tr_id = tr["id"]
-            sym = tr.get("symbol", "")
-            direction = tr.get("direction", "LONG").upper()
+            sym = str(tr.get("symbol") or "")
+            direction = str(tr.get("direction") or "LONG").upper()
             entry_p = float(tr.get("entry_price") or 0.0)
             exit_p = float(tr.get("exit_price") or entry_p)
             size = float(tr.get("position_size") or 0.0)
@@ -7135,7 +7168,8 @@ def audit_and_clean_db() -> Dict[str, Any]:
             b_unrealized = sum(float(r[0] or 0.0) for r in b_open)
 
             cursor.execute("SELECT COUNT(*) FROM trades_log WHERE bot_id = ?", (b_id,))
-            b_total_trades = cursor.fetchone()[0]
+            _b_cnt = cursor.fetchone()
+            b_total_trades = int(_b_cnt[0]) if _b_cnt and _b_cnt[0] is not None else 0
 
             cursor.execute(
                 """
@@ -7228,7 +7262,7 @@ def save_indicator_profile(profile_data: Dict[str, Any]) -> Tuple[bool, str]:
         existing = cursor.fetchone()
 
         if existing:
-            new_ver = existing["version"] + 1
+            new_ver = int(existing["version"] or 0) + 1
             cursor.execute(
                 """
                 UPDATE indicator_profiles
@@ -7309,7 +7343,8 @@ def get_scenario_profiles() -> list[Dict[str, Any]]:
         conn = get_connection()
         cursor = conn.cursor()
         cursor.execute("SELECT COUNT(*) as count FROM scenario_profiles")
-        if cursor.fetchone()["count"] == 0:
+        _sc_r = cursor.fetchone()
+        if (_sc_r["count"] if _sc_r else 0) == 0:
             scenarios = [
                 ("sc-trending-bull", "sc-trending-bull", "Trending Bull Market", "TRENDING_BULL", json.dumps(["ema", "macd", "adx", "supertrend", "vwap", "volume"]), json.dumps({"ema": {"fast": 20, "slow": 50}, "adx": {"threshold": 25}}), "Strong upward momentum trend preferred indicators."),
                 ("sc-trending-bear", "sc-trending-bear", "Trending Bear Market", "TRENDING_BEAR", json.dumps(["ema", "macd", "adx", "supertrend", "vwap", "volume"]), json.dumps({"ema": {"fast": 20, "slow": 50}, "adx": {"threshold": 25}}), "Strong downward trend preferred indicators."),
@@ -8378,14 +8413,14 @@ def get_market_universe(
 
         where_clause = " AND ".join(query_conditions)
 
-        cursor.execute(f"SELECT COUNT(*) as cnt FROM market_universe WHERE {where_clause}", params)
+        cursor.execute(f"SELECT COUNT(*) as cnt FROM market_universe WHERE {where_clause}", tuple(params))
         row_cnt = cursor.fetchone()
-        total_count = row_cnt["cnt"] if row_cnt else 0
+        total_count = int(row_cnt["cnt"]) if row_cnt and row_cnt["cnt"] is not None else 0
 
         fetch_params = params + [limit, offset]
         cursor.execute(
             f"SELECT * FROM market_universe WHERE {where_clause} ORDER BY asset_class ASC, volatility_score DESC, symbol ASC LIMIT ? OFFSET ?",
-            fetch_params
+            tuple(fetch_params)
         )
         rows = cursor.fetchall()
         for r in rows:
@@ -8506,35 +8541,21 @@ def get_universe_summary_stats_legacy() -> Dict[str, Any]:
         conn = get_connection()
         cursor = conn.cursor()
 
-        cursor.execute("SELECT COUNT(*) as c FROM market_universe")
-        stats["total_instruments"] = cursor.fetchone()["c"]
+        def _get_universe_cnt(sql_query: str) -> int:
+            cursor.execute(sql_query)
+            _r = cursor.fetchone()
+            return int(_r["c"]) if _r and _r["c"] is not None else 0
 
-        cursor.execute("SELECT COUNT(*) as c FROM market_universe WHERE asset_class = 'Indices'")
-        stats["indices_count"] = cursor.fetchone()["c"]
-
-        cursor.execute("SELECT COUNT(*) as c FROM market_universe WHERE asset_class = 'Stock' AND country = 'IN'")
-        stats["indian_stocks_count"] = cursor.fetchone()["c"]
-
-        cursor.execute("SELECT COUNT(*) as c FROM market_universe WHERE asset_class = 'Stock' AND country != 'IN'")
-        stats["global_stocks_count"] = cursor.fetchone()["c"]
-
-        cursor.execute("SELECT COUNT(*) as c FROM market_universe WHERE asset_class = 'Crypto'")
-        stats["crypto_count"] = cursor.fetchone()["c"]
-
-        cursor.execute("SELECT COUNT(*) as c FROM market_universe WHERE asset_class = 'Forex'")
-        stats["forex_count"] = cursor.fetchone()["c"]
-
-        cursor.execute("SELECT COUNT(*) as c FROM market_universe WHERE volatility_category IN ('High', 'Extreme')")
-        stats["high_volatility_count"] = cursor.fetchone()["c"]
-
-        cursor.execute("SELECT COUNT(*) as c FROM market_universe WHERE live_enabled = 1")
-        stats["live_enabled_count"] = cursor.fetchone()["c"]
-
-        cursor.execute("SELECT COUNT(*) as c FROM market_universe WHERE paper_enabled = 1")
-        stats["paper_trading_count"] = cursor.fetchone()["c"]
-
-        cursor.execute("SELECT COUNT(*) as c FROM market_universe WHERE data_available = 1 AND execution_available = 0")
-        stats["data_only_count"] = cursor.fetchone()["c"]
+        stats["total_instruments"] = _get_universe_cnt("SELECT COUNT(*) as c FROM market_universe")
+        stats["indices_count"] = _get_universe_cnt("SELECT COUNT(*) as c FROM market_universe WHERE asset_class = 'Indices'")
+        stats["indian_stocks_count"] = _get_universe_cnt("SELECT COUNT(*) as c FROM market_universe WHERE asset_class = 'Stock' AND country = 'IN'")
+        stats["global_stocks_count"] = _get_universe_cnt("SELECT COUNT(*) as c FROM market_universe WHERE asset_class = 'Stock' AND country != 'IN'")
+        stats["crypto_count"] = _get_universe_cnt("SELECT COUNT(*) as c FROM market_universe WHERE asset_class = 'Crypto'")
+        stats["forex_count"] = _get_universe_cnt("SELECT COUNT(*) as c FROM market_universe WHERE asset_class = 'Forex'")
+        stats["high_volatility_count"] = _get_universe_cnt("SELECT COUNT(*) as c FROM market_universe WHERE volatility_category IN ('High', 'Extreme')")
+        stats["live_enabled_count"] = _get_universe_cnt("SELECT COUNT(*) as c FROM market_universe WHERE live_enabled = 1")
+        stats["paper_trading_count"] = _get_universe_cnt("SELECT COUNT(*) as c FROM market_universe WHERE paper_enabled = 1")
+        stats["data_only_count"] = _get_universe_cnt("SELECT COUNT(*) as c FROM market_universe WHERE data_available = 1 AND execution_available = 0")
 
         cursor.execute("SELECT MAX(last_updated) as mx FROM market_universe")
         row_mx = cursor.fetchone()
@@ -8569,7 +8590,7 @@ def get_top_market_opportunities(limit: int = 10) -> list[Dict[str, Any]]:
         rows = cursor.fetchall()
         for r in rows:
             d = dict(r)
-            d["strategy_score"] = round(float(d.get("momentum_score", 50.0)) * 0.7 + float(d.get("volatility_score", 50.0)) * 0.3, 1)
+            d["strategy_score"] = round(float(d.get("momentum_score") or 50.0) * 0.7 + float(d.get("volatility_score") or 50.0) * 0.3, 1)
             opps.append(d)
         conn.close()
     except Exception as exc:
@@ -8622,7 +8643,7 @@ def batch_update_universe_controls(
             where_clause += " AND execution_available = 1"
 
         query = f"UPDATE market_universe SET {col_name} = ?, last_updated = ? WHERE {where_clause}"
-        cursor.execute(query, [bit_val, now_str])
+        cursor.execute(query, (bit_val, now_str))
         affected = cursor.rowcount
         conn.commit()
         conn.close()
@@ -8833,7 +8854,8 @@ def seed_risk_profiles_and_rules_if_needed():
 
         # 2. Seed Default Rules
         cursor.execute("SELECT COUNT(*) as cnt FROM risk_rules")
-        r_cnt = cursor.fetchone()["cnt"]
+        _rr_row = cursor.fetchone()
+        r_cnt = _rr_row["cnt"] if _rr_row else 0
         if r_cnt == 0:
             default_rules = [
                 ("rule_drawdown_lock", "Emergency Drawdown Lock", "global", "*", json.dumps({"metric": "daily_drawdown_pct", "operator": ">=", "value": 5.0}), "PAUSE_ALL_BOTS", 1, 100, "Pauses all bots when daily loss hits 5%"),
@@ -8853,7 +8875,8 @@ def seed_risk_profiles_and_rules_if_needed():
 
         # 3. Seed Default Active Limits
         cursor.execute("SELECT COUNT(*) as cnt FROM risk_limits WHERE key = 'active_limits'")
-        if cursor.fetchone()["cnt"] == 0:
+        _rl_row = cursor.fetchone()
+        if (_rl_row["cnt"] if _rl_row else 0) == 0:
             cursor.execute(
                 """
                 INSERT OR REPLACE INTO risk_limits (key, value_json, updated_at)
@@ -9341,7 +9364,8 @@ def seed_bot_templates_and_groups_if_needed() -> None:
 
         # 1. Seed Templates
         cursor.execute("SELECT COUNT(*) as cnt FROM bot_templates")
-        if cursor.fetchone()["cnt"] == 0:
+        _bt_r = cursor.fetchone()
+        if (_bt_r["cnt"] if _bt_r else 0) == 0:
             now_str = datetime.now(timezone.utc).isoformat()
             for tpl in DEFAULT_BOT_TEMPLATES:
                 cursor.execute(
@@ -9360,7 +9384,8 @@ def seed_bot_templates_and_groups_if_needed() -> None:
 
         # 2. Seed Groups
         cursor.execute("SELECT COUNT(*) as cnt FROM bot_groups")
-        if cursor.fetchone()["cnt"] == 0:
+        _bg_r = cursor.fetchone()
+        if (_bg_r["cnt"] if _bg_r else 0) == 0:
             now_str = datetime.now(timezone.utc).isoformat()
             for grp in DEFAULT_BOT_GROUPS:
                 cursor.execute(
@@ -9551,7 +9576,7 @@ def get_all_bot_groups() -> List[Dict[str, Any]]:
         for sr in status_rows:
             g_name = sr["group_name"]
             if g_name in group_map:
-                st = sr["status"].upper()
+                st = str(sr["status"] or "").upper()
                 c = sr["cnt"]
                 group_map[g_name]["total_bots"] += c
                 if st == "RUNNING":
@@ -9616,7 +9641,7 @@ def delete_bot_group(group_id_or_name: str) -> Tuple[bool, str]:
         cursor.execute("UPDATE bot_instances SET group_name = 'Crypto Scalping Bots' WHERE group_name = ?", (g_name,))
         conn.commit()
         conn.close()
-        return True, g_name
+        return True, str(g_name or "")
     except Exception as e:
         logger.error(f"Error deleting bot group: {e}")
         return False, str(e)
@@ -10249,14 +10274,17 @@ def get_universe_summary_stats() -> Dict[str, Any]:
             SUM(CASE WHEN tradability = 'TRADABLE' THEN 1 ELSE 0 END) as tradable
         FROM instruments
     """
-    row = safe_query_one(sql)
-    if not row:
+    row_val = safe_query_one(sql)
+    row: Dict[str, Any]
+    if not row_val:
         row = {
             "total_instruments": 0, "indian_stocks": 0, "indices": 0, "global_stocks": 0,
             "crypto": 0, "forex": 0, "commodities": 0, "futures": 0, "options": 0,
             "bonds": 0, "high_volatility": 0, "nse_total": 0, "bse_total": 0,
             "paper_enabled": 0, "live_enabled": 0, "tradable": 0
         }
+    else:
+        row = dict(row_val)
 
     # Add uppercase canonical category aliases for direct frontend tab mapping
     row["ALL"] = row.get("total_instruments", 0)
@@ -11983,7 +12011,8 @@ def get_risk_decisions(
     try:
         cursor = conn.cursor()
         cursor.execute("SELECT COUNT(*) FROM risk_decisions")
-        if cursor.fetchone()[0] == 0:
+        _rd_cnt = cursor.fetchone()
+        if (_rd_cnt[0] if _rd_cnt else 0) == 0:
             seed_canonical_risk_decisions()
 
         query = "SELECT * FROM risk_decisions WHERE 1=1"
@@ -12015,14 +12044,15 @@ def get_risk_decisions(
 
         # Total count query
         count_query = query.replace("SELECT *", "SELECT COUNT(*)")
-        cursor.execute(count_query, params)
-        total_count = cursor.fetchone()[0]
+        cursor.execute(count_query, tuple(params))
+        _tc_row = cursor.fetchone()
+        total_count = int(_tc_row[0]) if _tc_row and _tc_row[0] is not None else 0
 
         # Paginated results
         query += " ORDER BY evaluated_at DESC LIMIT ? OFFSET ?"
         params.extend([limit, offset])
 
-        cursor.execute(query, params)
+        cursor.execute(query, tuple(params))
         cols = [d[0] for d in cursor.description]
         rows = [dict(zip(cols, r)) for r in cursor.fetchall()]
 
@@ -12124,31 +12154,24 @@ def get_risk_decision_analytics() -> Dict[str, Any]:
     conn = get_connection()
     try:
         cursor = conn.cursor()
-        cursor.execute("SELECT COUNT(*) FROM risk_decisions")
-        total = cursor.fetchone()[0]
+
+        def _get_scalar(query_str: str) -> int:
+            cursor.execute(query_str)
+            _r = cursor.fetchone()
+            return int(_r[0]) if _r and _r[0] is not None else 0
+
+        total = _get_scalar("SELECT COUNT(*) FROM risk_decisions")
 
         if total == 0:
             seed_canonical_risk_decisions()
-            cursor.execute("SELECT COUNT(*) FROM risk_decisions")
-            total = cursor.fetchone()[0]
+            total = _get_scalar("SELECT COUNT(*) FROM risk_decisions")
 
-        cursor.execute("SELECT COUNT(*) FROM risk_decisions WHERE decision IN ('APPROVED', 'APPROVED_WITH_WARNING')")
-        approved = cursor.fetchone()[0]
-
-        cursor.execute("SELECT COUNT(*) FROM risk_decisions WHERE decision = 'BLOCKED'")
-        blocked = cursor.fetchone()[0]
-
-        cursor.execute("SELECT COUNT(*) FROM risk_decisions WHERE severity = 'WARNING'")
-        warnings = cursor.fetchone()[0]
-
-        cursor.execute("SELECT COUNT(*) FROM risk_decisions WHERE severity = 'CRITICAL'")
-        critical = cursor.fetchone()[0]
-
-        cursor.execute("SELECT COUNT(*) FROM risk_decisions WHERE is_overridden = 1")
-        overrides = cursor.fetchone()[0]
-
-        cursor.execute("SELECT COUNT(*) FROM risk_decisions WHERE account_mode = 'LIVE'")
-        live_events = cursor.fetchone()[0]
+        approved = _get_scalar("SELECT COUNT(*) FROM risk_decisions WHERE decision IN ('APPROVED', 'APPROVED_WITH_WARNING')")
+        blocked = _get_scalar("SELECT COUNT(*) FROM risk_decisions WHERE decision = 'BLOCKED'")
+        warnings = _get_scalar("SELECT COUNT(*) FROM risk_decisions WHERE severity = 'WARNING'")
+        critical = _get_scalar("SELECT COUNT(*) FROM risk_decisions WHERE severity = 'CRITICAL'")
+        overrides = _get_scalar("SELECT COUNT(*) FROM risk_decisions WHERE is_overridden = 1")
+        live_events = _get_scalar("SELECT COUNT(*) FROM risk_decisions WHERE account_mode = 'LIVE'")
 
         # Top blocking gates
         cursor.execute(
@@ -12189,7 +12212,8 @@ def seed_canonical_risk_decisions():
     try:
         cursor = conn.cursor()
         cursor.execute("SELECT COUNT(*) FROM risk_decisions")
-        if cursor.fetchone()[0] > 0:
+        _rd_row = cursor.fetchone()
+        if (_rd_row[0] if _rd_row else 0) > 0:
             return
     finally:
         conn.close()

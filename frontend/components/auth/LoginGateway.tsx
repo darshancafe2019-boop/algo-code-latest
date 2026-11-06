@@ -152,6 +152,13 @@ export function LoginGateway() {
     } catch {}
   }, []);
 
+  // Pre-warm Render backend on login screen mount so cold starts wake up before user submits OTP
+  useEffect(() => {
+    try {
+      fetch("/api/health/live", { cache: "no-store" }).catch(() => {});
+    } catch {}
+  }, []);
+
   // Evaluate Password Strength
   const evaluatePassword = (pwd: string): { score: number; label: string; color: string; criteria: PasswordCriteria } => {
     const criteria: PasswordCriteria = {
@@ -219,6 +226,10 @@ export function LoginGateway() {
     }
 
     setIsSubmitting(true);
+    // Eagerly pre-warm backend while user is waiting for and reading their email code
+    try {
+      fetch("/api/health/live", { cache: "no-store" }).catch(() => {});
+    } catch {}
     try {
       const res = await sendLoginOTP(target);
       if (res.success) {

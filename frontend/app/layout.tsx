@@ -94,8 +94,9 @@ export default function RootLayout({
                     }).catch(function() {});
                   }
                   // Auto-recover from stale Webpack chunk / Fast Refresh hash mismatches after server restarts or deploys
-                  function handleChunkLoadFailure(msg) {
-                    if (!msg) return;
+                  function handleChunkLoadFailure(errOrMsg) {
+                    if (!errOrMsg) return;
+                    var msg = typeof errOrMsg === 'string' ? errOrMsg : (((errOrMsg && (errOrMsg.message || errOrMsg.name)) || '') + ' ' + ((errOrMsg && errOrMsg.stack) || ''));
                     if (
                       msg.indexOf("Cannot read properties of undefined (reading 'call')") !== -1 ||
                       msg.indexOf("Loading chunk") !== -1 ||
@@ -105,19 +106,17 @@ export default function RootLayout({
                       var reloadKey = 'quantos_chunk_recover_ts';
                       var lastReload = sessionStorage.getItem(reloadKey);
                       var now = Date.now();
-                      if (!lastReload || (now - Number(lastReload)) > 10000) {
+                      if (!lastReload || (now - Number(lastReload)) > 6000) {
                         sessionStorage.setItem(reloadKey, String(now));
                         window.location.reload();
                       }
                     }
                   }
                   window.addEventListener('error', function(e) {
-                    handleChunkLoadFailure(e && e.message);
+                    handleChunkLoadFailure(e && (e.error || e.message));
                   });
                   window.addEventListener('unhandledrejection', function(e) {
-                    var reason = e && e.reason;
-                    var msg = (reason && (reason.message || reason.name)) || String(reason || '');
-                    handleChunkLoadFailure(msg);
+                    handleChunkLoadFailure(e && (e.reason || e));
                   });
                 }
               } catch (e) {}

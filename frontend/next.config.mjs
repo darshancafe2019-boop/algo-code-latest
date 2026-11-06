@@ -17,7 +17,7 @@ const nextConfig = {
     serverComponentsExternalPackages: ["ws", "bufferutil", "utf-8-validate"],
     optimizePackageImports: ["lucide-react", "@tanstack/react-query", "recharts", "date-fns"],
   },
-  webpack(config, { isServer }) {
+  webpack(config, { isServer, dev }) {
     if (!isServer) {
       config.resolve.fallback = {
         ...config.resolve.fallback,
@@ -26,6 +26,10 @@ const nextConfig = {
         tls: false,
         crypto: false,
       };
+      // Increase chunk loading timeout in dev mode to prevent ChunkLoadError timeouts during on-demand compilation
+      if (dev && config.output) {
+        config.output.chunkLoadTimeout = 60000;
+      }
     }
     return config;
   },

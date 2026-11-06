@@ -128,11 +128,11 @@ async function authenticateRequest(
       headers: {
         Accept: "application/json",
         Authorization: `Bearer ${token}`,
-        Cookie: `algo_session_token=${token}`,
+        Cookie: `algo_session_token=${token}; quantos_session_token=${token}`,
         "X-Request-Id": requestId,
       },
       cache: "no-store",
-      signal: AbortSignal.timeout(6000),
+      signal: AbortSignal.timeout(12000),
     });
 
     if (authRes.ok) {

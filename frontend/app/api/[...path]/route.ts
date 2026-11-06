@@ -150,6 +150,38 @@ async function handleProxy(req: NextRequest, ctx: { params?: { path: string[] } 
     }
   }
 
+  // ── 1.5 Special Fast-Path: Unauthenticated /api/auth/me Probes ──────────────
+  // When an unauthenticated visitor or initial browser tab loads, requests have neither
+  // session cookies nor an Authorization header. Immediately returning the unauthenticated
+  // contract prevents waiting for a sleeping/cold backend container and eliminates 504 timeouts.
+  if (subPath === "auth/me" && req.method === "GET") {
+    const hasToken = Boolean(
+      req.cookies.get("algo_session_token")?.value ||
+      req.cookies.get("quantos_session_token")?.value ||
+      req.cookies.get("session")?.value ||
+      req.headers.get("authorization")?.startsWith("Bearer ")
+    );
+
+    if (!hasToken) {
+      return NextResponse.json(
+        {
+          status: "success",
+          authenticated: false,
+          user: null,
+        },
+        {
+          status: 200,
+          headers: {
+            "X-Request-Id": requestId,
+            "X-Response-Time-Ms": "0",
+            "Content-Type": "application/json",
+            "Cache-Control": "no-store, max-age=0",
+          },
+        }
+      );
+    }
+  }
+
   // ── 2. Special Case: /api/health* Probes ────────────────────────────────────
   if (subPath.startsWith("health")) {
     if (!BACKEND_URL) {
@@ -317,22 +349,11 @@ async function handleProxy(req: NextRequest, ctx: { params?: { path: string[] } 
   const isHeavy = subPath.includes("backtest") || subPath.includes("simulate") || subPath.includes("risk/simulate");
   const isProductionEnv = isProduction();
 
-  // In cloud production (Vercel Serverless environment), bound timeouts to 13500ms
-  // so the proxy can catch the timeout and return structured JSON (GATEWAY_TIMEOUT)
-  // before Vercel terminates the function at its platform ceiling with an HTML 504.
+  // With maxDuration = 60 on Vercel, allow up to 50s for cold starts on auth & heavy endpoints,
+  // preventing premature AbortController cancellations at 13.5s while Render container boots up.
   const timeoutMs = isProductionEnv
-    ? (isStream ? 13500 : isHeavy ? 14000 : 13500)
-    : isStream
-      ? 15000
-      : isAuth
-        ? 25000
-        : isUniverse
-          ? 25000
-          : isHeavy
-            ? 30000
-            : (isStatus || isIndicator)
-              ? 10000
-              : 15000;
+    ? (isAuth ? 50000 : isHeavy ? 50000 : isUniverse ? 30000 : isStream ? 25000 : (isStatus || isIndicator) ? 15000 : 30000)
+    : (isAuth ? 30000 : isHeavy ? 45000 : isUniverse ? 30000 : isStream ? 20000 : (isStatus || isIndicator) ? 15000 : 20000);
 
   let bodyData: string | null = null;
   if (["POST", "PUT", "PATCH", "DELETE"].includes(req.method)) {

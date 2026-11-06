@@ -389,7 +389,7 @@ export function LoginGateway() {
     } finally {
       setIsSubmitting(false);
     }
-  }, [challengeId, destinationEmail, emailInput, isSubmitting, otpDigits, verifyEmailOTP]);
+  }, [challengeId, destinationEmail, emailInput, isSubmitting, otpDigits, setErrorMessage, verifyEmailOTP]);
 
   // Handle Resend OTP
   const handleResendOTP = async () => {

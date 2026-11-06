@@ -135,7 +135,7 @@ export function IndicatorBuilderView() {
             <h3 className="text-xs font-bold text-[#F8FAFC] uppercase">MATHEMATICAL AUDIT</h3>
           </div>
           <div className="p-3 rounded bg-[#06101B] border border-[#10263A] font-mono text-[10px] space-y-2 text-[#7D8EA5]">
-            <p className="text-[#00F0FF]">// Vectorized Formula Specification</p>
+            <p className="text-[#00F0FF]">{"// Vectorized Formula Specification"}</p>
             <p>alpha = 2 / ({period} + 1)</p>
             <p>series_t = alpha * {source}_t + (1 - alpha) * series_t-1</p>
             <p className="pt-2 text-[#F8FAFC]">Trigger: output &gt; {threshold} =&gt; BUY</p>

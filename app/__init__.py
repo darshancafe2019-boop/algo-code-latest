@@ -17,6 +17,7 @@ from app.blueprints.market_data import market_data_bp
 from app.blueprints.options import options_bp
 from app.blueprints.risk import risk_bp
 from app.blueprints.orders import orders_bp
+from app.blueprints.btc_options_intelligence import btc_options_intelligence_bp
 
 logger = logging.getLogger("QuantOSApp")
 
@@ -51,6 +52,7 @@ def create_app(config_name: str = None) -> Flask:
     app.register_blueprint(options_bp)
     app.register_blueprint(risk_bp)
     app.register_blueprint(orders_bp)
+    app.register_blueprint(btc_options_intelligence_bp)
 
     logger.info("QUANT.OS Application Factory initialized in [%s] mode.", config_name.upper())
     return app
